@@ -95,6 +95,12 @@ function DocumentHeader({
   const sidebarContext = useLocationSidebarContext();
   const [measureRef, size] = useMeasure();
   const isMobile = isMobileMedia || (size.width > 0 && size.width < 700);
+  // galadrim: the `isCompact` the header hands to its actions also turns on when
+  // the breadcrumb takes more than a third of the bar, which it now regularly
+  // does since it ends with the name of the document. The date of the last edit
+  // replaces the meta line that used to sit under the title, and a Notion top
+  // bar always shows it, so it only steps aside when the bar is really narrow.
+  const isNarrow = isMobileMedia || (size.width > 0 && size.width < 1000);
 
   // We cache this value for as long as the component is mounted so that if you
   // apply a template there is still the option to replace it until the user
@@ -218,7 +224,7 @@ function DocumentHeader({
           <SearchHighlightChip />
           {/* galadrim: replaces the meta line under the title, see HeaderInfo. */}
           {!isDeleted && !isRevision && (
-            <HeaderInfo document={document} isCompact={isCompact || isMobile} />
+            <HeaderInfo document={document} isCompact={isNarrow} />
           )}
           {!isDeleted && !isRevision && can.listViews && (
             <Collaborators
