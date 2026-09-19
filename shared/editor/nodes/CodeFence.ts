@@ -212,7 +212,9 @@ type CodeFenceOptions = {
 
 export default class CodeFence extends Node<CodeFenceOptions> {
   get showLineNumbers(): boolean {
-    return this.options.userPreferences?.codeBlockLineNumbers ?? true;
+    // galadrim: Notion never numbers the lines of a code block, so neither do we by default. Whoever wants them
+    // still turns them on in Settings > Preferences.
+    return this.options.userPreferences?.codeBlockLineNumbers ?? false;
   }
 
   get name() {
