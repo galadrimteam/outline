@@ -13,6 +13,10 @@ import { colorPalette } from "@shared/constants";
 import usePolicy from "~/hooks/usePolicy";
 import { observer } from "mobx-react";
 import lazyWithRetry from "~/utils/lazyWithRetry";
+import {
+  pageIconSize,
+  pageTitleStyles,
+} from "~/scenes/Document/components/pageTitle";
 
 const IconPicker = lazyWithRetry(() => import("~/components/IconPicker"));
 
@@ -46,21 +50,21 @@ export const Header = observer(function Header_({
   );
 
   const fallbackIcon = collection ? (
-    <CollectionIcon collection={collection} size={40} expanded />
+    <CollectionIcon collection={collection} size={pageIconSize} expanded />
   ) : null;
 
   const dir = isRTL(collection.name) ? "rtl" : "ltr";
 
   return (
-    <StyledHeading dir={dir}>
-      <IconTitleWrapper dir={dir}>
+    <StyledHeading dir={dir} $containsIcon>
+      <IconTitleWrapper dir={dir} $above={pageIconSize}>
         {canEdit ? (
           <Suspense fallback={fallbackIcon}>
             <IconPicker
               icon={collection.icon ?? "collection"}
               color={collection.color ?? (first(colorPalette) as string)}
               initial={collection.initial}
-              size={40}
+              size={pageIconSize}
               popoverPosition="bottom-start"
               onChange={handleIconChange}
               borderOnHover
@@ -86,7 +90,7 @@ export const Header = observer(function Header_({
   );
 });
 
-const StyledHeading = styled(Heading)`
+const StyledHeading = styled(Heading)<{ $containsIcon: boolean }>`
   display: flex;
   align-items: center;
   position: relative;
@@ -95,4 +99,8 @@ const StyledHeading = styled(Heading)`
   ${breakpoint("tablet")`
     margin-left: 0;
   `}
+
+  // galadrim: same title block as a document (big icon above the title, same
+  // typography and position), a collection is a page like any other in Notion.
+  ${pageTitleStyles}
 `;

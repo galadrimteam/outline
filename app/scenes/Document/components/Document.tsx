@@ -508,7 +508,9 @@ type ContentsContainerProps = {
 
 const ContentsContainer = styled.div<ContentsContainerProps>`
   ${breakpoint("tablet")`
-    margin-top: calc(44px + 6vh);
+    // galadrim: the title has a fixed top margin (see DocumentTitle), upstream
+    // follows its 6vh with calc(44px + 6vh).
+    margin-top: 140px;
 
     grid-row: 1;
     grid-column: ${({ docFullWidth, position }: ContentsContainerProps) =>

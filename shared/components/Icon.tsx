@@ -1,6 +1,6 @@
 import { observer } from "mobx-react";
 import { getLuminance } from "polished";
-import styled from "styled-components";
+import styled, { css } from "styled-components";
 import breakpoint from "styled-components-breakpoint";
 import useStores from "../hooks/useStores";
 import { IconType } from "../types";
@@ -110,7 +110,20 @@ const SVGIcon = observer(
   }
 );
 
-export const IconTitleWrapper = styled(Flex)<{ dir?: string }>`
+type IconTitleWrapperProps = {
+  dir?: string;
+  /**
+   * galadrim: when set, the icon is a square of this many px placed above the
+   * title and aligned with its start at every breakpoint, like the icon of a
+   * Notion page. When unset the upstream placement applies (40px, in the gutter
+   * beside the title from the tablet breakpoint up).
+   */
+  $above?: number;
+  /** galadrim: gap in px between an `$above` icon and the title, default 40. */
+  $gap?: number;
+};
+
+export const IconTitleWrapper = styled(Flex)<IconTitleWrapperProps>`
   align-items: center;
   justify-content: center;
   position: absolute;
@@ -123,9 +136,30 @@ export const IconTitleWrapper = styled(Flex)<{ dir?: string }>`
 
   ${breakpoint("tablet")`
     top: 3px;
-    ${(props: { dir?: string }) =>
+    ${(props: IconTitleWrapperProps) =>
       props.dir === "rtl" ? "right: -44px" : "left: -44px"};
   `}
+
+  // galadrim: the doubled class is required. The CSS preprocessor moves the
+  // media query above after every plain declaration of this rule, so that at
+  // equal specificity its "top" and "left" would win from the tablet
+  // breakpoint up whatever the order here.
+  ${(props) =>
+    props.$above
+      ? css`
+          && {
+            top: auto;
+            bottom: calc(100% + ${props.$gap ?? 40}px);
+            height: ${props.$above}px;
+            width: ${props.$above}px;
+            ${
+              props.dir === "rtl"
+                ? "right: 0; left: auto;"
+                : "left: 0; right: auto;"
+            }
+          }
+        `
+      : ""}
 `;
 
 const Span = styled(Flex)<{ size: number }>`

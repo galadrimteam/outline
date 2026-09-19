@@ -65,8 +65,11 @@ const buildBaseTheme = (input: Partial<Colors>) => {
   };
 
   return {
+    // galadrim: Notion's font stack order, the system UI font comes before the
+    // Inter webfont so that Windows renders Segoe UI as Notion does (upstream:
+    // "-apple-system, BlinkMacSystemFont, Inter, 'Segoe UI', ...").
     fontFamily:
-      "-apple-system, BlinkMacSystemFont, Inter, 'Segoe UI', Roboto, Oxygen, sans-serif",
+      "ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Display', 'Segoe UI', Inter, Helvetica, Roboto, Oxygen, Arial, sans-serif",
     fontFamilyMono:
       "'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace",
     fontFamilyEmoji:
@@ -129,7 +132,8 @@ export const buildLightTheme = (input: Partial<Colors>): DefaultTheme => {
     backgroundQuaternary: darken(0.05, "#d7e0ea"),
     link: colors.accent,
     cursor: colors.almostBlack,
-    text: colors.almostBlack,
+    // galadrim: Notion's text colour, rgb(44, 44, 43) (upstream: almostBlack).
+    text: "#2c2c2b",
     textSecondary: colors.slateDark,
     textTertiary: colors.slate,
     textDiffInserted: colors.almostBlack,
@@ -137,12 +141,15 @@ export const buildLightTheme = (input: Partial<Colors>): DefaultTheme => {
     textDiffDeleted: colors.slateDark,
     textDiffDeletedBackground: "rgba(255, 180, 173, 0.25)",
     placeholder: "#a2b2c3",
-    sidebarBackground: "hsl(212 31% 95% / 1)",
-    sidebarHoverBackground: "hsl(212 31% 90% / 1)",
-    sidebarActiveBackground: "hsl(212 31% 85% / 1)",
-    sidebarControlHoverBackground: "rgb(138 164 193 / 20%)",
+    // galadrim: Notion's warm greys instead of upstream's blue greys, sampled
+    // from a Notion screenshot: sidebar #f9f8f7, selected row #eeeceb, row
+    // label #5f5e59 (upstream: hsl(212 31% 95%), 90%, 85% and rgb(78, 92, 110)).
+    sidebarBackground: "#f9f8f7",
+    sidebarHoverBackground: "#eeeceb",
+    sidebarActiveBackground: "#eeeceb",
+    sidebarControlHoverBackground: "rgba(55, 53, 47, 0.08)",
     sidebarDraftBorder: "hsl(212 31% 75% / 1)",
-    sidebarText: "rgb(78, 92, 110)",
+    sidebarText: "#5f5e59",
     backdrop: "rgba(0, 0, 0, 0.2)",
     shadow: "rgba(0, 0, 0, 0.2)",
 

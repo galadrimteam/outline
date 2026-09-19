@@ -38,6 +38,7 @@ import type Revision from "~/models/Revision";
 import type Template from "~/models/Template";
 import { documentEditPath } from "~/utils/routeHelpers";
 import { ChangesNavigation } from "./ChangesNavigation";
+import HeaderInfo from "./HeaderInfo";
 import ObservingBanner from "./ObservingBanner";
 import { SearchHighlightChip } from "./SearchHighlightChip";
 import ShareButton from "./ShareButton";
@@ -205,6 +206,10 @@ function DocumentHeader({
         <>
           <ObservingBanner />
           <SearchHighlightChip />
+          {/* galadrim: replaces the meta line under the title, see HeaderInfo. */}
+          {!isDeleted && !isRevision && (
+            <HeaderInfo document={document} isCompact={isCompact || isMobile} />
+          )}
           {!isDeleted && !isRevision && can.listViews && (
             <Collaborators
               document={document}

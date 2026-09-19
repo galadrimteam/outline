@@ -27,6 +27,11 @@ import useBoolean from "~/hooks/useBoolean";
 import usePolicy from "~/hooks/usePolicy";
 import { useTranslation } from "react-i18next";
 import lazyWithRetry from "~/utils/lazyWithRetry";
+import {
+  pageIconPlaceholderSize,
+  pageIconSize,
+  pageTitleStyles,
+} from "./pageTitle";
 
 const IconPicker = lazyWithRetry(() => import("~/components/IconPicker"));
 
@@ -231,8 +236,11 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
   const dir = ref.current?.getComputedDirection();
   const initial = title.charAt(0).toUpperCase();
   const fallbackIcon = icon ? (
-    <Icon value={icon} initial={initial} color={color} size={40} />
+    <Icon value={icon} initial={initial} color={color} size={pageIconSize} />
   ) : null;
+  // galadrim: without an icon the picker is only a small "add icon" button that
+  // appears just above the title on hover, where Notion shows its "Add icon".
+  const pickerSize = icon ? pageIconSize : pageIconPlaceholderSize;
 
   return (
     <Title
@@ -253,13 +261,17 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
       ref={mergeRefs([ref, externalRef])}
     >
       {can.update && !readOnly ? (
-        <IconTitleWrapper dir={dir}>
+        <IconTitleWrapper
+          dir={dir}
+          $above={pickerSize}
+          $gap={icon ? undefined : 4}
+        >
           <React.Suspense fallback={fallbackIcon}>
             <StyledIconPicker
               icon={icon ?? null}
               color={color}
               initial={initial}
-              size={40}
+              size={pickerSize}
               popoverPosition="bottom-start"
               onChange={handleIconChange}
               onOpen={handleOpen}
@@ -270,7 +282,7 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
           </React.Suspense>
         </IconTitleWrapper>
       ) : icon ? (
-        <IconTitleWrapper dir={dir} aria-hidden>
+        <IconTitleWrapper dir={dir} $above={pageIconSize} aria-hidden>
           {fallbackIcon}
         </IconTitleWrapper>
       ) : null}
@@ -345,6 +357,10 @@ const Title = styled(ContentEditable)<TitleProps>`
     -webkit-text-fill-color: ${light.text};
     background: none;
   }
+
+  // galadrim: title typography and position of a Notion page, declared last so
+  // that it wins over the upstream values above.
+  ${pageTitleStyles}
 `;
 
 export default observer(DocumentTitle);

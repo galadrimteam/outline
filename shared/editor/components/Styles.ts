@@ -527,9 +527,10 @@ const textStyle = () => css`
 
 const style = (props: Props) => css`
 --font-size-p: var(--font-size-body);
---font-size-h1: 28px;
---font-size-h2: 22px;
---font-size-h3: 18px;
+/* galadrim: heading sizes of Notion (upstream: 28px, 22px, 18px). */
+--font-size-h1: 30px;
+--font-size-h2: 24px;
+--font-size-h3: 20px;
 --font-size-h4: 16px;
 --font-size-h5: 15px;
 --font-size-h6: 15px;
@@ -726,6 +727,29 @@ width: 100%;
   h4 { font-size: var(--font-size-h4); }
   h5 { font-size: var(--font-size-h5); }
   h6 { font-size: var(--font-size-h6); }
+
+  /* galadrim: vertical rhythm of Notion, measured with getBoundingClientRect on
+     app.notion.com (2026-09-19, 17 pages, same values everywhere). Distances
+     are between line boxes, Notion pads its blocks where we collapse margins:
+       body text  16px / 24px                  (same upstream)
+       h1         30px / 600 / line-height 1.3, 40px above, 16px below
+       h2         24px / 600 / line-height 1.3, 36px above, 16px below
+       h3         20px / 600 / line-height 1.3, 32px above, 16px below
+       paragraph  16px from the previous paragraph (upstream: 8px)
+     Upstream: line-height 1.5, 1em above and 0.25em below every heading. */
+  h1,
+  h2,
+  h3 {
+    line-height: 1.3;
+    margin-bottom: 16px;
+  }
+  h1 { margin-top: 40px; }
+  h2 { margin-top: 36px; }
+  h3 { margin-top: 32px; }
+
+  & > p + p {
+    margin-top: 1em;
+  }
 
   [data-heading-prefix]::before {
     content: attr(data-heading-prefix);

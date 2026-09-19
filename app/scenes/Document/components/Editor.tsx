@@ -2,7 +2,7 @@ import { observer } from "mobx-react";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { mergeRefs } from "react-merge-refs";
-import { useLocation, useRouteMatch } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import styled from "styled-components";
 import Text from "@shared/components/Text";
 import type { CommentAnchor } from "@shared/editor/commands/comment";
@@ -26,18 +26,11 @@ import { withUIExtensions } from "~/editor/extensions";
 import useCurrentTeam from "~/hooks/useCurrentTeam";
 import useCurrentUser from "~/hooks/useCurrentUser";
 import { useFocusedComment } from "~/hooks/useFocusedComment";
-import { useLocationSidebarContext } from "~/hooks/useLocationSidebarContext";
 import usePolicy from "~/hooks/usePolicy";
 import useQuery from "~/hooks/useQuery";
 import useStores from "~/hooks/useStores";
-import {
-  documentHistoryPath,
-  documentPath,
-  matchDocumentHistory,
-} from "~/utils/routeHelpers";
 import { decodeURIComponentSafe } from "~/utils/urls";
 import MultiplayerEditor from "./AsyncMultiplayerEditor";
-import DocumentMeta from "./DocumentMeta";
 import DocumentTitle from "./DocumentTitle";
 import { first } from "es-toolkit/compat";
 import useShare from "@shared/hooks/useShare";
@@ -71,7 +64,6 @@ function DocumentEditor(props: Props, ref: React.ForwardedRef<SharedEditor>) {
   const editorRef = React.useRef<SharedEditor>(null);
   const titleRef = React.useRef<RefHandle>(null);
   const { t } = useTranslation();
-  const match = useRouteMatch();
   const location = useLocation();
   const { setFocusedCommentId } = useDocumentContext();
   const focusedComment = useFocusedComment();
@@ -79,7 +71,6 @@ function DocumentEditor(props: Props, ref: React.ForwardedRef<SharedEditor>) {
   const { pane } = useSplitView();
   const user = useCurrentUser({ rejectOnEmpty: false });
   const team = useCurrentTeam({ rejectOnEmpty: false });
-  const sidebarContext = useLocationSidebarContext();
   const params = useQuery();
   const { shareId, showLastUpdated } = useShare();
   const {
@@ -216,8 +207,6 @@ function DocumentEditor(props: Props, ref: React.ForwardedRef<SharedEditor>) {
     [setEditorInitialized]
   );
 
-  const direction = titleRef.current?.getComputedDirection();
-
   return (
     <Flex auto column>
       <DocumentTitle
@@ -237,24 +226,14 @@ function DocumentEditor(props: Props, ref: React.ForwardedRef<SharedEditor>) {
         onBlur={handleBlur}
         placeholder={t("Untitled")}
       />
-      {shareId ? (
-        showLastUpdated && document.updatedAt ? (
-          <SharedMeta type="tertiary">
-            {t("Last updated")} <Time dateTime={document.updatedAt} addSuffix />
-          </SharedMeta>
-        ) : null
-      ) : !rest.template ? (
-        <DocumentMeta
-          document={document as Document}
-          to={{
-            pathname:
-              match.path === matchDocumentHistory
-                ? documentPath(document as Document)
-                : documentHistoryPath(document as Document),
-            state: { sidebarContext },
-          }}
-          rtl={direction === "rtl"}
-        />
+      {/* galadrim: no meta line under the title (last update, task count,
+          "Comment", "Viewed by"), a Notion page has nothing there. The header
+          shows when the document was edited and links to its history, comments
+          and insights stay in the document menu. */}
+      {shareId && showLastUpdated && document.updatedAt ? (
+        <SharedMeta type="tertiary">
+          {t("Last updated")} <Time dateTime={document.updatedAt} addSuffix />
+        </SharedMeta>
       ) : null}
       {/* The editor core loads lazily and can suspend after the title and
           meta above have mounted. A nested boundary prevents that suspension
