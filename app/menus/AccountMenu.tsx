@@ -8,11 +8,6 @@ import {
   navigateToProfileSettings,
   navigateToAccountPreferences,
   openKeyboardShortcuts,
-  openChangelog,
-  openDocumentation,
-  openAPIDocumentation,
-  openBugReportUrl,
-  openFeedbackUrl,
   logout,
 } from "~/actions/definitions/navigation";
 import { changeTheme } from "~/actions/definitions/settings";
@@ -30,13 +25,9 @@ const AccountMenu: React.FC<Props> = ({ children }: Props) => {
 
   const actions = React.useMemo(
     () => [
+      // galadrim: the links to the vendor's documentation, API reference,
+      // changelog, feedback and bug report forms are left to the command bar.
       openKeyboardShortcuts,
-      openDocumentation,
-      openAPIDocumentation,
-      ActionSeparator,
-      openChangelog,
-      openFeedbackUrl,
-      openBugReportUrl,
       ActionSeparator,
       // galadrim: entries that Notion's sidebar lacks live here instead. Each
       // action hides itself from users who are not allowed to perform it.

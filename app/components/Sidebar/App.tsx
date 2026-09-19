@@ -1,3 +1,4 @@
+import { useKBar } from "kbar";
 import { observer } from "mobx-react";
 import { SearchIcon, HomeIcon, SidebarIcon } from "outline-icons";
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -6,7 +7,6 @@ import {
   SidebarScrollProvider,
 } from "./components/DragActiveContext";
 import { useTranslation } from "react-i18next";
-import { useHistory } from "react-router-dom";
 import styled from "styled-components";
 import { SidebarSection, UserPreference } from "@shared/types";
 import { metaDisplay } from "@shared/utils/keyboard";
@@ -19,7 +19,7 @@ import usePolicy from "~/hooks/usePolicy";
 import useStores from "~/hooks/useStores";
 import TeamMenu from "~/menus/TeamMenu";
 import * as Scenes from "~/routes/scenes";
-import { homePath, searchPath } from "~/utils/routeHelpers";
+import { homePath } from "~/utils/routeHelpers";
 import TeamLogo from "../TeamLogo";
 import Tooltip from "../Tooltip";
 import Sidebar from "./Sidebar";
@@ -48,16 +48,15 @@ function AppSidebar() {
   const team = useCurrentTeam();
   const user = useCurrentUser();
   const can = usePolicy(team);
-  const history = useHistory();
   const isMobile = useMobile();
 
+  // galadrim: like Notion's quick find, search opens over the current page
+  // (the command bar: recent documents, then instant title matches) instead of
+  // replacing it. The full search page is one "Search documents for…" away.
+  const { query: commandBar } = useKBar();
   const handleSearchClick = useCallback(() => {
-    const basePath = searchPath();
-    const { pathname, search } = history.location;
-    if (pathname.startsWith(basePath) && (search || pathname !== basePath)) {
-      history.push(basePath);
-    }
-  }, [history]);
+    commandBar.toggle();
+  }, [commandBar]);
 
   useEffect(() => {
     void collections.fetchAll();
@@ -133,10 +132,8 @@ function AppSidebar() {
           <Section>
             {/* galadrim: search comes first, as in Notion. */}
             <SidebarLink
-              to={searchPath()}
               icon={<SearchIcon />}
               label={t("Search")}
-              exact={false}
               onClick={handleSearchClick}
               onClickIntent={Scenes.Search.preload}
             />
