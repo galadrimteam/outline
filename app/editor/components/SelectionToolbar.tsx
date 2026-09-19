@@ -78,6 +78,16 @@ export function SelectionToolbar(props: Props) {
   // visible for as long as the editor is being edited rather than only while
   // there is a selection.
   const isMobileEditing = isMobile && !readOnly && isEditorFocused;
+
+  // galadrim: whether the editor has had the focus since it was mounted. The
+  // selection of a freshly loaded document sits at its start, so a page that
+  // begins with a notice or a code block displayed the block toolbar (notice
+  // type, language) before anyone had clicked anywhere. The current focus state
+  // cannot be used for this: opening a menu of the toolbar blurs the editor.
+  const hasBeenFocused = React.useRef(false);
+  if (isEditorFocused) {
+    hasBeenFocused.current = true;
+  }
   const { state } = view;
   const [autoFocusLinkInput, setAutoFocusLinkInput] = React.useState(false);
   const isDragging = useIsDragging(state);
@@ -292,6 +302,12 @@ export function SelectionToolbar(props: Props) {
     activeToolbar === Toolbar.Menu &&
     items.length
   ) {
+    // galadrim: see hasBeenFocused. Read-only documents are left alone: they
+    // never take the focus, and the toolbar of their code blocks holds the copy
+    // button.
+    if (!readOnly && !hasBeenFocused.current) {
+      return null;
+    }
     return <StickyBlockToolbar ref={menuRef} items={items} rtl={rtl} />;
   }
 

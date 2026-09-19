@@ -9,10 +9,8 @@ import { Tab, Tabs } from "~/components/Tabs";
 import useCurrentUser from "~/hooks/useCurrentUser";
 import { useLocationSidebarContext } from "~/hooks/useLocationSidebarContext";
 import useStores from "~/hooks/useStores";
-import usePolicy from "~/hooks/usePolicy";
-import ReferenceListItem, {
-  NewChildReferenceListItem,
-} from "./ReferenceListItem";
+import ReferenceListItem from "./ReferenceListItem";
+import { getLinkedDocumentKeys, isLinkedDocument } from "./linkedDocuments";
 import useShare from "@shared/hooks/useShare";
 import type { NavigationNode } from "@shared/types";
 import { flattenTree } from "@shared/utils/tree";
@@ -41,20 +39,31 @@ function References({ document }: Props) {
     }
   }, [isShare, documents, document.id, isJustCreated]);
 
-  const children = useChildren(document, sharedTree);
-  const backlinks = useBacklinks(document, sharedTree);
-  const can = usePolicy(document);
+  const allChildren = useChildren(document, sharedTree);
+  const allBacklinks = useBacklinks(document, sharedTree);
+
+  // galadrim: a Notion page lists its sub-pages where its body links to them
+  // and nowhere else, and does not count its parent among its backlinks. So the
+  // children that the body already links to (all of them for an imported page)
+  // are not repeated here, nor are the ancestors among the backlinks, and the
+  // "New doc" row is gone. Children the body does not link to stay listed.
+  const linkedKeys = useMemo(
+    () => getLinkedDocumentKeys(document.data),
+    [document.data]
+  );
+  const children = allChildren.filter(
+    (node) => !isLinkedDocument(linkedKeys, node)
+  );
+  const ancestorIds = document.pathTo.map((node) => node.id);
+  const backlinks = allBacklinks.filter(
+    (node) => !ancestorIds.includes(node.id)
+  );
+
   const showBacklinks = !!backlinks.length;
   const showChildDocuments = !!children.length;
-  const showNewChildDocument =
-    showChildDocuments && !isShare && !!can.createChildDocument;
   const shouldFade = useRef(!showBacklinks && !showChildDocuments);
   const isBacklinksTab = activeTab === "backlinks" || !showChildDocuments;
-  const height =
-    Math.max(
-      backlinks.length,
-      children.length + (showNewChildDocument ? 1 : 0)
-    ) * 40;
+  const height = Math.max(backlinks.length, children.length) * 40;
   const Component = shouldFade.current ? Fade : Fragment;
 
   return showBacklinks || showChildDocuments ? (
@@ -121,12 +130,6 @@ function References({ document }: Props) {
                 />
               );
             })}
-            {showNewChildDocument && (
-              <NewChildReferenceListItem
-                parentDocumentId={document.id}
-                sidebarContext={locationSidebarContext}
-              />
-            )}
           </List>
         )}
       </Content>
