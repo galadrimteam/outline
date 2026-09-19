@@ -3,8 +3,17 @@ import type Token from "markdown-it/lib/token.mjs";
 
 const CHECKBOX_REGEX = /\[(X|\s|_|-)\]\s(.*)?/i;
 
+// galadrim: a to-do without a label yet ("- [ ]", frequent in Notion exports and
+// what the serializer writes for an empty checkbox item once the trailing space
+// is trimmed) is a checkbox too, it used to become a bullet showing "[ ]".
+const EMPTY_CHECKBOX_REGEX = /^\[(X|\s|_|-)\]$/i;
+
 function matches(token: Token) {
-  return token && token.content.match(CHECKBOX_REGEX);
+  return (
+    token &&
+    (token.content.match(CHECKBOX_REGEX) ||
+      token.content.match(EMPTY_CHECKBOX_REGEX))
+  );
 }
 
 function isInline(token: Token): boolean {
@@ -66,6 +75,14 @@ export default function markdownItCheckbox(md: MarkdownIt): void {
   md.core.ruler.after("inline", "checkboxes", (state) => {
     const tokens = state.tokens;
 
+    // galadrim: list tokens already converted by this rule. The search for the
+    // enclosing list must STOP at them: the list of a second checkbox item was
+    // converted by the first one, and searching past it retyped the previous
+    // (or next) plain bullet / numbered list of the same level into a checkbox
+    // list. Tokens made by the tables rule are not in this set (their level is
+    // not meaningful) and are still skipped.
+    const converted = new Set<Token>();
+
     // work backwards through the tokens and find text that looks like a checkbox
     for (let i = tokens.length - 1; i > 0; i--) {
       const matchesChecklist = looksLikeChecklist(tokens, i);
@@ -77,14 +94,28 @@ export default function markdownItCheckbox(md: MarkdownIt): void {
         // the checkbox item is preceded by plain items or contains nested lists.
         const listLevel = tokens[i - 2].level - 1;
         for (let k = i - 3; k >= 0; k--) {
-          if (tokens[k].level === listLevel && isListOpen(tokens[k])) {
+          if (tokens[k].level !== listLevel) {
+            continue;
+          }
+          if (converted.has(tokens[k])) {
+            break;
+          }
+          if (isListOpen(tokens[k])) {
             tokens[k].type = "checkbox_list_open";
+            converted.add(tokens[k]);
             break;
           }
         }
         for (let k = i + 1; k < tokens.length; k++) {
-          if (tokens[k].level === listLevel && isListClose(tokens[k])) {
+          if (tokens[k].level !== listLevel) {
+            continue;
+          }
+          if (converted.has(tokens[k])) {
+            break;
+          }
+          if (isListClose(tokens[k])) {
             tokens[k].type = "checkbox_list_close";
+            converted.add(tokens[k]);
             break;
           }
         }
@@ -93,10 +124,12 @@ export default function markdownItCheckbox(md: MarkdownIt): void {
         // child for escaped characters to be unescaped correctly.
         const tokenChildren = tokens[i].children;
         if (tokenChildren && tokenChildren[0].type === "text") {
-          const contentMatches = tokenChildren[0].content.match(CHECKBOX_REGEX);
+          const contentMatches =
+            tokenChildren[0].content.match(CHECKBOX_REGEX) ||
+            tokenChildren[0].content.match(EMPTY_CHECKBOX_REGEX);
 
           if (contentMatches) {
-            const label = contentMatches[2];
+            const label = contentMatches[2] ?? "";
 
             tokens[i].content = label;
             tokenChildren[0].content = label;
