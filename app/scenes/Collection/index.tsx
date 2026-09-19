@@ -3,8 +3,6 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
   useParams,
-  Switch,
-  Route,
   useHistory,
   useRouteMatch,
   useLocation,
@@ -35,7 +33,6 @@ import usePolicy from "~/hooks/usePolicy";
 import useStores from "~/hooks/useStores";
 import { NotFoundError } from "~/utils/errors";
 import {
-  collectionEditPath,
   collectionPath,
   matchCollectionEdit,
   updateCollectionPath,
@@ -45,17 +42,14 @@ import Actions from "./components/Actions";
 import DropToImport from "./components/DropToImport";
 import Empty from "./components/Empty";
 import MembershipPreview from "./components/MembershipPreview";
-import Navigation, { CollectionTab } from "./components/Navigation";
 import Notices from "./components/Notices";
 import Overview from "./components/Overview";
-import { CollectionMeta } from "./components/CollectionMeta";
 import { Header } from "./components/Header";
-import usePersistedState from "~/hooks/usePersistedState";
 import useCurrentUser from "~/hooks/useCurrentUser";
 import { ProsemirrorDataHelper } from "@shared/utils/ProsemirrorDataHelper";
 
 const CollectionScene = observer(function CollectionScene_() {
-  const params = useParams<{ collectionSlug?: string }>();
+  const params = useParams<{ collectionSlug?: string; tab?: string }>();
   const history = useHistory();
   const match = useRouteMatch();
   const location = useLocation();
@@ -78,14 +72,6 @@ const CollectionScene = observer(function CollectionScene_() {
     : false;
 
   const { pins, count } = usePinnedDocuments(urlId, collection?.id);
-
-  const [collectionTab, setCollectionTab] = usePersistedState<CollectionTab>(
-    `collection-tab:${collection?.id}`,
-    hasDescription ? CollectionTab.Overview : CollectionTab.Recent,
-    {
-      listen: false,
-    }
-  );
 
   useEffect(() => {
     if (collection?.name) {
@@ -140,7 +126,12 @@ const CollectionScene = observer(function CollectionScene_() {
     return <Loading />;
   }
 
-  const showOverview = can.update || hasDescription;
+  const readOnly = !can.update || (!isEditRoute && !!user?.separateEditMode);
+
+  // An empty overview is only rendered for those that can currently type in it,
+  // readers go straight to the list of documents.
+  const showOverview = hasDescription || !readOnly;
+  const isLegacyTabRoute = !!params.tab && !isEditRoute;
 
   return (
     <Scene
@@ -186,7 +177,6 @@ const CollectionScene = observer(function CollectionScene_() {
             collection={collection}
             isEditing={isEditRoute || !user?.separateEditMode}
           />
-          <CollectionMeta collection={collection} />
 
           <PinnedDocuments
             pins={pins}
@@ -195,150 +185,27 @@ const CollectionScene = observer(function CollectionScene_() {
           />
 
           <Content>
-            <Navigation
+            {/* The collection used to be split into tabs, links to them now
+                lead to the single collection page. */}
+            {isLegacyTabRoute && (
+              <Redirect
+                to={{
+                  pathname: collectionPath(collection),
+                  search: location.search,
+                  hash: location.hash,
+                  state: location.state ?? { sidebarContext },
+                }}
+              />
+            )}
+            {showOverview && (
+              <OverviewContainer>
+                <Overview collection={collection} readOnly={readOnly} compact />
+              </OverviewContainer>
+            )}
+            <CollectionDocuments
               collection={collection}
-              onChangeTab={setCollectionTab}
-              showOverview={showOverview}
-              sidebarContext={sidebarContext}
+              documents={documents}
             />
-            <Switch>
-              <Route path={collectionPath(collection)} exact>
-                <Redirect
-                  to={{
-                    pathname: collectionPath(collection!, collectionTab),
-                    state: { sidebarContext },
-                  }}
-                />
-              </Route>
-              <Route
-                path={[
-                  collectionPath(collection, CollectionTab.Overview),
-                  collectionEditPath(collection),
-                ]}
-              >
-                {showOverview ? (
-                  <Overview
-                    collection={collection}
-                    readOnly={
-                      !can.update || (!isEditRoute && !!user?.separateEditMode)
-                    }
-                  />
-                ) : (
-                  <Redirect
-                    to={{
-                      pathname: collectionPath(
-                        collection,
-                        CollectionTab.Recent
-                      ),
-                      state: { sidebarContext },
-                    }}
-                  />
-                )}
-              </Route>
-              {collection.isEmpty ? (
-                <Empty collection={collection} />
-              ) : !collection.isArchived ? (
-                <>
-                  <Route
-                    path={collectionPath(
-                      collection,
-                      CollectionTab.Alphabetical
-                    )}
-                  >
-                    <PaginatedDocumentList
-                      key="alphabetical"
-                      documents={documents.alphabeticalInCollection(
-                        collection.id
-                      )}
-                      fetch={documents.fetchAlphabetical}
-                      options={{
-                        collectionId: collection.id,
-                      }}
-                    />
-                  </Route>
-                  <Route path={collectionPath(collection, CollectionTab.Old)}>
-                    <PaginatedDocumentList
-                      key="old"
-                      documents={documents.leastRecentlyUpdatedInCollection(
-                        collection.id
-                      )}
-                      fetch={documents.fetchLeastRecentlyUpdated}
-                      options={{
-                        collectionId: collection.id,
-                      }}
-                    />
-                  </Route>
-                  <Route
-                    path={collectionPath(collection, CollectionTab.Published)}
-                  >
-                    <PaginatedDocumentList
-                      key="published"
-                      documents={documents.recentlyPublishedInCollection(
-                        collection.id
-                      )}
-                      fetch={documents.fetchRecentlyPublished}
-                      options={{
-                        collectionId: collection.id,
-                      }}
-                      showPublished
-                    />
-                  </Route>
-                  <Route
-                    path={collectionPath(collection, CollectionTab.Updated)}
-                  >
-                    <PaginatedDocumentList
-                      key="updated"
-                      documents={documents.recentlyUpdatedInCollection(
-                        collection.id
-                      )}
-                      fetch={documents.fetchRecentlyUpdated}
-                      options={{
-                        collectionId: collection.id,
-                      }}
-                    />
-                  </Route>
-                  <Route
-                    path={collectionPath(collection, CollectionTab.Popular)}
-                  >
-                    <PaginatedDocumentList
-                      key="popular"
-                      documents={documents.popularInCollection(collection.id)}
-                      fetch={documents.fetchPopular}
-                      options={{
-                        collectionId: collection.id,
-                      }}
-                    />
-                  </Route>
-                  <Route
-                    path={collectionPath(collection, CollectionTab.Recent)}
-                    exact
-                  >
-                    <RecentDocuments
-                      collection={collection}
-                      documents={documents}
-                    />
-                  </Route>
-                </>
-              ) : (
-                <Route
-                  path={collectionPath(collection, CollectionTab.Recent)}
-                  exact
-                >
-                  <PaginatedDocumentList
-                    documents={documents.archivedInCollection(collection.id)}
-                    fetch={documents.fetchPage}
-                    options={{
-                      collectionId: collection.id,
-                      parentDocumentId: null,
-                      sort: collection.sort.field,
-                      direction: collection.sort.direction,
-                      statusFilter: [StatusFilter.Archived],
-                    }}
-                    showParentDocuments
-                  />
-                </Route>
-              )}
-            </Switch>
           </Content>
         </CenteredContent>
       </DropToImport>
@@ -368,7 +235,11 @@ const Content = styled.div`
   background: ${s("background")};
 `;
 
-const RecentDocuments = observer(
+const OverviewContainer = styled.div`
+  margin-bottom: 24px;
+`;
+
+const CollectionDocuments = observer(
   ({
     collection,
     documents,
@@ -376,9 +247,32 @@ const RecentDocuments = observer(
     collection: Collection;
     documents: DocumentsStore;
   }) => {
+    // The document structure is cached on the collection once loaded, so this
+    // is a no-op when the sidebar has already requested it.
     useEffect(() => {
       void collection.fetchDocuments();
     }, [collection]);
+
+    if (collection.isEmpty) {
+      return <Empty collection={collection} />;
+    }
+
+    if (collection.isArchived) {
+      return (
+        <PaginatedDocumentList
+          documents={documents.archivedInCollection(collection.id)}
+          fetch={documents.fetchPage}
+          options={{
+            collectionId: collection.id,
+            parentDocumentId: null,
+            sort: collection.sort.field,
+            direction: collection.sort.direction,
+            statusFilter: [StatusFilter.Archived],
+          }}
+          showParentDocuments
+        />
+      );
+    }
 
     return (
       <PaginatedDocumentList

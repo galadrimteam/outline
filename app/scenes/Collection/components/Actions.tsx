@@ -15,7 +15,6 @@ import {
 } from "~/utils/routeHelpers";
 import useCurrentUser from "~/hooks/useCurrentUser";
 import type { SidebarContextType } from "~/components/Sidebar/components/SidebarContext";
-import { CollectionTab } from "./Navigation";
 import lazyWithRetry from "~/utils/lazyWithRetry";
 import history from "~/utils/history";
 import RegisterKeyDown from "~/components/RegisterKeyDown";
@@ -46,7 +45,7 @@ function Actions({ collection, isEditing, sidebarContext }: Props) {
 
   const goBack = useCallback(() => {
     history.push({
-      pathname: collectionPath(collection, CollectionTab.Overview),
+      pathname: collectionPath(collection),
       state: { sidebarContext },
     });
   }, [collection, sidebarContext]);

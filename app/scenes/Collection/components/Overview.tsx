@@ -24,11 +24,18 @@ import CodeWordBreak from "@shared/editor/extensions/CodeWordBreak";
 const extensions = [CodeWordBreak, ...withUIExtensions(richExtensions)];
 
 type Props = {
+  /** The collection to render the overview of. */
   collection: Collection;
+  /** Whether the overview can be edited. */
   readOnly?: boolean;
+  /**
+   * Whether more content is rendered beneath the overview, in which case the
+   * editor does not reserve empty space below its content.
+   */
+  compact?: boolean;
 };
 
-function Overview({ collection, readOnly }: Props) {
+function Overview({ collection, readOnly, compact }: Props) {
   const { documents, collections } = useStores();
   const { t } = useTranslation();
   const user = useCurrentUser({ rejectOnEmpty: false });
@@ -62,9 +69,11 @@ function Overview({ collection, readOnly }: Props) {
     () => ({
       padding: "0 32px",
       margin: "0 -32px",
-      paddingBottom: `calc(30vh - ${childOffsetHeight}px)`,
+      paddingBottom: compact
+        ? undefined
+        : `calc(30vh - ${childOffsetHeight}px)`,
     }),
-    [childOffsetHeight]
+    [childOffsetHeight, compact]
   );
 
   const onCreateLink = useCallback(
