@@ -19,7 +19,12 @@ const Embed = (props: Props) => {
   const ref = React.useRef<HTMLDivElement>(null);
   const { node, isEditable, embedsDisabled, onChangeSize } = props;
   const naturalWidth = 0;
-  const naturalHeight = 400;
+  const naturalHeight = React.useMemo(
+    () =>
+      getMatchingEmbed(props.embeds, node.attrs.href)?.embed.defaultHeight ??
+      400,
+    [props.embeds, node.attrs.href]
+  );
   const isResizable = !!onChangeSize && !embedsDisabled;
 
   const { width, height, handlePointerDown, dragging } = useDragResize({
@@ -33,7 +38,7 @@ const Embed = (props: Props) => {
 
   const style: React.CSSProperties = {
     width: width || "100%",
-    height: height || 400,
+    height: height || naturalHeight,
     maxWidth: "100%",
     pointerEvents: dragging ? "none" : "all",
   };

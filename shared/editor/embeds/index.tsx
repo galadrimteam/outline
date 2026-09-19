@@ -1,4 +1,4 @@
-import { BrowserIcon } from "outline-icons";
+import { BrowserIcon, DatabaseIcon } from "outline-icons";
 import * as React from "react";
 import styled from "styled-components";
 import type { Primitive } from "utility-types";
@@ -81,6 +81,8 @@ export class EmbedDescriptor {
   transformMatch?: (matches: RegExpMatchArray) => string;
   /** The node attributes */
   attrs?: Record<string, Primitive>;
+  /** The height in pixels of the embed when it has not been resized, defaults to 400 */
+  defaultHeight?: number;
   /** Whether the embed should be visible in menus, always true */
   visible?: boolean;
   /**
@@ -108,6 +110,7 @@ export class EmbedDescriptor {
     this.regexMatch = options.regexMatch;
     this.transformMatch = options.transformMatch;
     this.attrs = options.attrs;
+    this.defaultHeight = options.defaultHeight;
     this.visible = options.visible;
     this.component = options.component;
   }
@@ -730,6 +733,19 @@ const embeds: EmbedDescriptor[] = [
     ],
     icon: <Img src="/images/plantuml.png" alt="PlantUml" />,
     component: PlantUmlDiagrams,
+  }),
+  new EmbedDescriptor({
+    id: "teable",
+    title: "Teable",
+    keywords: "database table spreadsheet kanban",
+    // Matches any self-hosted instance served from a "teable." subdomain, both
+    // public share links and the /framed wrapper around a base.
+    regexMatch: [
+      new RegExp("^https?://teable\\.[a-z0-9.-]+/(framed\\?.+|share/.+)$"),
+    ],
+    transformMatch: (matches: RegExpMatchArray) => matches[0],
+    icon: <DatabaseIcon />,
+    defaultHeight: 720,
   }),
   /* The generic iframe embed should always be the last one */
   new EmbedDescriptor({
