@@ -41,10 +41,14 @@ export const unescape = function (text: string) {
 
 /**
  * Matches a markdown link or image, capturing the text between its
- * parentheses. A destination containing an unescaped closing parenthesis is
- * not matched.
+ * parentheses.
+ *
+ * galadrim: the destination may contain balanced parentheses (one level), as
+ * CommonMark allows and as Notion writes them: "[Page](Folder/Page%20(v2).md)".
+ * Upstream stopped at the first ")" so such a link was never resolved on import
+ * and stayed a dead relative link.
  */
-const linkRegex = /(!?\[[^\]]*\]\()([^)]*)(\))/g;
+const linkRegex = /(!?\[[^\]]*\]\()((?:[^()]|\([^()]*\))*)(\))/g;
 
 /**
  * Replaces the destination of every markdown link and image in a string.

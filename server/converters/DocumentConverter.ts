@@ -77,14 +77,11 @@ export class DocumentConverter extends BaseConverter {
       }
     }
 
-    // Only when the title supplied no icon is the body's leading emoji taken,
-    // so that a document without a heading can still lead with one.
-    if (!icon) {
-      const { emoji, doc: docWithoutEmoji } =
-        ProsemirrorHelper.extractEmojiFromStart(doc);
-      icon = emoji;
-      doc = docWithoutEmoji;
-    }
+    // galadrim: upstream falls back to the body here, taking its leading emoji
+    // (ProsemirrorHelper.extractEmojiFromStart) as the icon when the title has
+    // none. On imported pages that emoji belongs to the first heading or to the
+    // first callout, which lost it while the page got a wrong icon (Notion never
+    // does this). The icon only comes from the title: "# <emoji> Title".
 
     // Serialize to markdown and trim whitespace
     const text = serializer.serialize(doc).trim();

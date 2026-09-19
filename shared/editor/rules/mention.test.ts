@@ -219,6 +219,60 @@ describe("mention rule", () => {
     });
   });
 
+  // galadrim: labels carrying inline marks
+  describe("label with inline marks", () => {
+    const href =
+      "mention://a1b2c3d4-e5f6-7890-abcd-ef1234567890/document/f0e1d2c3-b4a5-6789-0abc-def123456789";
+
+    it("should parse a mention whose label is bold", () => {
+      const result = md.parse(`@[**Bold title**](${href})`, {});
+      const mentions = findMentionTokens(result);
+
+      expect(mentions).toHaveLength(1);
+      expect(mentions[0].type).toBe("document");
+      expect(mentions[0].modelId).toBe("f0e1d2c3-b4a5-6789-0abc-def123456789");
+      expect(mentions[0].label).toBe("Bold title");
+    });
+
+    it("should merge a label made of marked and plain text", () => {
+      const result = md.parse(
+        `before @[Plain *italic* and \`code\` end](${href}) after`,
+        {}
+      );
+      const mentions = findMentionTokens(result);
+      const inline = result.find((tok) => tok.type === "inline");
+
+      expect(mentions).toHaveLength(1);
+      expect(mentions[0].label).toBe("Plain italic and code end");
+      expect(inline?.children?.map((child) => child.type)).toEqual([
+        "text",
+        "mention",
+        "text",
+      ]);
+      expect(inline?.children?.[0].content).toBe("before ");
+      expect(inline?.children?.[2].content).toBe(" after");
+    });
+
+    it("should parse the mentions that follow", () => {
+      const result = md.parse(
+        `@[**One**](${href}) and @[Two](${href}) and @[_Three_](${href})`,
+        {}
+      );
+
+      expect(findMentionTokens(result).map((m) => m.label)).toEqual([
+        "One",
+        "Two",
+        "Three",
+      ]);
+    });
+
+    it("should leave a label mixing text and an image alone", () => {
+      const result = md.parse(`@[![alt](image.png) **text**](${href})`, {});
+
+      expect(findMentionTokens(result)).toHaveLength(0);
+    });
+  });
+
   describe("non-mentions", () => {
     it("should not parse regular links as mentions", () => {
       const result = md.parse("[John Doe](https://example.com)", {});
