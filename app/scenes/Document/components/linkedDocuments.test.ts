@@ -58,8 +58,26 @@ describe("getLinkedDocumentKeys", () => {
     );
 
     expect([...keys].sort()).toEqual(
-      ["Qq11Ww22Ee", "Rr33Tt44Yy", "ZyXwVu9876", "aBcDeF1234"].sort()
+      [
+        "some-title-aBcDeF1234",
+        "aBcDeF1234",
+        "other-ZyXwVu9876",
+        "ZyXwVu9876",
+        "third-title-Qq11Ww22Ee",
+        "Qq11Ww22Ee",
+        "Rr33Tt44Yy",
+      ].sort()
     );
+  });
+
+  it("collects the identifier of a link written as an id, as the importer writes them", () => {
+    const keys = getLinkedDocumentKeys(
+      doc(
+        paragraph(text("imported", "/doc/11111111-2222-3333-4444-555555555555"))
+      )
+    );
+
+    expect(keys.has("11111111-2222-3333-4444-555555555555")).toBe(true);
   });
 
   it("looks inside nested blocks such as lists, notices and tables", () => {
@@ -91,10 +109,22 @@ describe("isLinkedDocument", () => {
     doc(
       paragraph(
         mention("document", "doc-uuid-1"),
-        text("link", "/doc/old-title-aBcDeF1234")
+        text("link", "/doc/old-title-aBcDeF1234"),
+        text("imported", "/doc/11111111-2222-3333-4444-555555555555")
       )
     )
   );
+
+  it("matches a document the body links to by its id", () => {
+    // The shape our importer writes, and the one the sub-pages of every page it
+    // imported are linked with.
+    expect(
+      isLinkedDocument(keys, {
+        id: "11111111-2222-3333-4444-555555555555",
+        url: "/doc/une-sous-page-Nn77Mm88",
+      })
+    ).toBe(true);
+  });
 
   it("matches a mentioned document by id", () => {
     expect(isLinkedDocument(keys, { id: "doc-uuid-1", url: "/doc/x-Zz" })).toBe(

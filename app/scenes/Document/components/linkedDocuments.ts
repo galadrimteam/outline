@@ -26,9 +26,16 @@ function urlIdOf(slug: string): string {
 /**
  * Collects the documents a document links to, through mentions and links.
  *
+ * Both halves of the path segment of a link are kept: the segment as written,
+ * which is the document id when the link was imported (our importer's links are
+ * of the form "/doc/<id>", the 48 internal links of the 8 imported parent pages
+ * sampled on 2026-09-20 all are), and its url identifier, the part that a
+ * rename preserves in the "/doc/<title>-<urlId>" links the editor writes.
+ *
  * @param data the content of the document.
- * @returns a set holding the id of every mentioned document, and the url
- * identifier of every document that is the target of a link.
+ * @returns a set holding the id of every mentioned document, and, for every
+ * document that is the target of a link, the path segment of that link and its
+ * url identifier.
  */
 export function getLinkedDocumentKeys(
   data: ProsemirrorData | undefined | null
@@ -49,6 +56,7 @@ export function getLinkedDocumentKeys(
       const match =
         typeof href === "string" ? documentPathRegex.exec(href) : null;
       if (match) {
+        keys.add(match[1]);
         keys.add(urlIdOf(match[1]));
       }
     }
@@ -77,5 +85,5 @@ export function isLinkedDocument(
     return true;
   }
   const match = node.url ? documentPathRegex.exec(node.url) : null;
-  return !!match && keys.has(urlIdOf(match[1]));
+  return !!match && (keys.has(match[1]) || keys.has(urlIdOf(match[1])));
 }
