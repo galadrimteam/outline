@@ -32,6 +32,11 @@ import type {
   SearchResponse,
 } from "@server/utils/BaseSearchProvider";
 import { BaseSearchProvider } from "@server/utils/BaseSearchProvider";
+import { SEARCH_CONFIGURATION } from "@server/utils/searchConfiguration";
+import {
+  accentInsensitivePattern,
+  accentInsensitiveWordPattern,
+} from "./accents";
 
 type RankedDocument = Document & {
   id: string;
@@ -292,15 +297,23 @@ export default class PostgresSearchProvider extends BaseSearchProvider {
     const where = await PostgresSearchProvider.buildWhere(user, rest);
 
     if (query) {
-      where[Op.and].push({
-        title: { [Op.iLike]: QueryHelper.likeContains(query) },
-      });
+      // galadrim: accents are ignored, as they are for collections below and
+      // in the full text search ("reunion" finds "Réunion"). Upstream:
+      // { title: { [Op.iLike]: QueryHelper.likeContains(query) } }
+      where[Op.and].push(
+        Sequelize.literal(
+          `unaccent("document"."title") ILIKE unaccent(:titleQuery)`
+        )
+      );
     }
 
     return Document.withMembershipScope(user.id, {
       includeDrafts: true,
     }).findAll({
       where,
+      replacements: query
+        ? { titleQuery: QueryHelper.likeContains(query) }
+        : undefined,
       order: [
         [
           options.sort ?? SortFilter.UpdatedAt,
@@ -519,9 +532,10 @@ export default class PostgresSearchProvider extends BaseSearchProvider {
     const order: Order = [];
 
     if (query) {
+      // galadrim: SEARCH_CONFIGURATION in place of 'english'
       const rankExpression = usePopularityBoost
-        ? `ts_rank("searchVector", to_tsquery('english', :query)) * (1 + 0.25 * LN(1 + COALESCE("popularityScore", 0)))`
-        : `ts_rank("searchVector", to_tsquery('english', :query))`;
+        ? `ts_rank("searchVector", to_tsquery('${SEARCH_CONFIGURATION}', :query)) * (1 + 0.25 * LN(1 + COALESCE("popularityScore", 0)))`
+        : `ts_rank("searchVector", to_tsquery('${SEARCH_CONFIGURATION}', :query))`;
 
       attributes.push([Sequelize.literal(rankExpression), "searchRanking"]);
       replacements["query"] = PostgresSearchProvider.webSearchQuery(query);
@@ -563,7 +577,10 @@ export default class PostgresSearchProvider extends BaseSearchProvider {
     const text = DocumentHelper.toPlainText(document);
 
     // Regex to highlight quoted queries as ts_headline will not do this by default due to stemming.
-    const fullMatchRegex = new RegExp(escapeRegExp(query), "i");
+    // galadrim: accents are ignored like they are by the search itself, so the
+    // excerpt is cut around "Sécurité" and highlights it for "securite".
+    // Upstream: escapeRegExp(query) and `\\b${escapeRegExp(match)}\\b`.
+    const fullMatchRegex = new RegExp(accentInsensitivePattern(query), "i");
     const highlightRegex = new RegExp(
       [
         fullMatchRegex.source,
@@ -572,7 +589,8 @@ export default class PostgresSearchProvider extends BaseSearchProvider {
           : PostgresSearchProvider.removeStopWords(query)
               .trim()
               .split(" ")
-              .map((match) => `\\b${escapeRegExp(match)}\\b`)),
+              .filter(Boolean)
+              .map(accentInsensitiveWordPattern)),
       ].join("|"),
       "gi"
     );
@@ -758,7 +776,8 @@ export default class PostgresSearchProvider extends BaseSearchProvider {
         where[Op.and].push(
           Sequelize.fn(
             `"searchVector" @@ to_tsquery`,
-            "english",
+            // galadrim: in place of "english"
+            SEARCH_CONFIGURATION,
             Sequelize.literal(":query")
           )
         );

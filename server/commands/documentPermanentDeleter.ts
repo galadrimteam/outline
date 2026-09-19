@@ -7,6 +7,7 @@ import { DocumentHelper } from "@server/models/helpers/DocumentHelper";
 import { ProsemirrorHelper } from "@server/models/helpers/ProsemirrorHelper";
 import DeleteAttachmentTask from "@server/queues/tasks/DeleteAttachmentTask";
 import { sequelizeReadOnly } from "@server/storage/database";
+import { SEARCH_CONFIGURATION } from "@server/utils/searchConfiguration";
 
 export default async function documentPermanentDeleter(documents: Document[]) {
   const activeDocument = documents.find((doc) => !doc.deletedAt);
@@ -17,10 +18,12 @@ export default async function documentPermanentDeleter(documents: Document[]) {
     );
   }
 
+  // galadrim: SEARCH_CONFIGURATION in place of 'english', the query must be
+  // parsed like the vectors are or a referenced attachment could be missed.
   const query = `
     SELECT COUNT(id)
     FROM documents
-    WHERE "searchVector" @@ to_tsquery('english', :query) AND
+    WHERE "searchVector" @@ to_tsquery('${SEARCH_CONFIGURATION}', :query) AND
     "teamId" = :teamId AND
     "id" != :documentId
   `;
