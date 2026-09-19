@@ -86,6 +86,17 @@ describe("pageTitleStyles", () => {
     );
   });
 
+  it("only keeps the room of the icon when printed", () => {
+    const css = cssOf(<Title $containsIcon />);
+    const print = css.slice(css.lastIndexOf("@mediaprint"));
+
+    expect(print).toContain("margin-top:118px");
+    // Declared after the tablet media query, which also applies on paper.
+    expect(css.lastIndexOf("@mediaprint")).toBeGreaterThan(
+      css.lastIndexOf("margin-top:198px")
+    );
+  });
+
   it("uses the smaller margins without an icon", () => {
     const css = cssOf(<Title $containsIcon={false} />);
 

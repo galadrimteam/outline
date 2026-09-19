@@ -63,4 +63,10 @@ export const pageTitleStyles = css<{ $containsIcon: boolean }>`
     margin-top: ${(props: { $containsIcon: boolean }) =>
       pageTitleMarginTop(props.$containsIcon)}px;
   `};
+
+  /* On paper only the room the icon needs is kept above the title. */
+  @media print {
+    margin-top: ${(props) =>
+      props.$containsIcon ? pageIconSize + pageIconGap : 0}px;
+  }
 `;
