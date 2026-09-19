@@ -3,6 +3,7 @@ import {
   DoneIcon,
   ExpandedIcon,
   InfoIcon,
+  NotepadIcon,
   StarredIcon,
   WarningIcon,
 } from "outline-icons";
@@ -19,7 +20,9 @@ export default function noticeMenuItems(ctx: SelectionContext): MenuItem[] {
   const node = ctx.selection.$from.node(-1);
   const currentStyle = node?.attrs.style as NoticeTypes;
 
-  const mapping = {
+  const mapping: Record<NoticeTypes, string> = {
+    // galadrim: Notion's plain grey callout, the style of a new notice
+    [NoticeTypes.Default]: t("Plain notice"),
     [NoticeTypes.Info]: t("Info notice"),
     [NoticeTypes.Warning]: t("Warning notice"),
     [NoticeTypes.Success]: t("Success notice"),
@@ -33,6 +36,13 @@ export default function noticeMenuItems(ctx: SelectionContext): MenuItem[] {
       label: mapping[currentStyle],
       icon: <ExpandedIcon />,
       children: [
+        {
+          // galadrim: the way back to Notion's plain grey callout
+          name: NoticeTypes.Default,
+          icon: <NotepadIcon />,
+          label: t("Plain notice"),
+          active: () => currentStyle === NoticeTypes.Default,
+        },
         {
           name: NoticeTypes.Info,
           icon: <InfoIcon />,
