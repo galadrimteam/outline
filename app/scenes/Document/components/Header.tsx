@@ -184,10 +184,13 @@ function DocumentHeader({
           <TableOfContentsMenu />
         ) : (
           // galadrim: the breadcrumb ends with the document itself as in Notion,
-          // the favourite star moved to the right of the header.
-          <DocumentBreadcrumb document={document} showCurrent>
+          // and the favourite star moved to the right of the header. The
+          // contents button follows the breadcrumb instead of being its child,
+          // a child would put a separator after the name of the document.
+          <Flex align="center" gap={4}>
+            <DocumentBreadcrumb document={document} showCurrent />
             {toc}
-          </DocumentBreadcrumb>
+          </Flex>
         )
       }
       title={
