@@ -8,17 +8,15 @@ import { s } from "@shared/styles";
 import { SubscriptionType, UserPreference } from "@shared/types";
 import type Document from "~/models/Document";
 import type Template from "~/models/Template";
+import { useDocumentContext } from "~/components/DocumentContext";
 import { DropdownMenu } from "~/components/Menu/DropdownMenu";
 import { OverflowMenuButton } from "~/components/Menu/OverflowMenuButton";
-import { toMenuItems, toMobileMenuItems } from "~/components/Menu/transformer";
 import Switch from "~/components/Switch";
-import { actionToMenuItem } from "~/actions";
-import { changeHeadingPrefix } from "~/actions/definitions/documents";
-import useActionContext, {
-  ActionContextProvider,
-} from "~/hooks/useActionContext";
+import Time from "~/components/Time";
+import { ActionContextProvider } from "~/hooks/useActionContext";
 import useCurrentUser from "~/hooks/useCurrentUser";
 import { useDocumentActiveModels } from "~/hooks/useDocumentActiveModels";
+import { useFormatNumber } from "~/hooks/useFormatNumber";
 import useMobile from "~/hooks/useMobile";
 import usePolicy from "~/hooks/usePolicy";
 import useRequest from "~/hooks/useRequest";
@@ -35,7 +33,10 @@ type Props = {
   neutral?: boolean;
   /** Pass true if the document is currently being displayed */
   showDisplayOptions?: boolean;
-  /** Whether to include the option of toggling embeds as menu item */
+  /**
+   * Whether to include the option of toggling embeds as menu item. galadrim:
+   * ignored, the switch left the menu; kept for the callers.
+   */
   showToggleEmbeds?: boolean;
   /** Invoked when the "Find and replace" menu item is clicked */
   onFindAndReplace?: () => void;
@@ -53,7 +54,6 @@ function DocumentMenu({
   document,
   align,
   neutral,
-  showToggleEmbeds,
   showDisplayOptions,
   onSelectTemplate,
   onRename,
@@ -99,17 +99,6 @@ function DocumentMenu({
     }
   }, [auxDataLoading, auxDataLoaded, auxDataRequest, document]);
 
-  const handleEmbedsToggle = React.useCallback(
-    (checked: boolean) => {
-      if (checked) {
-        document.enableEmbeds();
-      } else {
-        document.disableEmbeds();
-      }
-    },
-    [document]
-  );
-
   const handleFullWidthToggle = React.useCallback(
     (checked: boolean) => {
       user.setPreference(UserPreference.FullWidthDocuments, checked);
@@ -120,13 +109,6 @@ function DocumentMenu({
     [user, document]
   );
 
-  const handleInsightsToggle = React.useCallback(
-    (checked: boolean) => {
-      void document.save({ insightsEnabled: checked });
-    },
-    [document]
-  );
-
   const rootAction = useDocumentMenuAction({
     documentId: document.id,
     isViewing: showDisplayOptions,
@@ -135,69 +117,45 @@ function DocumentMenu({
     onSelectTemplate,
   });
 
+  // galadrim: of the display options only "Full width" is left, the one a Notion
+  // page has. Heading numbering stays in the command bar (Ctrl+K), the "viewer
+  // insights" and "embeds" switches have no Notion equivalent. The menu of the
+  // document being viewed ends, as in Notion, with its word count and last edit.
   const toggleSwitches = React.useMemo<React.ReactNode>(() => {
-    if (!can.update || !(showDisplayOptions || showToggleEmbeds)) {
+    if (!can.update || !showDisplayOptions || isMobile) {
       return;
     }
 
     return (
-      <>
-        <MenuSeparator />
-        {showDisplayOptions && <HeadingPrefixMenuItem />}
-        <DisplayOptions>
-          {can.updateInsights && (
-            <Style>
-              <ToggleMenuItem
-                width={26}
-                height={14}
-                label={t("Enable viewer insights")}
-                labelPosition="left"
-                checked={document.insightsEnabled}
-                onChange={handleInsightsToggle}
-              />
-            </Style>
-          )}
-          {showToggleEmbeds && (
-            <Style>
-              <ToggleMenuItem
-                width={26}
-                height={14}
-                label={t("Enable embeds")}
-                labelPosition="left"
-                checked={!document.embedsDisabled}
-                onChange={handleEmbedsToggle}
-              />
-            </Style>
-          )}
-          {showDisplayOptions && !isMobile && (
-            <Style>
-              <ToggleMenuItem
-                width={26}
-                height={14}
-                label={t("Full width")}
-                labelPosition="left"
-                checked={document.fullWidth}
-                onChange={handleFullWidthToggle}
-              />
-            </Style>
-          )}
-        </DisplayOptions>
-      </>
+      <DisplayOptions>
+        <Style>
+          <ToggleMenuItem
+            width={26}
+            height={14}
+            label={t("Full width")}
+            labelPosition="left"
+            checked={document.fullWidth}
+            onChange={handleFullWidthToggle}
+          />
+        </Style>
+      </DisplayOptions>
     );
   }, [
     t,
     can.update,
-    can.updateInsights,
-    document.embedsDisabled,
     document.fullWidth,
-    document.insightsEnabled,
     isMobile,
     showDisplayOptions,
-    showToggleEmbeds,
-    handleEmbedsToggle,
     handleFullWidthToggle,
-    handleInsightsToggle,
   ]);
+
+  const append = showDisplayOptions ? (
+    <>
+      <MenuSeparator />
+      {toggleSwitches}
+      <MenuFooter document={document} />
+    </>
+  ) : undefined;
 
   return (
     <ActionContextProvider value={{ activeModels }}>
@@ -207,7 +165,7 @@ function DocumentMenu({
         onOpen={onOpen}
         onClose={onClose}
         ariaLabel={t("Document options")}
-        append={toggleSwitches}
+        append={append}
       >
         <OverflowMenuButton
           neutral={neutral}
@@ -219,43 +177,48 @@ function DocumentMenu({
 }
 
 /**
- * Renders the heading numbering submenu as part of the display options block.
- * A separate component so the action context is read inside the provider.
+ * galadrim: the last lines of the menu of the document being viewed, as at the
+ * bottom of the menu of a Notion page: word count, who edited last and when. A
+ * separate component so that the word count is only computed once the menu is
+ * open, it must be rendered within the document context.
  */
-const HeadingPrefixMenuItem = observer(function HeadingPrefixMenuItem_() {
-  const context = useActionContext({ isMenu: true });
-  const isMobile = useMobile();
-  const item = actionToMenuItem(changeHeadingPrefix, context);
+const MenuFooter = observer(function MenuFooter_({
+  document,
+}: {
+  document: Document;
+}) {
+  const { t } = useTranslation();
+  const { stats } = useDocumentContext();
+  const formatNumber = useFormatNumber();
 
-  // On mobile the display options are appended to a drawer rather than to menu
-  // content, so there is no menu root for the submenu primitives to attach to.
-  // Flatten the submenu into an inline group of options instead, which also
-  // matches the toggles it sits alongside — picking one leaves the drawer open.
-  if (isMobile) {
-    if (item.type !== "submenu") {
-      return null;
-    }
-
-    return (
-      <>
-        {toMobileMenuItems(
-          [
-            {
-              type: "group",
-              title: item.title,
-              visible: item.visible,
-              items: item.items,
-            },
-          ],
-          noop,
-          noop
-        )}
-      </>
-    );
-  }
-
-  return <>{toMenuItems([item])}</>;
+  return (
+    <Footer>
+      <div>
+        {t(`{{ number }} words`, {
+          count: stats.words,
+          number: formatNumber(stats.words),
+        })}
+      </div>
+      <div>
+        {t("Last edited")}
+        {document.updatedBy
+          ? ` ${t("by {{ name }}", { name: document.updatedBy.name })}`
+          : ""}
+      </div>
+      <div>
+        <Time dateTime={document.updatedAt} addSuffix />
+      </div>
+    </Footer>
+  );
 });
+
+const Footer = styled.div`
+  padding: 8px 12px 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: ${s("textTertiary")};
+  user-select: none;
+`;
 
 const ToggleMenuItem = styled(Switch)`
   * {

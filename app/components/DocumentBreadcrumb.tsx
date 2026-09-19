@@ -72,10 +72,64 @@ export function documentBreadcrumbText(
   return segments.length ? segments.join(" / ") : undefined;
 }
 
+/** The part of a navigation node that a breadcrumb item is rendered from. */
+type BreadcrumbNode = {
+  id: string;
+  title: string;
+  url: string;
+  icon?: string;
+  color?: string;
+};
+
+/**
+ * galadrim: returns the documents to render in the breadcrumb of a document,
+ * after the collection. Upstream lists the ancestors only; the top bar of a
+ * Notion page ends with the page itself, which `includeCurrent` adds using the
+ * live title and icon of the document rather than those of the collection
+ * structure, which lag behind while the title is being edited.
+ *
+ * @param document - the document to compute the breadcrumb for.
+ * @param includeCurrent - whether the document itself is the last item.
+ * @returns the nodes to render, outermost first.
+ */
+export function documentBreadcrumbNodes(
+  document: Pick<Document, "id" | "title" | "url" | "icon" | "color"> & {
+    pathTo: BreadcrumbNode[];
+  },
+  includeCurrent = false
+): BreadcrumbNode[] {
+  const { pathTo } = document;
+
+  if (!includeCurrent) {
+    return pathTo.slice(0, -1);
+  }
+
+  // The path ends with the document itself, unless it is empty: a draft that is
+  // not in the collection structure and has no parent loaded.
+  const last = pathTo[pathTo.length - 1];
+  const ancestors = last?.id === document.id ? pathTo.slice(0, -1) : pathTo;
+
+  return [
+    ...ancestors,
+    {
+      id: document.id,
+      title: document.title,
+      url: document.url,
+      icon: document.icon ?? undefined,
+      color: document.color ?? undefined,
+    },
+  ];
+}
+
 type Props = {
   children?: React.ReactNode;
   document: Document;
   onlyText?: boolean;
+  /**
+   * galadrim: also show the document itself as the last item, and one more
+   * item before the middle of the path collapses into a menu.
+   */
+  showCurrent?: boolean;
   /**
    * Maximum number of ancestor documents to show, counted back from the
    * document's immediate parent. Any ancestors beyond this depth are replaced
@@ -86,7 +140,7 @@ type Props = {
 };
 
 function DocumentBreadcrumb(
-  { document, children, onlyText, maxDepth }: Props,
+  { document, children, onlyText, maxDepth, showCurrent }: Props,
   ref: React.RefObject<HTMLDivElement> | null
 ) {
   const { collections } = useStores();
@@ -102,7 +156,7 @@ function DocumentBreadcrumb(
     void document.loadRelations({ withoutPolicies: true });
   }, [document]);
 
-  const path = document.pathTo.slice(0, -1);
+  const path = documentBreadcrumbNodes(document, showCurrent);
 
   const actions = React.useMemo(() => {
     if (depth === 0) {
@@ -234,7 +288,12 @@ function DocumentBreadcrumb(
   }
 
   return (
-    <Breadcrumb actions={actions} ref={ref} highlightFirstItem>
+    <Breadcrumb
+      actions={actions}
+      ref={ref}
+      max={showCurrent ? 3 : undefined}
+      highlightFirstItem
+    >
       {children}
     </Breadcrumb>
   );

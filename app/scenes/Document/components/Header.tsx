@@ -1,5 +1,5 @@
 import { observer } from "mobx-react";
-import { TableOfContentsIcon, EditIcon } from "outline-icons";
+import { TableOfContentsIcon, EditIcon, LinkIcon } from "outline-icons";
 import { useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -9,7 +9,10 @@ import Icon from "@shared/components/Icon";
 import { HEADER_HEIGHT } from "@shared/constants";
 import { s } from "@shared/styles";
 import { altDisplay, metaDisplay } from "@shared/utils/keyboard";
-import { publishDocument } from "~/actions/definitions/documents";
+import {
+  copyDocumentLink,
+  publishDocument,
+} from "~/actions/definitions/documents";
 import { restoreRevision } from "~/actions/definitions/revisions";
 import { Action } from "~/components/Actions";
 import Badge from "~/components/Badge";
@@ -19,18 +22,18 @@ import DocumentBreadcrumb from "~/components/DocumentBreadcrumb";
 import { useDocumentContext } from "~/components/DocumentContext";
 import Flex from "~/components/Flex";
 import Header from "~/components/Header";
+import NudeButton from "~/components/NudeButton";
 import Star from "~/components/Star";
 import Tooltip from "~/components/Tooltip";
 import useCurrentTeam from "~/hooks/useCurrentTeam";
+import { ActionContextProvider } from "~/hooks/useActionContext";
 import useCurrentUser from "~/hooks/useCurrentUser";
-import useEditingFocus from "~/hooks/useEditingFocus";
 import useKeyDown from "~/hooks/useKeyDown";
 import { useLocationSidebarContext } from "~/hooks/useLocationSidebarContext";
 import useMobile from "~/hooks/useMobile";
 import usePolicy from "~/hooks/usePolicy";
 import useStores from "~/hooks/useStores";
 import DocumentMenu from "~/menus/DocumentMenu";
-import NewChildDocumentMenu from "~/menus/NewChildDocumentMenu";
 import TableOfContentsMenu from "~/menus/TableOfContentsMenu";
 import TemplatesMenu from "~/menus/TemplatesMenu";
 import type Document from "~/models/Document";
@@ -77,15 +80,16 @@ function DocumentHeader({
   const user = useCurrentUser({ rejectOnEmpty: false });
   const isMobileMedia = useMobile();
   const isRevision = !!revision;
-  const isEditingFocus = useEditingFocus();
 
-  // Set CSS variable for header offset (used by sticky table headers)
+  // Set CSS variable for header offset (used by sticky table headers).
+  // galadrim: the header no longer fades out after 3s of typing ("editing
+  // focus"), the top bar of a Notion page never hides, so the offset is constant.
   useEffect(() => {
     window.document.documentElement.style.setProperty(
       "--header-offset",
-      isEditingFocus ? "0px" : `${HEADER_HEIGHT}px`
+      `${HEADER_HEIGHT}px`
     );
-  }, [isEditingFocus]);
+  }, []);
 
   const { hasHeadings, editor } = useDocumentContext();
   const sidebarContext = useLocationSidebarContext();
@@ -172,35 +176,38 @@ function DocumentHeader({
   );
 
   return (
-    <StyledHeader
+    <Header
       ref={measureRef}
-      $hidden={isEditingFocus}
       hasSidebar
       left={
         isMobile ? (
           <TableOfContentsMenu />
         ) : (
-          <DocumentBreadcrumb document={document}>
-            {toc}{" "}
-            <StarAction>
-              <Star document={document} color={theme.textSecondary} />
-            </StarAction>
+          // galadrim: the breadcrumb ends with the document itself as in Notion,
+          // the favourite star moved to the right of the header.
+          <DocumentBreadcrumb document={document} showCurrent>
+            {toc}
           </DocumentBreadcrumb>
         )
       }
       title={
-        <Flex gap={4} align="center">
-          {document.icon && (
-            <Icon
-              value={document.icon}
-              initial={document.initial}
-              color={document.color ?? undefined}
-            />
-          )}
-          {document.title}
-          {document.isArchived && <Badge>{t("Archived")}</Badge>}
-          {document.isDraft && <Badge>{t("Draft")}</Badge>}
-        </Flex>
+        // galadrim: the breadcrumb already names the document, the title that
+        // fades in the middle of the header on scroll is only kept on mobile
+        // where there is no breadcrumb.
+        isMobile ? (
+          <Flex gap={4} align="center">
+            {document.icon && (
+              <Icon
+                value={document.icon}
+                initial={document.initial}
+                color={document.color ?? undefined}
+              />
+            )}
+            {document.title}
+            {document.isArchived && <Badge>{t("Archived")}</Badge>}
+            {document.isDraft && <Badge>{t("Draft")}</Badge>}
+          </Flex>
+        ) : null
       }
       actions={({ isCompact }) => (
         <>
@@ -253,15 +260,9 @@ function DocumentHeader({
             user?.separateEditMode &&
             !isRevision &&
             editAction}
-          {can.update &&
-            can.createChildDocument &&
-            !isRevision &&
-            !isCompact &&
-            !isMobile && (
-              <Action>
-                <NewChildDocumentMenu document={document} />
-              </Action>
-            )}
+          {/* galadrim: no "New doc" button, Notion has none: a nested document
+              is created from the sidebar, with "@" or "[[" in the text, or from
+              the command bar. */}
           {revision && (
             <>
               <Action>
@@ -293,6 +294,24 @@ function DocumentHeader({
               </Button>
             </Action>
           )}
+          {/* galadrim: copy link and favourite sit on the right before the
+              menu, in the order of the top bar of a Notion page. */}
+          {!isMobile && !isDeleted && !isRevision && (
+            <Action>
+              <IconAction>
+                <ActionContextProvider value={{ activeModels: [document] }}>
+                  <NudeButton
+                    action={copyDocumentLink}
+                    tooltip={{ content: t("Copy link"), delay: 500 }}
+                    aria-label={t("Copy link")}
+                  >
+                    <LinkIcon color={theme.textSecondary} />
+                  </NudeButton>
+                </ActionContextProvider>
+                <Star document={document} color={theme.textSecondary} />
+              </IconAction>
+            </Action>
+          )}
           <Action>
             <DocumentMenu
               document={document}
@@ -310,11 +329,6 @@ function DocumentHeader({
   );
 }
 
-const StyledHeader = styled(Header)<{ $hidden: boolean }>`
-  transition: opacity 500ms ease-in-out;
-  ${(props) => props.$hidden && "opacity: 0;"}
-`;
-
 const TocButton = styled(Button)`
   border-radius: 4px;
 
@@ -326,7 +340,7 @@ const TocButton = styled(Button)`
   }
 `;
 
-const StarAction = styled.span`
+const IconAction = styled.span`
   display: inline-flex;
 
   button {

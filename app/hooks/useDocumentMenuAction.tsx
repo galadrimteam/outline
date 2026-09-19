@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { SearchIcon } from "outline-icons";
+import { LinkIcon, SearchIcon } from "outline-icons";
 import { ActionSeparator, createAction, createRootMenuAction } from "~/actions";
 import {
   restoreDocument,
@@ -9,32 +9,23 @@ import {
   restoreDocumentToCollection,
   starDocument,
   unstarDocument,
-  editDocument,
-  shareDocument,
-  createNewDocument,
-  createNewDocumentInAlphabeticalCollection,
   importDocument,
-  createTemplateFromDocument,
   duplicateDocument,
   publishDocument,
-  unpublishDocument,
-  archiveDocument,
   moveDocument,
   applyTemplateActionFactory,
-  pinDocument,
   openDocumentComments,
   openDocumentHistory,
   openDocumentInsights,
   openDocumentInDesktop,
-  openDocumentInSplit,
   exportDocument,
   copyDocument,
+  copyDocumentLink,
   presentDocument,
   searchInDocument,
   deleteDocument,
   leaveDocument,
   permanentlyDeleteDocument,
-  toggleDocumentStats,
 } from "~/actions/definitions/documents";
 import { renameActionFactory } from "~/actions/definitions/common";
 import { ActiveDocumentSection } from "~/actions/sections";
@@ -42,10 +33,24 @@ import useMobile from "./useMobile";
 import type Template from "~/models/Template";
 import { useTemplateMenuActions } from "./useTemplateMenuActions";
 
+/**
+ * galadrim: "Copy link" as a first level entry, as in the menu of a Notion page.
+ * The action is otherwise only a child of "Copy", where it has no icon.
+ */
+const copyLink = {
+  ...copyDocumentLink,
+  id: "copy-document-link-menu",
+  icon: <LinkIcon />,
+  iconInContextMenu: true,
+};
+
 type Props = {
   /** Document ID for which the actions are generated */
   documentId: string;
-  /** Whether the document is currently being viewed */
+  /**
+   * Whether the document is currently being viewed. galadrim: unused since the
+   * "Show editing stats" entry left the menu, kept for the callers.
+   */
   isViewing?: boolean;
   /** Invoked when the "Find and replace" menu item is clicked */
   onFindAndReplace?: () => void;
@@ -57,7 +62,6 @@ type Props = {
 
 export function useDocumentMenuAction({
   documentId,
-  isViewing = false,
   onFindAndReplace,
   onRename,
   onSelectTemplate,
@@ -70,6 +74,13 @@ export function useDocumentMenuAction({
     onSelectTemplate,
   });
 
+  // galadrim: the menu follows the "…" menu of a Notion page, in its order:
+  // favourite, copy link, duplicate, rename, move, trash; then present, import,
+  // export, copy, search; then analytics, history, comments, notifications.
+  // Entries Notion has no equivalent for left the menu and stay available in
+  // the command bar (Ctrl+K), all of them being in rootDocumentActions: edit,
+  // permissions (the Share button of the header), create template, unpublish,
+  // archive, new (nested) document, pin, split view and editing stats.
   return useCallback(
     () =>
       createRootMenuAction([
@@ -77,8 +88,19 @@ export function useDocumentMenuAction({
         restoreDocumentToCollection,
         starDocument,
         unstarDocument,
-        subscribeDocument,
-        unsubscribeDocument,
+        copyLink,
+        duplicateDocument,
+        renameActionFactory({
+          section: ActiveDocumentSection,
+          modelId: documentId,
+          onRename,
+        }),
+        moveDocument,
+        publishDocument,
+        deleteDocument,
+        permanentlyDeleteDocument,
+        leaveDocument,
+        ActionSeparator,
         createAction({
           name: `${t("Find and replace")}…`,
           section: ActiveDocumentSection,
@@ -86,49 +108,20 @@ export function useDocumentMenuAction({
           visible: !!onFindAndReplace && isMobile,
           perform: () => onFindAndReplace?.(),
         }),
-        ActionSeparator,
-        editDocument,
-        renameActionFactory({
-          section: ActiveDocumentSection,
-          modelId: documentId,
-          onRename,
-        }),
-        shareDocument,
-        createTemplateFromDocument,
-        duplicateDocument,
-        publishDocument,
-        unpublishDocument,
-        archiveDocument,
-        moveDocument,
+        presentDocument,
         applyTemplateActionFactory({ actions: templateMenuActions }),
         importDocument,
-        createNewDocument,
-        createNewDocumentInAlphabeticalCollection,
-        pinDocument,
-        ActionSeparator,
-        openDocumentComments,
-        openDocumentHistory,
-        openDocumentInsights,
-        ...(isViewing ? [toggleDocumentStats] : []),
-        openDocumentInSplit,
-        openDocumentInDesktop,
-        presentDocument,
         exportDocument,
         copyDocument,
         searchInDocument,
         ActionSeparator,
-        deleteDocument,
-        permanentlyDeleteDocument,
-        leaveDocument,
+        openDocumentInsights,
+        openDocumentHistory,
+        openDocumentComments,
+        subscribeDocument,
+        unsubscribeDocument,
+        openDocumentInDesktop,
       ]),
-    [
-      t,
-      isMobile,
-      isViewing,
-      templateMenuActions,
-      documentId,
-      onFindAndReplace,
-      onRename,
-    ]
+    [t, isMobile, templateMenuActions, documentId, onFindAndReplace, onRename]
   );
 }
