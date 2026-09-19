@@ -23,13 +23,13 @@ import { homePath, searchPath } from "~/utils/routeHelpers";
 import TeamLogo from "../TeamLogo";
 import Tooltip from "../Tooltip";
 import Sidebar from "./Sidebar";
-import ArchiveLink from "./components/ArchiveLink";
 import Collections from "./components/Collections";
 import DraggableSection, {
   normalizeSidebarSectionOrder,
 } from "./components/DraggableSection";
 import { DraftsLink } from "./components/DraftsLink";
 import DragPlaceholder from "./components/DragPlaceholder";
+import PrivateDocuments from "./components/PrivateDocuments";
 import { DismissableSidebarAction } from "./components/DismissableSidebarAction";
 import HistoryNavigation from "./components/HistoryNavigation";
 import Section from "./components/Section";
@@ -40,6 +40,7 @@ import Starred from "./components/Starred";
 import ToggleButton from "./components/ToggleButton";
 import TrashLink from "./components/TrashLink";
 import useMobile from "~/hooks/useMobile";
+import usePrivateCollection from "./hooks/usePrivateCollection";
 
 function AppSidebar() {
   const { t } = useTranslation();
@@ -80,10 +81,19 @@ function AppSidebar() {
     user.getPreference(UserPreference.SidebarSectionOrder, [])
   );
 
+  // galadrim: Notion's "Private" section – the member's own private
+  // collection is listed there instead of among the collections.
+  const privateCollection = usePrivateCollection();
+
   const sectionContent = {
     [SidebarSection.Starred]: <Starred />,
     [SidebarSection.SharedWithMe]: <SharedWithMe />,
-    [SidebarSection.Collections]: <Collections />,
+    [SidebarSection.Collections]: (
+      <Collections privateCollectionId={privateCollection?.id} />
+    ),
+    [SidebarSection.Private]: (
+      <PrivateDocuments collection={privateCollection} />
+    ),
   };
 
   return (
@@ -121,13 +131,7 @@ function AppSidebar() {
         </TeamMenu>
         <Overflow>
           <Section>
-            <SidebarLink
-              to={homePath()}
-              icon={<HomeIcon />}
-              exact={false}
-              label={t("Home")}
-              onClickIntent={Scenes.Home.preload}
-            />
+            {/* galadrim: search comes first, as in Notion. */}
             <SidebarLink
               to={searchPath()}
               icon={<SearchIcon />}
@@ -136,7 +140,17 @@ function AppSidebar() {
               onClick={handleSearchClick}
               onClickIntent={Scenes.Search.preload}
             />
-            {can.createDocument && <DraftsLink />}
+            <SidebarLink
+              to={homePath()}
+              icon={<HomeIcon />}
+              exact={false}
+              label={t("Home")}
+              onClickIntent={Scenes.Home.preload}
+            />
+            {/* galadrim: Notion has no drafts – new documents are published to
+                the private collection (see DocumentNew), so the link only shows
+                while there are drafts. It stays in the account menu. */}
+            {can.createDocument && documents.totalDrafts > 0 && <DraftsLink />}
           </Section>
         </Overflow>
         <Scrollable flex shadow ref={scrollRef}>
@@ -146,21 +160,21 @@ function AppSidebar() {
                 {sectionContent[section]}
               </DraggableSection>
             ))}
-            {can.createDocument && (
-              <Section auto>
-                <ArchiveLink />
-              </Section>
-            )}
+            {/* galadrim: Notion has no archive next to its trash – the link
+                moved to the account menu. */}
             <Section>
               {can.createDocument && <TrashLink />}
               <DismissableSidebarAction
                 id="sidebar-import-hidden"
                 action={navigateToImport}
               />
-              <DismissableSidebarAction
-                id="sidebar-invite-hidden"
-                action={inviteUser}
-              />
+              {/* galadrim: inviting is an admin matter, as in Notion. */}
+              {user.isAdmin && (
+                <DismissableSidebarAction
+                  id="sidebar-invite-hidden"
+                  action={inviteUser}
+                />
+              )}
             </Section>
           </SidebarScrollProvider>
         </Scrollable>

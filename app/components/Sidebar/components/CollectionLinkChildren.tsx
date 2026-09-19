@@ -37,6 +37,11 @@ type Props = {
   prefetchDocument?: (documentId: string) => Promise<Document | void>;
   /** Element to display above the child documents */
   children?: React.ReactNode;
+  /**
+   * galadrim: render the documents at the root of the sidebar, as the
+   * "Privé" section does, instead of nested below a collection row.
+   */
+  rootLevel?: boolean;
 };
 
 function CollectionLinkChildren({
@@ -45,10 +50,11 @@ function CollectionLinkChildren({
   depth = 0,
   prefetchDocument,
   children,
+  rootLevel,
 }: Props) {
   // Documents sit one level below the collection, with a minimum that leaves
   // room for their own disclosure to the left of the label.
-  const childDepth = Math.max(depth + 1, 2);
+  const childDepth = rootLevel ? 0 : Math.max(depth + 1, 2);
   const pageSize = DEFAULT_PAGE_SIZE;
   const { documents, ui } = useStores();
   const { t } = useTranslation();

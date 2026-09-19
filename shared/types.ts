@@ -354,6 +354,8 @@ export enum SidebarSection {
   SharedWithMe = "shared",
   /** The collections section. */
   Collections = "collections",
+  /** galadrim: the documents of the member's own private collection ("Privé"). */
+  Private = "private",
 }
 
 export enum UserPreference {

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { UserPreference } from "@shared/types";
 import { ProsemirrorDataHelper } from "@shared/utils/ProsemirrorDataHelper";
 import CenteredContent from "~/components/CenteredContent";
+import { resolvePrivateCollection } from "~/components/Sidebar/hooks/usePrivateCollection";
 import Flex from "~/components/Flex";
 import PlaceholderDocument from "~/components/PlaceholderDocument";
 import useCurrentUser from "~/hooks/useCurrentUser";
@@ -21,8 +22,14 @@ function DocumentNew() {
   const user = useCurrentUser();
   const match = useRouteMatch<{ collectionSlug?: string }>();
   const { t } = useTranslation();
-  const { documents, collections, userMemberships, groupMemberships } =
-    useStores();
+  const {
+    documents,
+    collections,
+    memberships,
+    userMemberships,
+    groupMemberships,
+    policies,
+  } = useStores();
   const id = match.params.collectionSlug || query.get("collectionId");
 
   useEffect(() => {
@@ -40,6 +47,22 @@ function DocumentNew() {
       try {
         if (id) {
           collection = await collections.fetch(id);
+        } else if (!parentDocumentId) {
+          // galadrim: like a new page in Notion, a document that is not filed
+          // anywhere is published to the member's private collection ("Privé"
+          // in the sidebar) rather than left as an unfiled draft. Members
+          // without such a collection keep the upstream behaviour.
+          const privateCollection = await resolvePrivateCollection(
+            { collections, memberships, groupMemberships },
+            user.id
+          ).catch(() => undefined);
+
+          if (
+            privateCollection &&
+            policies.abilities(privateCollection.id).createDocument
+          ) {
+            collection = privateCollection;
+          }
         }
 
         const document = await documents.create(
