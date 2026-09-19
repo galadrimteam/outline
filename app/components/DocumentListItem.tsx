@@ -44,6 +44,13 @@ type Props = {
   showCollection?: boolean;
   showPublished?: boolean;
   showDraft?: boolean;
+  /**
+   * galadrim: renders the item as one line, the way Notion lists the sub-pages
+   * of a page: icon and title only, without the meta line, the search context,
+   * the star and the selection checkbox. The menu stays available on hover and
+   * on right click.
+   */
+  compact?: boolean;
 };
 
 const SEARCH_RESULT_REGEX = /<b\b[^>]*>(.*?)<\/b>/gi;
@@ -83,6 +90,7 @@ function DocumentListItem(
     showDraft = true,
     highlight,
     context,
+    compact = false,
     ...rest
   } = props;
   const queryIsInTitle =
@@ -92,7 +100,7 @@ function DocumentListItem(
 
   // Multi-select is only offered for documents the user can update.
   const can = usePolicy(document.id);
-  const selectable = !!selection && !!can.update;
+  const selectable = !!selection && !!can.update && !compact;
   const isSelected = selection?.isSelected(document.id) ?? false;
   const isSelecting =
     selectable && ((selection?.isActive ?? false) || isSelected);
@@ -162,6 +170,7 @@ function DocumentListItem(
           $isDragging={isDragging}
           $menuOpen={menuOpen}
           $selectable={selectable}
+          $compact={compact}
           to={{
             pathname: documentPath(document),
             search: highlight
@@ -207,7 +216,7 @@ function DocumentListItem(
               </DocumentIconWrapper>
             </IconWrapper>
             <Content>
-              <Heading dir={document.dir}>
+              <Heading dir={document.dir} $compact={compact}>
                 <Title
                   text={document.titleWithDefault}
                   highlight={highlight}
@@ -221,23 +230,27 @@ function DocumentListItem(
                     <Badge>{t("Draft")}</Badge>
                   </Tooltip>
                 )}
-                {canStar && !isMobile && <StarButton document={document} />}
+                {canStar && !isMobile && !compact && (
+                  <StarButton document={document} />
+                )}
               </Heading>
 
-              {!queryIsInTitle && (
+              {!queryIsInTitle && !compact && (
                 <ResultContext
                   text={context}
                   highlight={highlight ? SEARCH_RESULT_REGEX : undefined}
                   processResult={replaceResultMarks}
                 />
               )}
-              <DocumentMeta
-                document={document}
-                showCollection={showCollection}
-                showPublished={showPublished}
-                showParentDocuments={showParentDocuments}
-                showLastViewed
-              />
+              {!compact && (
+                <DocumentMeta
+                  document={document}
+                  showCollection={showCollection}
+                  showPublished={showPublished}
+                  showParentDocuments={showParentDocuments}
+                  showLastViewed
+                />
+              )}
             </Content>
           </Flex>
           <Actions>
@@ -330,6 +343,7 @@ const DocumentLink = styled(Link)<{
   $isDragging?: boolean;
   $menuOpen?: boolean;
   $selectable?: boolean;
+  $compact?: boolean;
 }>`
   display: flex;
   align-items: center;
@@ -412,9 +426,33 @@ const DocumentLink = styled(Link)<{
         opacity: 0.5;
       }
     `}
+
+  /* galadrim: one row of a Notion list of sub-pages, measured on
+  app.notion.com (2026-09-19): 30px from one row to the next, a 28px link with
+  a 4px radius, a 24px icon box then the title 4px further (upstream: 10px
+  margins and 6px paddings around two lines, 8px radius). The vertical margins
+  of consecutive rows collapse, hence 2px for a 30px pitch. */
+  ${(props) =>
+    props.$compact &&
+    css`
+      margin: 2px -6px;
+      padding: 2px 6px;
+      border-radius: 4px;
+
+      ${Actions} {
+        margin: 0 0 0 8px;
+      }
+    `}
 `;
 
-const Heading = styled.span<{ rtl?: boolean }>`
+// galadrim: declared before Heading, whose compact variant refers to it.
+const Title = styled(Highlight)`
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const Heading = styled.span<{ rtl?: boolean; $compact?: boolean }>`
   display: flex;
   justify-content: ${(props) => (props.rtl ? "flex-end" : "flex-start")};
   align-items: center;
@@ -427,12 +465,21 @@ const Heading = styled.span<{ rtl?: boolean }>`
   font-size: 18px;
   line-height: 1.2;
   gap: 4px;
-`;
 
-const Title = styled(Highlight)`
-  max-width: 90%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* galadrim: a Notion sub-page title is 16px / 500 / line-height 1.3 with a
+  faint line under it (border-bottom 0.8px rgba(28, 19, 1, 0.11)). */
+  ${(props) =>
+    props.$compact &&
+    css`
+      margin-bottom: 0;
+      font-size: 16px;
+      line-height: 1.3;
+      min-height: 24px;
+
+      ${Title} {
+        border-bottom: 1px solid ${s("divider")};
+      }
+    `}
 `;
 
 const ResultContext = styled(Highlight)`

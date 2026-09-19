@@ -198,7 +198,7 @@ const CollectionScene = observer(function CollectionScene_() {
               />
             )}
             {showOverview && (
-              <OverviewContainer>
+              <OverviewContainer $empty={!hasDescription}>
                 <Overview collection={collection} readOnly={readOnly} compact />
               </OverviewContainer>
             )}
@@ -235,8 +235,10 @@ const Content = styled.div`
   background: ${s("background")};
 `;
 
-const OverviewContainer = styled.div`
-  margin-bottom: 24px;
+// galadrim: an empty overview is a single blank line (its placeholder only
+// shows on hover or focus), the documents follow it without a further gap.
+const OverviewContainer = styled.div<{ $empty: boolean }>`
+  margin-bottom: ${(props) => (props.$empty ? 0 : 24)}px;
 `;
 
 const CollectionDocuments = observer(
@@ -270,6 +272,7 @@ const CollectionDocuments = observer(
             statusFilter: [StatusFilter.Archived],
           }}
           showParentDocuments
+          compact
         />
       );
     }
@@ -285,6 +288,7 @@ const CollectionDocuments = observer(
           direction: collection.sort.direction,
         }}
         showParentDocuments
+        compact
       />
     );
   }

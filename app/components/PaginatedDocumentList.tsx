@@ -21,6 +21,8 @@ type Props = {
   showPublished?: boolean;
   showDraft?: boolean;
   showTemplate?: boolean;
+  /** galadrim: one line per document, see DocumentListItem. */
+  compact?: boolean;
 };
 
 const PaginatedDocumentList = React.memo<Props>(function PaginatedDocumentList({
@@ -34,6 +36,7 @@ const PaginatedDocumentList = React.memo<Props>(function PaginatedDocumentList({
   showPublished,
   showTemplate,
   showDraft,
+  compact,
   ...rest
 }: Props) {
   const { t } = useTranslation();
@@ -69,6 +72,7 @@ const PaginatedDocumentList = React.memo<Props>(function PaginatedDocumentList({
             showCollection={showCollection}
             showPublished={showPublished}
             showDraft={showDraft}
+            compact={compact}
           />
         )}
         {...rest}

@@ -99,7 +99,10 @@ function Overview({ collection, readOnly, compact }: Props) {
       {collections.isSaving && <LoadingIndicator />}
       {(can.update || readOnly) && (
         <Suspense fallback={<Placeholder>Loading…</Placeholder>}>
-          <MeasuredContainer name="document">
+          <MeasuredContainer
+            name="document"
+            as={compact ? QuietPlaceholder : "div"}
+          >
             <Editor
               defaultValue={collection.data}
               onChange={handleSave}
@@ -119,6 +122,23 @@ function Overview({ collection, readOnly, compact }: Props) {
     </>
   );
 }
+
+/**
+ * galadrim: the empty body of a Notion page shows nothing until it is clicked,
+ * so the "Add a description…" placeholder of an empty overview only appears
+ * while the editor is hovered or focused. The editor styles show it with
+ * `.placeholder:nth-child(1)::before { opacity: 1 }`, hence the specificity.
+ */
+const QuietPlaceholder = styled.div`
+  &&& .placeholder::before {
+    opacity: 0;
+  }
+
+  &&&:hover .placeholder::before,
+  &&& .ProseMirror-focused .placeholder::before {
+    opacity: 1;
+  }
+`;
 
 const Placeholder = styled(Text)`
   color: ${s("placeholder")};
