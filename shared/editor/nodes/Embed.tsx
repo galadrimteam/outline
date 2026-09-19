@@ -15,6 +15,7 @@ import EmbedComponent from "../components/Embed";
 import defaultEmbeds from "../embeds";
 import { getMatchingEmbed, transformListToEmbeds } from "../lib/embeds";
 import type { MarkdownSerializerState } from "../lib/markdown/serializer";
+import embedsRule from "../rules/embeds";
 import type { ComponentProps } from "../types";
 import Node from "./Node";
 import { isInList } from "../queries/isInList";
@@ -24,6 +25,11 @@ import { isList } from "../queries/isList";
 export default class Embed extends Node {
   get name() {
     return "embed";
+  }
+
+  get rulePlugins() {
+    // Evaluated lazily as the editor is bound after the node is constructed.
+    return [embedsRule(() => this.editor?.props.embeds ?? defaultEmbeds)];
   }
 
   get schema(): NodeSpec {
