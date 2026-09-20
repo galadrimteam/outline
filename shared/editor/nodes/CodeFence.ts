@@ -64,6 +64,14 @@ const COLLAPSE_HEIGHT_RATIO = 0.5;
 /** Approximate rendered line height of a code block, in pixels. */
 const CODE_LINE_HEIGHT = 20;
 
+// galadrim: Notion always renders a code block in full; the only content this
+// editor ever hides outright is a tall block auto-collapsed on load or when
+// content arrives from an import/sync, with no visible way back to seeing it
+// (26 of 34 sampled blocks stayed collapsed even at 1080px of viewport
+// height). Keep the toggle button and findTallBlocks so a reader can still
+// fold a long block by hand, just never impose that on them.
+const AUTO_COLLAPSE_TALL_BLOCKS = false;
+
 const collapseKey = new PluginKey<CollapseState>("collapse-code-block");
 
 /**
@@ -447,7 +455,11 @@ export default class CodeFence extends Node<CodeFenceOptions> {
         state: {
           init: (_config, state) => {
             const tallBlocks = findTallBlocks(state.doc);
-            return build(state.doc, tallBlocks, new Set(tallBlocks));
+            return build(
+              state.doc,
+              tallBlocks,
+              AUTO_COLLAPSE_TALL_BLOCKS ? new Set(tallBlocks) : new Set()
+            );
           },
           apply: (tr, prev, oldState, newState) => {
             const meta = tr.getMeta(collapseKey);
@@ -523,7 +535,11 @@ export default class CodeFence extends Node<CodeFenceOptions> {
               }
 
               for (const pos of tallBlocks) {
-                if (isRemote && !mappedTallBlocks.has(pos)) {
+                if (
+                  AUTO_COLLAPSE_TALL_BLOCKS &&
+                  isRemote &&
+                  !mappedTallBlocks.has(pos)
+                ) {
                   // Newly tall blocks start collapsed on load
                   collapsedBlocks.add(pos);
                 } else if (mappedCollapsedBlocks.has(pos)) {
