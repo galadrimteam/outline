@@ -42,6 +42,12 @@ type Props = {
    * "Privé" section does, instead of nested below a collection row.
    */
   rootLevel?: boolean;
+  /**
+   * galadrim: do not render the "Empty" row when the collection holds no
+   * document. That row navigates to the collection page itself, which the
+   * "Privé" section exists to hide – and Notion shows nothing there.
+   */
+  hideEmptyState?: boolean;
 };
 
 function CollectionLinkChildren({
@@ -51,6 +57,7 @@ function CollectionLinkChildren({
   prefetchDocument,
   children,
   rootLevel,
+  hideEmptyState,
 }: Props) {
   // Documents sit one level below the collection, with a minimum that leaves
   // room for their own disclosure to the left of the label.
@@ -115,7 +122,7 @@ function CollectionLinkChildren({
               index={index}
             />
           ))}
-          {childDocuments?.length === 0 && !children && (
+          {childDocuments?.length === 0 && !children && !hideEmptyState && (
             <SidebarLink
               label={
                 <Text type="tertiary" size="small" italic>

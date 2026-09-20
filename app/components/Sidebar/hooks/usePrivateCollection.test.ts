@@ -4,11 +4,13 @@ import stores from "~/stores";
 import { client } from "~/utils/ApiClient";
 import {
   PRIVATE_COLLECTION_PREFIX,
+  PRIVATE_COLLECTION_TRIAL_SUFFIX,
   fetchIsSoleMember,
   findPrivateCollection,
   hasOtherMembers,
   isExcludedCandidate,
   isPrivateCollectionCandidate,
+  privateCollectionName,
   resolvePrivateCollection,
 } from "./usePrivateCollection";
 
@@ -111,10 +113,23 @@ describe("PRIVATE_COLLECTION_PREFIX", () => {
   });
 });
 
+describe("privateCollectionName", () => {
+  it("is the name the importer gives to the member's collection", () => {
+    expect(privateCollectionName("Ada Lovelace")).toBe(
+      `${PRIVATE_COLLECTION_PREFIX}Ada Lovelace`
+    );
+  });
+
+  it("truncates to the 90 characters the importer keeps", () => {
+    expect(privateCollectionName("x".repeat(200))).toHaveLength(90);
+  });
+});
+
 describe("isPrivateCollectionCandidate", () => {
   it("accepts a private collection named with the prefix", () => {
     expect(
       isPrivateCollectionCandidate({
+        id: mine,
         name: `${PRIVATE_COLLECTION_PREFIX}Ada Lovelace`,
         isPrivate: true,
       })
@@ -127,6 +142,7 @@ describe("isPrivateCollectionCandidate", () => {
     );
     expect(
       isPrivateCollectionCandidate({
+        id: mine,
         name: `${PRIVATE_COLLECTION_PREFIX}Ada Lovelace`.normalize("NFD"),
         isPrivate: true,
       })
@@ -136,8 +152,22 @@ describe("isPrivateCollectionCandidate", () => {
   it("rejects a collection that is open to the workspace", () => {
     expect(
       isPrivateCollectionCandidate({
+        id: mine,
         name: `${PRIVATE_COLLECTION_PREFIX}Ada Lovelace`,
         isPrivate: false,
+      })
+    ).toBe(false);
+  });
+
+  it("rejects the collection of a trial import", () => {
+    // The migrator's /?limit=3 run makes a private, sole-member collection
+    // that the lead deletes afterwards – new pages must never land in it,
+    // even while it is the only candidate.
+    expect(
+      isPrivateCollectionCandidate({
+        id: trial,
+        name: `${PRIVATE_COLLECTION_PREFIX}Ada Lovelace${PRIVATE_COLLECTION_TRIAL_SUFFIX}`,
+        isPrivate: true,
       })
     ).toBe(false);
   });
@@ -149,36 +179,79 @@ describe("isPrivateCollectionCandidate", () => {
       "Privé",
       "Espace Privé – Ada Lovelace",
     ]) {
-      expect(isPrivateCollectionCandidate({ name, isPrivate: true })).toBe(
-        false
-      );
+      expect(
+        isPrivateCollectionCandidate({ id: team, name, isPrivate: true })
+      ).toBe(false);
     }
   });
 });
 
 describe("findPrivateCollection", () => {
   const collections = [
-    { name: "Tech", isPrivate: true },
+    { id: team, name: "Tech", isPrivate: true },
     {
-      name: `${PRIVATE_COLLECTION_PREFIX}Ada Lovelace (test)`,
+      id: trial,
+      name: `${PRIVATE_COLLECTION_PREFIX}Ada Lovelace${PRIVATE_COLLECTION_TRIAL_SUFFIX}`,
       isPrivate: true,
     },
-    { name: `${PRIVATE_COLLECTION_PREFIX}Ada Lovelace`, isPrivate: true },
+    {
+      id: mine,
+      name: `${PRIVATE_COLLECTION_PREFIX}Ada Lovelace`,
+      isPrivate: true,
+    },
   ];
 
-  it("prefers the shortest name among several candidates", () => {
+  it("ignores the trial collection and keeps the imported one", () => {
     expect(findPrivateCollection(collections, () => false)).toBe(
       collections[2]
     );
   });
 
-  it("skips a candidate that is shared with someone else", () => {
+  it("returns nothing when only the trial collection is left", () => {
     expect(
       findPrivateCollection(
         collections,
         (collection) => collection === collections[2]
       )
-    ).toBe(collections[1]);
+    ).toBe(undefined);
+  });
+
+  it("prefers the name the importer gives to the current user", () => {
+    const candidates = [
+      {
+        id: someoneElse,
+        name: `${PRIVATE_COLLECTION_PREFIX}Alan Turing`,
+        isPrivate: true,
+      },
+      {
+        id: mine,
+        name: `${PRIVATE_COLLECTION_PREFIX}Ada Lovelace`,
+        isPrivate: true,
+      },
+    ];
+
+    expect(
+      findPrivateCollection(
+        candidates,
+        () => false,
+        privateCollectionName("Ada Lovelace")
+      )
+    ).toBe(candidates[1]);
+  });
+
+  it("is deterministic when two candidates cannot be told apart", () => {
+    const name = `${PRIVATE_COLLECTION_PREFIX}Ada Lovelace`;
+    const first = { id: mine, name, isPrivate: true };
+    const second = { id: team, name, isPrivate: true };
+
+    // Neither the order the server listed them in nor the expected name can
+    // decide, so the smallest id does – the same one every time.
+    expect(findPrivateCollection([first, second], () => false, name)).toBe(
+      first
+    );
+    expect(findPrivateCollection([second, first], () => false, name)).toBe(
+      first
+    );
   });
 
   it("returns undefined without a candidate", () => {
@@ -307,8 +380,22 @@ describe("resolvePrivateCollection", () => {
       listed
     );
 
-    const collection = await resolvePrivateCollection(stores, me);
+    const collection = await resolvePrivateCollection(
+      stores,
+      me,
+      "Ada Lovelace"
+    );
     expect(collection?.id).toBe(mine);
+  });
+
+  it("never files a document into a trial import", async () => {
+    // Between the trial run and the real one the "(test)" collection is the
+    // only candidate: the document must stay an unfiled draft instead.
+    mockApi({ [trial]: { userIds: [me] } }, [listed[0], listed[1]]);
+
+    await expect(
+      resolvePrivateCollection(stores, me, "Ada Lovelace")
+    ).resolves.toBe(undefined);
   });
 
   it("ignores a candidate shared with someone else", async () => {
@@ -320,14 +407,17 @@ describe("resolvePrivateCollection", () => {
       listed
     );
 
-    const collection = await resolvePrivateCollection(stores, me);
-    expect(collection?.id).toBe(trial);
+    await expect(
+      resolvePrivateCollection(stores, me, "Ada Lovelace")
+    ).resolves.toBe(undefined);
   });
 
-  it("does not use a candidate that cannot be verified", async () => {
+  it("rejects when a candidate cannot be verified", async () => {
+    // Resolving to undefined here would silently produce an unfiled draft on
+    // a dropped request, and a page in "Privé" on the next click.
     mockApi({}, [listed[2]]);
 
-    await expect(resolvePrivateCollection(stores, me)).resolves.toBe(undefined);
+    await expect(resolvePrivateCollection(stores, me)).rejects.toThrow();
   });
 
   it("returns undefined for a member without a private collection", async () => {

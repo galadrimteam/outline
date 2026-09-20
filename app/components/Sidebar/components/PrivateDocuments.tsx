@@ -53,10 +53,15 @@ function PrivateDocuments({ collection }: Props) {
       <Flex column>
         <Header id="private" title={t("Private")}>
           <Relative>
+            {/* `expanded` is constant because Header renders its children
+                only while the section is open: collapsing "Privé" unmounts
+                this subtree, and with it the request that loads the
+                collection's documents. */}
             <CollectionLinkChildren
               collection={collection}
               expanded
               rootLevel
+              hideEmptyState
               prefetchDocument={documents.prefetchDocument}
             />
             {can.createDocument && (

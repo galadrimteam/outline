@@ -52,10 +52,15 @@ function DocumentNew() {
           // anywhere is published to the member's private collection ("Privé"
           // in the sidebar) rather than left as an unfiled draft. Members
           // without such a collection keep the upstream behaviour.
+          // A failed lookup is *not* swallowed: it would silently produce an
+          // unfiled draft instead, so the same click would land the page in
+          // two different places depending on the network. It falls through to
+          // the catch below, which asks the member to try again.
           const privateCollection = await resolvePrivateCollection(
             { collections, memberships, groupMemberships },
-            user.id
-          ).catch(() => undefined);
+            user.id,
+            user.name
+          );
 
           if (
             privateCollection &&
