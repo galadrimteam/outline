@@ -252,22 +252,28 @@ export default class Heading extends Node<HeadingOptions> {
 
       doc.descendants((node, pos) => {
         if (node.type.name === "heading") {
-          decorations.push(
-            Decoration.widget(
-              // Safari requires the widget to be placed at the end of the node rather than the beginning
-              // or caret selection is not correct, browser quirk – see issue #1234
-              isSafari ? pos + node.nodeSize - 1 : pos + 1,
-              createAnchor,
-              {
-                // Safari keeps this widget at the end; positive side preserves IME
-                // insertion order, while relaxed side preserves caret navigation.
-                side: isSafari ? 1 : -1,
-                ignoreSelection: true,
-                relaxedSide: isSafari,
-                key: "anchor",
-              }
-            )
-          );
+          // galadrim: Notion never offers a "copy link to heading" affordance
+          // to a read-only viewer (no block handle there at all), so don't
+          // even mount the anchor button in that case – the CSS already
+          // keeps it hidden until the heading is hovered either way.
+          if (!this.editor?.props.readOnly) {
+            decorations.push(
+              Decoration.widget(
+                // Safari requires the widget to be placed at the end of the node rather than the beginning
+                // or caret selection is not correct, browser quirk – see issue #1234
+                isSafari ? pos + node.nodeSize - 1 : pos + 1,
+                createAnchor,
+                {
+                  // Safari keeps this widget at the end; positive side preserves IME
+                  // insertion order, while relaxed side preserves caret navigation.
+                  side: isSafari ? 1 : -1,
+                  ignoreSelection: true,
+                  relaxedSide: isSafari,
+                  key: "anchor",
+                }
+              )
+            );
+          }
 
           // Creates a "space" for the caret to move to before the widget.
           // Without this it is very hard to place the caret at the beginning

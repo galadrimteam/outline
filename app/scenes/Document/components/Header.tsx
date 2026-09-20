@@ -195,7 +195,10 @@ function DocumentHeader({
           // a child would put a separator after the name of the document.
           <Flex align="center" gap={4}>
             <DocumentBreadcrumb document={document} showCurrent />
-            {toc}
+            {/* galadrim: Notion has no contents button on a page with no
+                headings to jump to, rather than one whose tooltip explains
+                that. */}
+            {hasHeadings && toc}
           </Flex>
         )
       }
