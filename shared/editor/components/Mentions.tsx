@@ -99,6 +99,26 @@ export const MentionGroup = observer(function MentionGroup_(
   );
 });
 
+/**
+ * galadrim: Notion draws the same distinction we make between a link with
+ * the author's own words and a mention: a document mention's stored label
+ * is only the target's title by coincidence when the mention is created,
+ * and our importer writes it as the author's actual sentence text ("the
+ * project is [Add a project to Gatus]"), not always the title of the page
+ * it points to. Prefer that stored text; only a mention without one
+ * (older data) falls back to the live title.
+ *
+ * @param label the mention's stored attrs.label.
+ * @param title the live title of the document it points to, if loaded.
+ * @returns the text to display for the mention.
+ */
+export function documentMentionLabel(
+  label: string | undefined,
+  title: string | undefined
+): string | undefined {
+  return label || title;
+}
+
 export const MentionDocument = observer(function MentionDocument_(
   props: ComponentProps
 ) {
@@ -135,7 +155,7 @@ export const MentionDocument = observer(function MentionDocument_(
       ) : (
         <DocumentIcon size={18} />
       )}
-      <span>{doc?.title || node.attrs.label}</span>
+      <span>{documentMentionLabel(node.attrs.label, doc?.title)}</span>
     </Link>
   );
 });
