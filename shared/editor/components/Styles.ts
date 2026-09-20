@@ -785,13 +785,19 @@ width: 100%;
   // galadrim: Notion keeps this same paragraph-to-paragraph spacing inside a
   // callout, a list item or a quote -- a mail template dropped in a callout
   // read as one dense block otherwise, its paragraphs touching. A table cell
-  // is not page rhythm though, so it opts back out.
-  p + p {
+  // is not page rhythm though, so a stack of paragraphs directly in one opts
+  // back out; a callout, list or quote *inside* a cell keeps its rhythm,
+  // which is why the opt-out is a child selector and not a descendant one.
+  p + p,
+  // accounts for block insert trigger and other widgets between paragraphs
+  p + .ProseMirror-widget + p {
     margin-top: 1em;
   }
 
-  td p + p,
-  th p + p {
+  td > p + p,
+  td > p + .ProseMirror-widget + p,
+  th > p + p,
+  th > p + .ProseMirror-widget + p {
     margin-top: 0;
   }
 
