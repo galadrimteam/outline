@@ -70,9 +70,29 @@ describe("replaceMarkdownLinks", () => {
     );
   });
 
-  it("leaves a destination with unbalanced parentheses alone", () => {
-    expect(replaceMarkdownLinks("[x](doc(1.md)", toUpper)).toBe(
-      "[x](doc(1.md)"
+  // galadrim: Notion cuts a long page or file name at a fixed length, and the
+  // cut often falls inside a parenthesis. The first ")" then closes the link,
+  // as it did upstream, so the page is still resolved on import.
+  it("replaces a destination whose parentheses do not balance", () => {
+    expect(
+      replaceMarkdownLinks(
+        "[Forum](Forums/04%2011%20Forum%20(Mines,%20PSL,%20ab12.md) et la suite",
+        toUpper
+      )
+    ).toBe(
+      "[Forum](FORUMS/04%2011%20FORUM%20(MINES,%20PSL,%20AB12.MD) et la suite"
     );
+  });
+
+  it("stops an unbalanced destination at the end of its line", () => {
+    expect(
+      replaceMarkdownLinks("[x](doc(1.md\n\nUn paragraphe (a).", toUpper)
+    ).toBe("[x](doc(1.md\n\nUn paragraphe (a).");
+  });
+
+  it("replaces the links that follow an unbalanced one", () => {
+    expect(
+      replaceMarkdownLinks("[a](un%20(1.md) puis [b](deux.md)", toUpper)
+    ).toBe("[a](UN%20(1.MD) puis [b](DEUX.MD)");
   });
 });
