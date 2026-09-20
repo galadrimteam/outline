@@ -74,6 +74,15 @@ export default function linksToNodes(md: MarkdownIt) {
             // an "x" in it: "[report.docx](…)" or "[Budget.xlsx](…)", as other
             // tools write file links, became a broken video player, and every
             // other file lost the last word of its name.
+            //
+            // Neither half can be narrowed further, because both shapes are
+            // what our own serializers write back:
+            // - "\d*" and not "\d+", because a video whose dimensions are not
+            //   known has them null (Video.tsx) and is written "[name x]";
+            //   asking for digits on both sides would turn it into a file.
+            // - a bare number is a size even when what precedes it has no
+            //   extension, because Attachment.tsx always appends the size: a
+            //   file named "Budget 2024" is written "[Budget 2024 4096]".
             const last = parts[parts.length - 1];
             const isDimensions = /^\d*x\d*$/.test(last);
             const size =
