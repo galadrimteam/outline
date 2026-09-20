@@ -219,4 +219,15 @@ describe("applyInputRules", () => {
     expect(result.doc.firstChild?.type.name).toBe("paragraph");
     expect(result.doc.firstChild?.textContent).toBe("no code ```");
   });
+  // galadrim: a callout typed in the editor is Notion's plain grey one, not
+  // the blue "info" notice the node's schema still defaults to (see
+  // shared/editor/nodes/Notice.tsx for why that default stays).
+  it("wraps text in a plain grey notice when ':::' is typed", () => {
+    const testDoc = doc([p("::")]);
+
+    const result = type(testDoc, "::", ":");
+
+    expect(result.doc.firstChild?.type.name).toBe("container_notice");
+    expect(result.doc.firstChild?.attrs.style).toBe("default");
+  });
 });

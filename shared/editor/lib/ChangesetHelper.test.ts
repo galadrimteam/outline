@@ -1,4 +1,5 @@
 import type { Slice } from "prosemirror-model";
+import { parser } from "../../test/editor";
 import { ChangesetHelper, type ExtendedChange } from "./ChangesetHelper";
 import type { ProsemirrorData } from "../../types";
 
@@ -289,6 +290,65 @@ describe("ChangesetHelper.getChangeset", () => {
       // In the new document the change is the blockquote's closing token at
       // 8, not the paragraph's at 7.
       expect([changes[1].fromB, changes[1].toB]).toEqual([8, 9]);
+    });
+  });
+
+  // galadrim: a deleted callout has to reach the rendered diff. The steps are
+  // recreated from JSON patches that do not always carry `attrs`, so a node
+  // rebuilt along the way takes its schema defaults; when those differ from the
+  // notice being compared, the deletion is read as an attribute change
+  // ("modified") and the callout disappears from the diff that is rendered from
+  // `deleted`. Keeping the notice's default style equal to the style the
+  // importer and the editor write most (`info`) is what keeps this working.
+  describe("a deleted notice", () => {
+    const withNotice = `Kept paragraph
+
+- list item 1
+- list item 2
+
+:::info
+Content in a callout
+:::
+
+- [ ] task 1
+- [x] task 2
+
+same on both sides`;
+
+    const withoutNotice = `Kept paragraph
+
+An added paragraph
+
+- list item 1
+- list item 2
+
+Another added paragraph
+
+- [x] task 1
+- [ ] task 2
+- [ ] task 3
+
+same on both sides`;
+
+    const fromMarkdown = (markdown: string) =>
+      parser.parse(markdown)!.toJSON() as ProsemirrorData;
+
+    it("is reported as a deletion, not as an attribute change", () => {
+      const changes = changesFor(
+        fromMarkdown(withoutNotice),
+        fromMarkdown(withNotice)
+      );
+
+      expect(changes.map(deletedText).join("")).toContain(
+        "Content in a callout"
+      );
+      expect(
+        changes.flatMap((change) =>
+          change.modified.map(
+            (modification) => modification.data.oldAttrs.style
+          )
+        )
+      ).not.toContain("info");
     });
   });
 

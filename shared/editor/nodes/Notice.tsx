@@ -81,9 +81,16 @@ export default class Notice extends Node {
     return {
       attrs: {
         style: {
-          // galadrim: a notice with no style written is Notion's plain grey
-          // callout, it used to be the blue "info" one.
-          default: NoticeTypes.Default,
+          // galadrim: the schema default stays upstream's "info", and every
+          // path that makes a notice says which style it wants instead: a
+          // notice with no style written is Notion's plain grey callout
+          // (parseMarkdown below), and so is one typed as ":::" (inputRules).
+          // The revision diff rebuilds nodes from JSON patches that do not
+          // always carry `attrs`, so those rebuilt nodes take this default;
+          // when it does not match the notice being compared, the diff reads a
+          // deleted notice as an attribute change and drops it from the
+          // rendered diff (ChangesetHelper, "modified").
+          default: NoticeTypes.Info,
         },
         // galadrim: the callout's own emoji, shown in place of the style icon.
         icon: {
@@ -103,9 +110,9 @@ export default class Notice extends Node {
             node.querySelector(`div.${EditorStyleHelper.noticeContent}`) ||
             node,
           getAttrs: (dom: HTMLDivElement) => ({
-            // galadrim: "default" is told apart from "info" (the fallback is
-            // no longer the node's default attribute, which is now grey), and
-            // the emoji is read back so a copied notice keeps its icon.
+            // galadrim: "default" is read back like the other styles, so a
+            // plain grey callout stays grey when it is copied, and so is the
+            // emoji, so a copied notice keeps its icon.
             style:
               [
                 NoticeTypes.Tip,
@@ -258,7 +265,9 @@ export default class Notice extends Node {
   };
 
   inputRules({ type }: { type: NodeType }) {
-    return [wrappingInputRule(/^:::$/, type)];
+    // galadrim: typing ":::" gives Notion's plain grey callout, not the blue
+    // "info" one. Upstream: wrappingInputRule(/^:::$/, type)
+    return [wrappingInputRule(/^:::$/, type, { style: NoticeTypes.Default })];
   }
 
   toMarkdown(state: MarkdownSerializerState, node: ProsemirrorNode) {

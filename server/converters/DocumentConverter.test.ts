@@ -213,7 +213,11 @@ John,25`;
         expect(result.title).toEqual("Title");
         expect(result.icon).toBeUndefined();
         expect(result.text).toContain("## 🔭 First heading");
-        expect(result.text).toContain("💡 Notice text");
+        // galadrim: the emoji leading a notice becomes that notice's own icon
+        // and is written on its fence (shared/editor/rules/notices.ts); it is
+        // still shown, and neither emoji is taken as the document's icon.
+        expect(result.text).toContain(":::info 💡");
+        expect(result.text).toContain("Notice text");
       });
 
       it("should extract emoji leading the title", async () => {
