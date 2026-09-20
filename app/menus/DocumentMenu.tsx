@@ -31,13 +31,12 @@ type Props = {
   align?: "start" | "end";
   /** Trigger's variant - renders nude variant if unset */
   neutral?: boolean;
-  /** Pass true if the document is currently being displayed */
-  showDisplayOptions?: boolean;
   /**
-   * Whether to include the option of toggling embeds as menu item. galadrim:
-   * ignored, the switch left the menu; kept for the callers.
+   * Pass true if the document is currently being displayed. galadrim: this is
+   * also what makes the menu the "…" of the page, trimmed to Notion's entries
+   * (see useDocumentMenuAction); every other caller gets the upstream menu.
    */
-  showToggleEmbeds?: boolean;
+  showDisplayOptions?: boolean;
   /** Invoked when the "Find and replace" menu item is clicked */
   onFindAndReplace?: () => void;
   /** Callback when a template is selected to apply its content to the document */
@@ -112,6 +111,7 @@ function DocumentMenu({
   const rootAction = useDocumentMenuAction({
     documentId: document.id,
     isViewing: showDisplayOptions,
+    variant: showDisplayOptions ? "page" : "context",
     onFindAndReplace,
     onRename,
     onSelectTemplate,
@@ -149,10 +149,18 @@ function DocumentMenu({
     handleFullWidthToggle,
   ]);
 
+  // galadrim: a separator is only drawn for a block that actually renders —
+  // the display options are hidden on mobile and for anyone who cannot edit,
+  // and an empty block would leave a rule hanging over the footer.
   const append = showDisplayOptions ? (
     <>
+      {toggleSwitches ? (
+        <>
+          <MenuSeparator />
+          {toggleSwitches}
+        </>
+      ) : null}
       <MenuSeparator />
-      {toggleSwitches}
       <MenuFooter document={document} />
     </>
   ) : undefined;

@@ -25,7 +25,6 @@ import Header from "~/components/Header";
 import NudeButton from "~/components/NudeButton";
 import Star from "~/components/Star";
 import Tooltip from "~/components/Tooltip";
-import useCurrentTeam from "~/hooks/useCurrentTeam";
 import { ActionContextProvider } from "~/hooks/useActionContext";
 import useCurrentUser from "~/hooks/useCurrentUser";
 import useKeyDown from "~/hooks/useKeyDown";
@@ -76,7 +75,6 @@ function DocumentHeader({
   const { t } = useTranslation();
   const { ui } = useStores();
   const theme = useTheme();
-  const team = useCurrentTeam({ rejectOnEmpty: false });
   const user = useCurrentUser({ rejectOnEmpty: false });
   const isMobileMedia = useMobile();
   const isRevision = !!revision;
@@ -119,7 +117,6 @@ function DocumentHeader({
 
   const can = usePolicy(document);
   const { isDeleted } = document;
-  const canToggleEmbeds = team?.documentEmbeds;
   const showContents = ui.tocVisible === true;
 
   useEffect(() => {
@@ -328,7 +325,6 @@ function DocumentHeader({
               neutral
               onSelectTemplate={onSelectTemplate}
               onFindAndReplace={editor?.commands.openFindAndReplace}
-              showToggleEmbeds={canToggleEmbeds}
               showDisplayOptions
             />
           </Action>

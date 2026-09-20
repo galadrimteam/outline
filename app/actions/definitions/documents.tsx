@@ -1798,6 +1798,60 @@ export const toggleDocumentStats = createAction({
   },
 });
 
+/**
+ * galadrim: the per-document "Enable embeds" and "Enable viewer insights"
+ * switches left the "…" menu of a page — Notion has no equivalent — but the
+ * menu was their only writer. They stay reachable from the command bar so that
+ * neither setting can be locked in: "embeds disabled" is a per-browser flag,
+ * and with it a page never renders its Teable databases again.
+ */
+export const toggleEmbeds = createAction({
+  name: ({ t }) => t("Enable embeds"),
+  analyticsName: "Toggle embeds",
+  section: ActiveDocumentSection,
+  icon: <EmbedIcon />,
+  selected: ({ activeDocumentId, stores }) =>
+    !stores.documents.get(activeDocumentId ?? "")?.embedsDisabled,
+  visible: ({ activeDocumentId, stores }) =>
+    !!activeDocumentId &&
+    !!stores.auth.team?.documentEmbeds &&
+    stores.policies.abilities(activeDocumentId).update,
+  perform: ({ activeDocumentId, stores }) => {
+    const document = activeDocumentId
+      ? stores.documents.get(activeDocumentId)
+      : undefined;
+    if (!document) {
+      return;
+    }
+    if (document.embedsDisabled) {
+      document.enableEmbeds();
+    } else {
+      document.disableEmbeds();
+    }
+  },
+});
+
+export const toggleViewerInsights = createAction({
+  name: ({ t }) => t("Enable viewer insights"),
+  analyticsName: "Toggle viewer insights",
+  section: ActiveDocumentSection,
+  icon: <GraphIcon />,
+  selected: ({ activeDocumentId, stores }) =>
+    !!stores.documents.get(activeDocumentId ?? "")?.insightsEnabled,
+  visible: ({ activeDocumentId, stores }) =>
+    !!activeDocumentId &&
+    stores.policies.abilities(activeDocumentId).updateInsights,
+  perform: async ({ activeDocumentId, stores }) => {
+    const document = activeDocumentId
+      ? stores.documents.get(activeDocumentId)
+      : undefined;
+    if (!document) {
+      return;
+    }
+    await document.save({ insightsEnabled: !document.insightsEnabled });
+  },
+});
+
 /** An example of the numbering each style produces, used to aid search. */
 const headingPrefixExamples: Record<HeadingPrefixStyle, string> = {
   [HeadingPrefixStyle.None]: "",
@@ -1967,5 +2021,7 @@ export const rootDocumentActions = [
   openDocumentInSplit,
   shareDocument,
   toggleDocumentStats,
+  toggleEmbeds,
+  toggleViewerInsights,
   changeHeadingPrefix,
 ];
