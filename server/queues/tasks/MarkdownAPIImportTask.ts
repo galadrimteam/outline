@@ -91,7 +91,10 @@ export function rewriteAttachmentPaths(
         reference
       );
 
-    const segments = attachment.pathInZip.split(path.sep);
+    // galadrim: a zip always separates its entries with "/", whatever the
+    // platform; path.sep is "\" on Windows and split nothing there, so the
+    // "attachments/..." form was never matched when running on Windows.
+    const segments = attachment.pathInZip.split("/");
     const attachmentsIdx = segments.findIndex(
       (seg) => seg.toLowerCase() === "attachments"
     );
@@ -133,12 +136,17 @@ export function rewriteInternalLinks(
   documentPath: string,
   docMap: Record<string, string>
 ): string {
-  const basePath = path.dirname(documentPath);
+  // galadrim: path.posix, because these are zip entries and the keys of
+  // docMap are written with "/". On Windows path.normalize turned them into
+  // backslashes and no link was ever resolved.
+  const basePath = path.posix.dirname(documentPath);
 
   return replaceMarkdownLinks(markdown, (href) => {
     let normalizedDocPath: string;
     try {
-      normalizedDocPath = decodeURI(path.normalize(`${basePath}/${href}`));
+      normalizedDocPath = decodeURI(
+        path.posix.normalize(`${basePath}/${href}`)
+      );
     } catch {
       return undefined;
     }
