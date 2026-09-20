@@ -50,6 +50,7 @@ function Home() {
 
   const recentlyViewed = (
     <PaginatedDocumentList
+      compact
       key="recent"
       documents={documents.recentlyViewed}
       fetch={documents.fetchRecentlyViewed}
@@ -115,6 +116,7 @@ function Home() {
           </Route>
           <Route path="/home/recent">
             <PaginatedDocumentList
+              compact
               documents={documents.recentlyUpdated}
               fetch={documents.fetchRecentlyUpdated}
               empty={<Empty>{t("Weird, this shouldn't ever be empty")}</Empty>}
@@ -123,6 +125,7 @@ function Home() {
           </Route>
           <Route path="/home/popular">
             <PaginatedDocumentList
+              compact
               key="popular"
               documents={documents.popular}
               fetch={documents.fetchPopular}
@@ -136,6 +139,7 @@ function Home() {
           </Route>
           <Route path="/home/created">
             <PaginatedDocumentList
+              compact
               key="created"
               documents={documents.createdByUser(userId)}
               fetch={documents.fetchOwned}
