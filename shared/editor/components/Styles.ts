@@ -2230,6 +2230,20 @@ table {
     }
   }
 
+  /* galadrim: Notion only shows a table's add/drag handles while the pointer
+   * is over the table, not at rest – readOnly alone used to gate them, and it
+   * is never true for a team member, so they were visible on every table on
+   * every page. Editing itself is unchanged, only when the handles fade in. */
+  &:hover {
+    .${EditorStyleHelper.tableAddRow}::after,
+    .${EditorStyleHelper.tableAddColumn}::after,
+    .${EditorStyleHelper.tableGripColumn}::after,
+    .${EditorStyleHelper.tableGripRow}::after,
+    .${EditorStyleHelper.tableGrip}::after {
+      opacity: 1;
+    }
+  }
+
   .${EditorStyleHelper.tableAddRow},
   .${EditorStyleHelper.tableAddColumn} {
     display: block;
@@ -2275,6 +2289,8 @@ table {
       width: 4px;
       height: 4px;
       display: ${props.readOnly ? "none" : "block"};
+      opacity: 0;
+      transition: opacity 100ms ease-in-out;
       border-radius: 100%;
       background-color: ${props.theme.divider};
     }
@@ -2320,6 +2336,8 @@ table {
       width: 4px;
       height: 4px;
       display: ${props.readOnly ? "none" : "block"};
+      opacity: 0;
+      transition: opacity 100ms ease-in-out;
       border-radius: 100%;
       background-color: ${props.theme.divider};
     }
@@ -2365,6 +2383,8 @@ table {
       height: 12px;
       background: ${props.theme.divider};
       display: ${props.readOnly ? "none" : "block"};
+      opacity: 0;
+      transition: opacity 100ms ease-in-out;
     }
 
     &:hover::after {
@@ -2400,6 +2420,8 @@ table {
       background: ${props.theme.divider};
       border-color: ${props.theme.background};
       display: ${props.readOnly ? "none" : "block"};
+      opacity: 0;
+      transition: opacity 100ms ease-in-out;
     }
 
     &:hover::after {
@@ -2436,6 +2458,8 @@ table {
       top: -18px;
       left: -18px;
       display: ${props.readOnly ? "none" : "block"};
+      opacity: 0;
+      transition: opacity 100ms ease-in-out;
       z-index: 10;
     }
 
