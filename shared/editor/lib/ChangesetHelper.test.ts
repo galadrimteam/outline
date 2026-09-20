@@ -293,20 +293,20 @@ describe("ChangesetHelper.getChangeset", () => {
     });
   });
 
-  // galadrim: a deleted callout has to reach the rendered diff. The steps are
-  // recreated from JSON patches that do not always carry `attrs`, so a node
-  // rebuilt along the way takes its schema defaults; when those differ from the
-  // notice being compared, the deletion is read as an attribute change
-  // ("modified") and the callout disappears from the diff that is rendered from
-  // `deleted`. Keeping the notice's default style equal to the style the
-  // importer and the editor write most (`info`) is what keeps this working.
+  // galadrim: a deleted callout has to reach the rendered diff (the revision
+  // viewer and the e-mail diff both render `deleted`). Recreating the steps
+  // from JSON patches deletes a node whose attributes are not the schema's
+  // defaults in two steps — the attributes are reset first, then the node is
+  // removed — and the first step alone looks exactly like an attribute change.
+  // A deletion is therefore only read as one when the node the step left
+  // behind is still in the new document (ChangesetHelper.containsNode).
   describe("a deleted notice", () => {
-    const withNotice = `Kept paragraph
+    const withNotice = (fence: string) => `Kept paragraph
 
 - list item 1
 - list item 2
 
-:::info
+${fence}
 Content in a callout
 :::
 
@@ -333,22 +333,72 @@ same on both sides`;
     const fromMarkdown = (markdown: string) =>
       parser.parse(markdown)!.toJSON() as ProsemirrorData;
 
-    it("is reported as a deletion, not as an attribute change", () => {
+    // Every style, and a callout carrying its own emoji: `default` is the one
+    // Notion's callouts import as, and three notices out of four have an emoji.
+    it.each([
+      ":::info",
+      ":::",
+      ":::warning",
+      ":::tip",
+      ":::success",
+      ":::info 💡",
+      "::: 💡",
+    ])("%s is reported as a deletion, not as an attribute change", (fence) => {
       const changes = changesFor(
         fromMarkdown(withoutNotice),
-        fromMarkdown(withNotice)
+        fromMarkdown(withNotice(fence))
       );
 
       expect(changes.map(deletedText).join("")).toContain(
         "Content in a callout"
       );
-      expect(
-        changes.flatMap((change) =>
-          change.modified.map(
-            (modification) => modification.data.oldAttrs.style
-          )
-        )
-      ).not.toContain("info");
+      expect(changes.flatMap((change) => change.modified)).toHaveLength(0);
+    });
+  });
+
+  // galadrim: the other side of the guard above — a notice that is still there
+  // with another style, or another icon, is still reported as an attribute
+  // change and not as a deletion followed by an insertion.
+  describe("a notice that changed", () => {
+    const fromMarkdown = (markdown: string) =>
+      parser.parse(markdown)!.toJSON() as ProsemirrorData;
+
+    const attributeChanges = (after: string, before: string) =>
+      changesFor(fromMarkdown(after), fromMarkdown(before)).flatMap((change) =>
+        change.modified.map((modification) => modification.data)
+      );
+
+    it("reports a style change as an attribute change", () => {
+      const modified = attributeChanges(
+        "Intro\n\n:::tip\nContent in a callout\n:::\n\nOutro",
+        "Intro\n\n:::warning\nContent in a callout\n:::\n\nOutro"
+      );
+
+      expect(modified).toHaveLength(1);
+      expect(modified[0].oldAttrs.style).toBe("tip");
+      expect(modified[0].newAttrs.style).toBe("warning");
+    });
+
+    it("reports an icon change as an attribute change", () => {
+      const modified = attributeChanges(
+        "Intro\n\n:::info 💡\nContent in a callout\n:::\n\nOutro",
+        "Intro\n\n:::info\nContent in a callout\n:::\n\nOutro"
+      );
+
+      expect(modified).toHaveLength(1);
+      expect(modified[0].oldAttrs.icon).toBe("💡");
+      expect(modified[0].newAttrs.icon).toBeNull();
+    });
+
+    it("reports a code block's language change as an attribute change", () => {
+      const modified = attributeChanges(
+        "Intro\n\n```python\nconst a = 1;\n```\n\nOutro",
+        "Intro\n\n```javascript\nconst a = 1;\n```\n\nOutro"
+      );
+
+      expect(modified).toHaveLength(1);
+      expect(modified[0].oldAttrs.language).toBe("python");
+      expect(modified[0].newAttrs.language).toBe("javascript");
     });
   });
 

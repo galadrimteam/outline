@@ -193,6 +193,60 @@ function removeIgnoredMarks(node: Node): Node {
 }
 
 /**
+ * galadrim: whether `node` is really in `doc` between the two positions.
+ *
+ * A deletion is only read as an attribute change (a "modification") when the
+ * node it was replaced with survived to the end of the diff. Recreating the
+ * steps from JSON patches deletes a node whose attributes are not the schema's
+ * defaults in two steps — first the attributes are reset on the node, then the
+ * node is removed — and without this check the first step alone makes the
+ * deletion look like an attribute change, so the deleted node is dropped from
+ * the rendered diff. Upstream only ever saw it for the four notice styles and
+ * for code blocks; Notion's callouts made it the common case.
+ *
+ * @param doc The newer document, in whose positions `from` and `to` are.
+ * @param from Start of the change in that document.
+ * @param to End of the change in that document.
+ * @param node The node the step put in place of the deletion.
+ * @returns Whether a node of the same type and text is there.
+ */
+function containsNode(
+  doc: Node,
+  from: number,
+  to: number,
+  node: Node
+): boolean {
+  const start = Math.max(0, Math.min(from, doc.content.size));
+  // An attribute-only change spans the node's opening token alone, and an
+  // empty range would visit nothing, so the range is at least one position.
+  const end = Math.min(Math.max(to, start + 1), doc.content.size);
+  if (end <= start) {
+    return false;
+  }
+
+  let found = false;
+  try {
+    doc.nodesBetween(start, end, (candidate) => {
+      if (found) {
+        return false;
+      }
+      if (
+        candidate.type.name === node.type.name &&
+        candidate.textContent === node.textContent
+      ) {
+        found = true;
+        return false;
+      }
+      return true;
+    });
+  } catch {
+    // Out of range positions: treat it as absent, i.e. a plain deletion.
+    return false;
+  }
+  return found;
+}
+
+/**
  * Represents a modification (attribute change) in the document.
  */
 export type Modification = {
@@ -409,6 +463,13 @@ export class ChangesetHelper {
                 if (
                   oldNode.textContent !== newNode.textContent ||
                   (!isSameType && !isRelatedNodeType)
+                ) {
+                  isModification = false;
+                } else if (
+                  // galadrim: the node the step inserted must still be in the
+                  // new document, otherwise this is a deletion the step
+                  // recreation split in two — see containsNode.
+                  !containsNode(docNew, change.fromB, change.toB, oldNode)
                 ) {
                   isModification = false;
                 } else if (
