@@ -7,7 +7,7 @@ import type { match } from "react-router";
 import { useHistory } from "react-router-dom";
 import scrollIntoView from "scroll-into-view-if-needed";
 import Icon from "@shared/components/Icon";
-import { hasDatabaseEmbed } from "@shared/editor/embeds/teable";
+import { isDatabasePage } from "@shared/editor/embeds/teable";
 import type { NavigationNode } from "@shared/types";
 import { DocumentPermission, UserPreference } from "@shared/types";
 import { ProsemirrorDataHelper } from "@shared/utils/ProsemirrorDataHelper";
@@ -84,14 +84,23 @@ const DocumentLink = observer(function DocumentLink(props: Props) {
   const isActiveDocument = activeDocument && activeDocument.id === node.id;
   // galadrim: a database page's rows are Notion sub-pages nowhere but inside
   // the table, so don't offer to unfold them here either – same rule as the
-  // "Documents" tab at the bottom of the page itself (References.tsx). Only
-  // takes effect once this node's own document is loaded (usually true: it's
-  // the page the reader came from to reach one of its rows), otherwise falls
-  // back to the plain child count below.
-  const isDatabasePage = hasDatabaseEmbed(documents.get(node.id)?.data);
-  const hasChildDocuments =
-    !isDatabasePage &&
-    (!!node.children.length || activeDocument?.parentDocumentId === node.id);
+  // "Documents" tab at the bottom of the page itself (References.tsx). A page
+  // that merely holds an inline base among its own content is not one, and
+  // keeps its disclosure triangle. Only takes effect once this node's own
+  // document is loaded (usually true: it's the page the reader came from to
+  // reach one of its rows), otherwise falls back to the plain child count
+  // below – the tree is a little richer until then, never poorer.
+  const isDatabase = isDatabasePage(documents.get(node.id)?.data);
+  // A draft the reader is writing under this page is not one of the rows, so
+  // it stays visible there like anywhere else.
+  const insertDraftChild = !!(
+    activeDocument?.isDraft &&
+    activeDocument?.isActive &&
+    activeDocument?.parentDocumentId === node.id
+  );
+  const hasChildDocuments = isDatabase
+    ? insertDraftChild
+    : !!node.children.length || activeDocument?.parentDocumentId === node.id;
   const sidebarContext = useSidebarContext();
   const activeSidebarContext = useActiveSidebarContext();
   const { fetchChildDocuments } = documents;
@@ -119,21 +128,17 @@ const DocumentLink = observer(function DocumentLink(props: Props) {
     isActiveDocument,
   ]);
 
-  const insertDraftChild = !!(
-    activeDocument?.isDraft &&
-    activeDocument?.isActive &&
-    activeDocument?.parentDocumentId === node.id
-  );
-
   const draftNavNode = insertDraftChild
     ? activeDocument?.asNavigationNode
     : undefined;
 
-  // galadrim: nothing renders under a database page – see isDatabasePage above.
+  // galadrim: only a draft renders under a database page – see isDatabase above.
   const nodeChildren = React.useMemo(
     () =>
-      isDatabasePage
-        ? []
+      isDatabase
+        ? draftNavNode
+          ? [draftNavNode]
+          : []
         : collection && draftNavNode
           ? sortNavigationNodes(
               [draftNavNode, ...node.children],
@@ -141,7 +146,7 @@ const DocumentLink = observer(function DocumentLink(props: Props) {
               false
             )
           : node.children,
-    [isDatabasePage, draftNavNode, collection, node.children]
+    [isDatabase, draftNavNode, collection, node.children]
   );
 
   // The last child shares its bottom edge with this node's subtree, so a drop

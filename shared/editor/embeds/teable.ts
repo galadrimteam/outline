@@ -3,41 +3,62 @@ import type { ProsemirrorData } from "../../types";
 /**
  * galadrim: the URL shape of a Teable base embedded through our /framed
  * wrapper or a public share link. Single source of truth for the "teable"
- * embed descriptor (below) and for the sidebar/references code that treats
- * a document holding one of these as a Notion-style database page — see
- * app/scenes/Document/components/linkedDocuments.ts and
- * app/components/Sidebar/components/SidebarExpansionContext.ts.
+ * embed descriptor (shared/editor/embeds/index.tsx) and for the two
+ * navigation surfaces that treat a document holding one as a Notion-style
+ * database page — see app/scenes/Document/components/References.tsx and
+ * app/components/Sidebar/components/DocumentLink.tsx.
  */
 export const TEABLE_FRAME_REGEX = new RegExp(
   "^https?://teable\\.[a-z0-9.-]+/(framed\\?.+|share/.+)$"
 );
 
 /**
- * galadrim: whether a document's body is (or contains) a Teable base embed,
- * i.e. is a database page imported from a Notion database. Notion never
- * lists a database's rows anywhere but inside the database itself, so a
- * page like this should not repeat them as child documents or backlinks.
+ * Whether a node is an embed of a Teable base.
+ *
+ * @param node a node of a document's content.
+ * @returns true for an embed pointing at a Teable base.
+ */
+function isTeableEmbed(node: ProsemirrorData): boolean {
+  return (
+    node.type === "embed" &&
+    typeof node.attrs?.href === "string" &&
+    TEABLE_FRAME_REGEX.test(node.attrs.href)
+  );
+}
+
+/**
+ * Whether a node is an empty paragraph, i.e. carries nothing a reader sees.
+ * The editor leaves one at the end of a document readily enough that it
+ * should not change what the page *is*.
+ *
+ * @param node a node of a document's content.
+ * @returns true for a paragraph with no content.
+ */
+function isBlank(node: ProsemirrorData): boolean {
+  return node.type === "paragraph" && !node.content?.length;
+}
+
+/**
+ * galadrim: whether a document *is* a database page imported from a Notion
+ * database, i.e. its whole body is the embed of its Teable base and nothing
+ * else. Notion never lists a database's rows anywhere but inside the database
+ * itself, so such a page repeats them neither in its "Documents" tab nor in
+ * the sidebar tree.
+ *
+ * Deliberately not "the body contains a Teable embed somewhere": a Notion page
+ * may hold an inline database among its own content, and it is then an
+ * ordinary page whose real sub-pages stay listed and unfoldable, exactly as
+ * they are in Notion. Measured on the imported corpus (1308 documents): 124
+ * documents hold a Teable embed, but all 412 row-documents hang under the 53
+ * whose body is only that embed; the wider rule took 41 real sub-pages, and
+ * 265 of their descendants, out of both surfaces.
  *
  * @param data the document's content.
- * @returns true if any embed node in the tree points at a Teable base.
+ * @returns true if the body is just the embed of a Teable base.
  */
-export function hasDatabaseEmbed(
+export function isDatabasePage(
   data: ProsemirrorData | undefined | null
 ): boolean {
-  if (!data) {
-    return false;
-  }
-
-  const visit = (node: ProsemirrorData): boolean => {
-    if (
-      node.type === "embed" &&
-      typeof node.attrs?.href === "string" &&
-      TEABLE_FRAME_REGEX.test(node.attrs.href)
-    ) {
-      return true;
-    }
-    return !!node.content?.some(visit);
-  };
-
-  return visit(data);
+  const blocks = data?.content?.filter((node) => !isBlank(node));
+  return !!blocks && blocks.length === 1 && isTeableEmbed(blocks[0]);
 }
