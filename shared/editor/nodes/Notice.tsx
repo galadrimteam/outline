@@ -2,6 +2,7 @@ import type Token from "markdown-it/lib/token.mjs";
 import { WarningIcon, InfoIcon, StarredIcon, DoneIcon } from "outline-icons";
 import { wrappingInputRule } from "prosemirror-inputrules";
 import type {
+  DOMOutputSpec,
   NodeSpec,
   Node as ProsemirrorNode,
   NodeType,
@@ -10,7 +11,7 @@ import type { Command, EditorState, Transaction } from "prosemirror-state";
 import type { Primitive } from "utility-types";
 import toggleWrap from "../commands/toggleWrap";
 import type { MarkdownSerializerState } from "../lib/markdown/serializer";
-import noticesRule from "../rules/notices";
+import noticesRule, { noticeInfo } from "../rules/notices";
 import { EditorStyleHelper } from "../styles/EditorStyleHelper";
 import type { ComponentProps } from "../types";
 import Node from "./Node";
@@ -20,6 +21,51 @@ export enum NoticeTypes {
   Success = "success",
   Tip = "tip",
   Warning = "warning",
+  /**
+   * galadrim: Notion's plain callout, a neutral grey box with no icon of its
+   * own. Two Notion callouts out of three are this one, and it is now what a
+   * new notice is, so that writing in Outline gives what writing in Notion
+   * gave. The four styles above keep working, for existing documents and for
+   * the styles menu.
+   */
+  Default = "default",
+}
+
+/**
+ * galadrim: the style a notice written with one of Notion's block colours
+ * takes, so that the importer may pass `format.block_color` through as it
+ * reads it. A colour Notion has and Outline has not falls back to the nearest
+ * one, and anything unknown to the plain grey callout.
+ */
+const noticeTypeByName: Record<string, NoticeTypes> = {
+  [NoticeTypes.Info]: NoticeTypes.Info,
+  [NoticeTypes.Success]: NoticeTypes.Success,
+  [NoticeTypes.Tip]: NoticeTypes.Tip,
+  [NoticeTypes.Warning]: NoticeTypes.Warning,
+  [NoticeTypes.Default]: NoticeTypes.Default,
+  gray: NoticeTypes.Default,
+  grey: NoticeTypes.Default,
+  blue: NoticeTypes.Info,
+  purple: NoticeTypes.Info,
+  yellow: NoticeTypes.Tip,
+  orange: NoticeTypes.Tip,
+  brown: NoticeTypes.Tip,
+  green: NoticeTypes.Success,
+  teal: NoticeTypes.Success,
+  red: NoticeTypes.Warning,
+  pink: NoticeTypes.Warning,
+};
+
+/**
+ * galadrim: reads the notice style written on the opening fence.
+ *
+ * @param name A style name, a Notion block colour ("gray_background"), or
+ *   anything else a document may carry.
+ * @returns The style to render the notice with.
+ */
+export function toNoticeType(name: string | undefined): NoticeTypes {
+  const key = (name ?? "").toLowerCase().replace(/_background$/, "");
+  return noticeTypeByName[key] ?? NoticeTypes.Default;
 }
 
 export default class Notice extends Node {
@@ -35,7 +81,13 @@ export default class Notice extends Node {
     return {
       attrs: {
         style: {
-          default: NoticeTypes.Info,
+          // galadrim: a notice with no style written is Notion's plain grey
+          // callout, it used to be the blue "info" one.
+          default: NoticeTypes.Default,
+        },
+        // galadrim: the callout's own emoji, shown in place of the style icon.
+        icon: {
+          default: null,
         },
       },
       content:
@@ -51,13 +103,18 @@ export default class Notice extends Node {
             node.querySelector(`div.${EditorStyleHelper.noticeContent}`) ||
             node,
           getAttrs: (dom: HTMLDivElement) => ({
-            style: dom.className.includes(NoticeTypes.Tip)
-              ? NoticeTypes.Tip
-              : dom.className.includes(NoticeTypes.Warning)
-                ? NoticeTypes.Warning
-                : dom.className.includes(NoticeTypes.Success)
-                  ? NoticeTypes.Success
-                  : undefined,
+            // galadrim: "default" is told apart from "info" (the fallback is
+            // no longer the node's default attribute, which is now grey), and
+            // the emoji is read back so a copied notice keeps its icon.
+            style:
+              [
+                NoticeTypes.Tip,
+                NoticeTypes.Warning,
+                NoticeTypes.Success,
+                NoticeTypes.Default,
+              ].find((type) => dom.className.includes(type)) ??
+              NoticeTypes.Info,
+            icon: dom.dataset.icon ?? null,
           }),
         },
         // Quill editor parsing
@@ -65,7 +122,7 @@ export default class Notice extends Node {
           tag: "div.ql-hint",
           preserveWhitespace: "full",
           getAttrs: (dom: HTMLDivElement) => ({
-            style: dom.dataset.hint,
+            style: dom.dataset.hint ?? NoticeTypes.Info,
           }),
         },
         // GitBook parsing
@@ -77,7 +134,7 @@ export default class Notice extends Node {
               ? NoticeTypes.Warning
               : dom.className.includes(NoticeTypes.Success)
                 ? NoticeTypes.Success
-                : undefined,
+                : NoticeTypes.Info,
           }),
         },
         // Confluence parsing
@@ -91,15 +148,35 @@ export default class Notice extends Node {
                 ? NoticeTypes.Tip
                 : dom.className.includes("confluence-information-macro-warning")
                   ? NoticeTypes.Warning
-                  : undefined,
+                  : NoticeTypes.Info,
           }),
         },
       ],
-      toDOM: (node) => [
-        "div",
-        { class: `${EditorStyleHelper.notice} ${node.attrs.style}` },
-        ["div", { class: EditorStyleHelper.noticeContent }, 0],
-      ],
+      toDOM: (node) => {
+        const content: DOMOutputSpec = [
+          "div",
+          { class: EditorStyleHelper.noticeContent },
+          0,
+        ];
+        // galadrim: the emoji is written next to the content and on the
+        // element, so that it survives a copy and shows in the HTML Outline
+        // renders outside the editor.
+        return node.attrs.icon
+          ? [
+              "div",
+              {
+                class: `${EditorStyleHelper.notice} ${node.attrs.style}`,
+                "data-icon": node.attrs.icon,
+              },
+              ["div", { class: EditorStyleHelper.noticeIcon }, node.attrs.icon],
+              content,
+            ]
+          : [
+              "div",
+              { class: `${EditorStyleHelper.notice} ${node.attrs.style}` },
+              content,
+            ];
+      },
     };
   }
 
@@ -115,6 +192,9 @@ export default class Notice extends Node {
         this.handleStyleChange(state, dispatch, NoticeTypes.Success),
       tip: (): Command => (state, dispatch) =>
         this.handleStyleChange(state, dispatch, NoticeTypes.Tip),
+      // galadrim: back to Notion's plain grey callout
+      default: (): Command => (state, dispatch) =>
+        this.handleStyleChange(state, dispatch, NoticeTypes.Default),
     };
   }
 
@@ -144,21 +224,31 @@ export default class Notice extends Node {
     const { node } = props;
 
     let icon;
-    if (node.attrs.style === NoticeTypes.Tip) {
+    if (node.attrs.icon) {
+      // galadrim: the callout's own emoji, as Notion shows it. The style icons
+      // below are kept for the notices that have none.
+      icon = node.attrs.icon;
+    } else if (node.attrs.style === NoticeTypes.Tip) {
       icon = <StarredIcon />;
     } else if (node.attrs.style === NoticeTypes.Warning) {
       icon = <WarningIcon />;
     } else if (node.attrs.style === NoticeTypes.Success) {
       icon = <DoneIcon />;
+    } else if (node.attrs.style === NoticeTypes.Default) {
+      // galadrim: a plain callout with no emoji has no icon at all, as in
+      // Notion — an icon of Outline's own would be a tool difference.
+      icon = null;
     } else {
       icon = <InfoIcon />;
     }
 
     return (
       <div className={`${EditorStyleHelper.notice} ${node.attrs.style}`}>
-        <div className={EditorStyleHelper.noticeIcon} contentEditable={false}>
-          {icon}
-        </div>
+        {icon ? (
+          <div className={EditorStyleHelper.noticeIcon} contentEditable={false}>
+            {icon}
+          </div>
+        ) : null}
         <div
           className={EditorStyleHelper.noticeContent}
           ref={props.contentRef}
@@ -172,7 +262,12 @@ export default class Notice extends Node {
   }
 
   toMarkdown(state: MarkdownSerializerState, node: ProsemirrorNode) {
-    state.write("\n:::" + (node.attrs.style || "info") + "\n");
+    // galadrim: the emoji follows the style on the fence, ":::info 💡", which
+    // is where the rule reads it back from.
+    const icon = node.attrs.icon ? ` ${node.attrs.icon as string}` : "";
+    state.write(
+      "\n:::" + (node.attrs.style || NoticeTypes.Default) + icon + "\n"
+    );
     state.renderContent(node);
     state.ensureNewLine();
     state.write(":::");
@@ -182,7 +277,13 @@ export default class Notice extends Node {
   parseMarkdown() {
     return {
       block: "container_notice",
-      getAttrs: (tok: Token) => ({ style: tok.info }),
+      // galadrim: the style is one of ours or one of Notion's block colours,
+      // and the icon is the emoji the callout leads with. Upstream:
+      // ({ style: tok.info })
+      getAttrs: (tok: Token) => {
+        const { style, icon } = noticeInfo(tok);
+        return { style: toNoticeType(style), icon: icon ?? null };
+      },
     };
   }
 }

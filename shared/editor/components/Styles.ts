@@ -30,6 +30,41 @@ export const pulse = (color: string) => keyframes`
   100% { box-shadow: 0 0 0 1px ${color} }
 `;
 
+/**
+ * galadrim: Notion's callout backgrounds. The grey and the yellow of the light
+ * set are the values measured on a Notion page (rgb(249,248,247) and
+ * rgb(249,243,220)); the three others are the same family, and the dark set is
+ * Notion's dark palette.
+ */
+const noticeBackgrounds = {
+  light: {
+    default: "rgb(249, 248, 247)",
+    info: "rgb(231, 243, 248)",
+    tip: "rgb(249, 243, 220)",
+    success: "rgb(237, 243, 236)",
+    warning: "rgb(253, 235, 236)",
+  },
+  dark: {
+    default: "rgb(47, 47, 47)",
+    info: "rgb(20, 58, 78)",
+    tip: "rgb(86, 67, 40)",
+    success: "rgb(36, 61, 48)",
+    warning: "rgb(82, 46, 42)",
+  },
+} as const;
+
+/**
+ * galadrim: the background of a notice of the given style.
+ *
+ * @param props The editor style props, for the current theme.
+ * @param style The notice style.
+ * @returns A CSS colour.
+ */
+const noticeBackground = (
+  props: Props,
+  style: keyof (typeof noticeBackgrounds)["light"]
+) => noticeBackgrounds[props.theme.isDark ? "dark" : "light"][style];
+
 const codeMarkCursor = () => css`
   /* Based on https://github.com/curvenote/editor/blob/main/packages/prosemirror-codemark/src/codemark.css */
   .no-cursor {
@@ -285,7 +320,7 @@ const codeBlockStyle = (props: Props) => css`
 
 const diffStyle = (props: Props) => css`
   .${EditorStyleHelper.diffNodeInsertion},
-    .${EditorStyleHelper.diffInsertion}:not([class^="component-"]),
+  .${EditorStyleHelper.diffInsertion}:not([class^="component-"]),
   .${EditorStyleHelper.diffInsertion} > * {
     color: ${props.theme.textDiffInserted};
     background-color: ${props.theme.textDiffInsertedBackground};
@@ -311,19 +346,19 @@ const diffStyle = (props: Props) => css`
   }
 
   .${EditorStyleHelper.diffNodeInsertion}[class*="component-"],
-    .${EditorStyleHelper.diffNodeInsertion}.math-node,
-    ul.${EditorStyleHelper.diffNodeInsertion},
-    li.${EditorStyleHelper.diffNodeInsertion} {
+  .${EditorStyleHelper.diffNodeInsertion}.math-node,
+  ul.${EditorStyleHelper.diffNodeInsertion},
+  li.${EditorStyleHelper.diffNodeInsertion} {
     border-radius: ${EditorStyleHelper.blockRadius};
   }
 
   td.${EditorStyleHelper.diffNodeInsertion},
-    th.${EditorStyleHelper.diffNodeInsertion} {
+  th.${EditorStyleHelper.diffNodeInsertion} {
     border-color: ${props.theme.textDiffInsertedBackground};
   }
 
   .${EditorStyleHelper.diffNodeDeletion},
-    .${EditorStyleHelper.diffDeletion}:not([class^="component-"]),
+  .${EditorStyleHelper.diffDeletion}:not([class^="component-"]),
   .${EditorStyleHelper.diffDeletion} > * {
     color: ${props.theme.textDiffDeleted};
     background-color: ${props.theme.textDiffDeletedBackground};
@@ -353,19 +388,19 @@ const diffStyle = (props: Props) => css`
   }
 
   .${EditorStyleHelper.diffNodeDeletion}[class*="component-"],
-    .${EditorStyleHelper.diffNodeDeletion}.math-node,
-    ul.${EditorStyleHelper.diffNodeDeletion},
-    li.${EditorStyleHelper.diffNodeDeletion} {
+  .${EditorStyleHelper.diffNodeDeletion}.math-node,
+  ul.${EditorStyleHelper.diffNodeDeletion},
+  li.${EditorStyleHelper.diffNodeDeletion} {
     border-radius: ${EditorStyleHelper.blockRadius};
   }
 
   td.${EditorStyleHelper.diffNodeDeletion},
-    th.${EditorStyleHelper.diffNodeDeletion} {
+  th.${EditorStyleHelper.diffNodeDeletion} {
     border-color: ${props.theme.textDiffDeletedBackground};
   }
 
   .${EditorStyleHelper.diffNodeModification},
-    .${EditorStyleHelper.diffModification}:not([class^="component-"]),
+  .${EditorStyleHelper.diffModification}:not([class^="component-"]),
   .${EditorStyleHelper.diffModification} > * {
     color: ${props.theme.text};
     background-color: ${transparentize(0.7, "#FFA500")};
@@ -392,14 +427,14 @@ const diffStyle = (props: Props) => css`
   }
 
   .${EditorStyleHelper.diffNodeModification}[class*="component-"],
-    .${EditorStyleHelper.diffNodeModification}.math-node,
-    ul.${EditorStyleHelper.diffNodeModification},
-    li.${EditorStyleHelper.diffNodeModification} {
+  .${EditorStyleHelper.diffNodeModification}.math-node,
+  ul.${EditorStyleHelper.diffNodeModification},
+  li.${EditorStyleHelper.diffNodeModification} {
     border-radius: ${EditorStyleHelper.blockRadius};
   }
 
   td.${EditorStyleHelper.diffNodeModification},
-    th.${EditorStyleHelper.diffNodeModification} {
+  th.${EditorStyleHelper.diffNodeModification} {
     border-color: ${transparentize(0.5, "#FFA500")};
   }
 `;
@@ -1317,19 +1352,26 @@ ${
 `
 }
 
+/* galadrim: notices are drawn like Notion's callouts — a soft full background,
+   10px corners, 12px of padding, no coloured bar on the left and the page's
+   own text colour. Upstream used a 4px left border, a 10% tint of a saturated
+   accent and that accent as the text colour, which no Notion page ever looks
+   like. The grey and yellow values are the computed styles measured on a
+   Notion page (rgb(249,248,247) and rgb(249,243,220)); the others are the same
+   family, and the dark ones are Notion's dark palette. */
 .${EditorStyleHelper.notice} {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  gap: 8px;
   position: relative;
-  background: ${transparentize(0.9, props.theme.noticeInfoBackground)};
-  border-left: 4px solid ${props.theme.noticeInfoBackground};
-  color: ${props.theme.noticeInfoText};
-  border-radius: 4px;
-  padding: 8px 10px 8px 8px;
+  background: ${noticeBackground(props, "default")};
+  color: ${props.theme.text};
+  border-radius: 10px;
+  padding: 12px;
   margin: 8px 0;
 
   a {
-    color: ${props.theme.noticeInfoText};
+    color: ${props.theme.text};
     text-decoration: underline;
   }
 
@@ -1351,56 +1393,42 @@ ${
   .${EditorStyleHelper.noticeIcon} {
     width: 24px;
     height: 24px;
+    flex-shrink: 0;
     align-self: flex-start;
-    margin-right: 4px;
+    /* galadrim: the icon is an emoji as often as an SVG now, centre it in the
+       same 24px box Notion gives a callout icon. */
+    font-size: 16px;
+    line-height: 24px;
+    text-align: center;
     color: ${props.theme.noticeInfoBackground};
-  }
-
-  &:dir(rtl) .${EditorStyleHelper.noticeIcon} {
-    margin-right: 0;
-    margin-left: 4px;
   }
 }
 
+.${EditorStyleHelper.notice}.info {
+  background: ${noticeBackground(props, "info")};
+}
+
 .${EditorStyleHelper.notice}.tip {
-  background: ${transparentize(0.9, props.theme.noticeTipBackground)};
-  border-left: 4px solid ${props.theme.noticeTipBackground};
-  color: ${props.theme.noticeTipText};
+  background: ${noticeBackground(props, "tip")};
 
   .${EditorStyleHelper.noticeIcon} {
     color: ${props.theme.noticeTipBackground};
   }
-
-  a {
-    color: ${props.theme.noticeTipText};
-  }
 }
 
 .${EditorStyleHelper.notice}.warning {
-  background: ${transparentize(0.9, props.theme.noticeWarningBackground)};
-  border-left: 4px solid ${props.theme.noticeWarningBackground};
-  color: ${props.theme.noticeWarningText};
+  background: ${noticeBackground(props, "warning")};
 
   .${EditorStyleHelper.noticeIcon} {
     color: ${props.theme.noticeWarningBackground};
   }
-
-  a {
-    color: ${props.theme.noticeWarningText};
-  }
 }
 
 .${EditorStyleHelper.notice}.success {
-  background: ${transparentize(0.9, props.theme.noticeSuccessBackground)};
-  border-left: 4px solid ${props.theme.noticeSuccessBackground};
-  color: ${props.theme.noticeSuccessText};
+  background: ${noticeBackground(props, "success")};
 
   .${EditorStyleHelper.noticeIcon} {
     color: ${props.theme.noticeSuccessBackground};
-  }
-
-  a {
-    color: ${props.theme.noticeSuccessText};
   }
 }
 

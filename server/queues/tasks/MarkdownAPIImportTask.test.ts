@@ -143,4 +143,14 @@ describe("rewriteInternalLinks", () => {
     );
     expect(out).toBe('see [other](<<doc-5>> "The other one")');
   });
+
+  // galadrim: Notion leaves the parentheses of a page title raw in the path
+  it("rewrites a link whose path contains parentheses", () => {
+    const out = rewriteInternalLinks(
+      "see [other](Parent%20(old)/My%20Doc%20(v2).md) (soon)",
+      "Collection/parent.md",
+      { "Collection/Parent (old)/My Doc (v2).md": "doc-6" }
+    );
+    expect(out).toBe("see [other](<<doc-6>>) (soon)");
+  });
 });

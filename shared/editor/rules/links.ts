@@ -67,10 +67,20 @@ export default function linksToNodes(md: MarkdownIt) {
           if (insideLink && isAttachment(insideLink)) {
             const { content } = current;
             const parts = content.split(" ");
-            const size = parts.pop();
+            // galadrim: the last word of the label is only taken off the title
+            // when it is what the serializers write there, "<width>x<height>"
+            // for a video (either may be empty) or a size in bytes for a file.
+            // Upstream always took it and made a video of any last word with
+            // an "x" in it: "[report.docx](…)" or "[Budget.xlsx](…)", as other
+            // tools write file links, became a broken video player, and every
+            // other file lost the last word of its name.
+            const last = parts[parts.length - 1];
+            const isDimensions = /^\d*x\d*$/.test(last);
+            const size =
+              isDimensions || /^\d+$/.test(last) ? parts.pop() : undefined;
             const title = parts.join(" ");
 
-            if (size?.includes("x")) {
+            if (size && isDimensions) {
               // convert to video
               const token = new state.Token("video", "video", 0);
               token.attrSet("src", insideLink.attrGet("href") || "");

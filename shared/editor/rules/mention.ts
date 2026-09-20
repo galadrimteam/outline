@@ -157,16 +157,58 @@ function parseMentions(state: StateCore) {
       return [precToken, mentionToken];
     };
 
+    // galadrim: the label may carry inline marks. "@[**Bold title**](mention://…)"
+    // is what the Markdown import writes for a sub-page link whose label is bold
+    // or italic in the source; upstream only accepts a single text token, which
+    // left a literal "@" followed by a dead link to mention://. The label tokens
+    // are merged into one text token (a mention shows plain text, marks are
+    // dropped) so that the upstream checks below apply unchanged.
+    const chunkAt = (
+      children: Token[],
+      start: number
+    ): { chunk: Token[]; size: number } => {
+      const plain = { chunk: children.slice(start, start + 4), size: 4 };
+      if (
+        children[start + 1]?.type !== "link_open" ||
+        children[start + 3]?.type === "link_close"
+      ) {
+        return plain;
+      }
+
+      let end = start + 2;
+      let label = "";
+      while (end < children.length && children[end].type !== "link_close") {
+        const child = children[end];
+        const isMark = child.nesting !== 0 && child.type !== "link_open";
+        if (child.type === "text" || child.type === "code_inline") {
+          label += child.content;
+        } else if (!isMark) {
+          return plain;
+        }
+        end++;
+      }
+      if (end >= children.length) {
+        return plain;
+      }
+
+      const textToken = new state.Token("text", "", 0);
+      textToken.content = label;
+      return {
+        chunk: [children[start], children[start + 1], textToken, children[end]],
+        size: end - start + 1,
+      };
+    };
+
     let newChildren: Token[] = [];
     let j = 0;
     while (j < tok.children.length) {
       // attempt to grab next four tokens that could potentially construct a mention token
-      const chunk = tok.children.slice(j, j + 4);
+      const { chunk, size } = chunkAt(tok.children, j);
       if (canChunkComposeMentionToken(chunk)) {
         newChildren = newChildren.concat(chunkWithMentionToken(chunk));
-        // skip by 4 since mention token for this group of tokens has been composed
+        // skip the group since mention token for this group of tokens has been composed
         // and the group cannot compose mention tokens any further
-        j += 4;
+        j += size;
       } else {
         // push the tokens which do not participate in composing a mention token as it is
         newChildren.push(tok.children[j]);

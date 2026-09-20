@@ -732,7 +732,12 @@ export default abstract class ImportsProcessor<
       }
     }
 
-    idMap[externalId] = internalId ?? randomUUID();
+    // galadrim: read the map again after the await above. The mentions of a
+    // page are transformed concurrently (Promise.all in rewriteReferences), so
+    // two mentions of the same not-yet-created document both got here with no
+    // id; each wrote its own UUID, the last one became the document's id and
+    // the first mention pointed at a document that never exists.
+    idMap[externalId] = idMap[externalId] ?? internalId ?? randomUUID();
     return idMap[externalId];
   }
 

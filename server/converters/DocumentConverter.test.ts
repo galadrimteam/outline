@@ -183,7 +183,8 @@ John,25`;
         expect(result.text).not.toContain("My Title");
       });
 
-      it("should extract emoji from start", async () => {
+      // galadrim: the body's leading emoji is no longer taken as the icon.
+      it("should leave an emoji leading the body alone", async () => {
         const html = "<p>🚀 Launch content</p>";
         const result = await DocumentConverter.convert(
           html,
@@ -191,8 +192,28 @@ John,25`;
           "text/html"
         );
 
-        expect(result.icon).toEqual("🚀");
-        expect(result.text).not.toMatch(/^🚀/);
+        expect(result.icon).toBeUndefined();
+        expect(result.text).toMatch(/^🚀 Launch content/);
+      });
+
+      it("should leave the emoji of the first heading or notice alone", async () => {
+        const markdown = `# Title
+
+## 🔭 First heading
+
+:::info
+💡 Notice text
+:::`;
+        const result = await DocumentConverter.convert(
+          markdown,
+          "test.md",
+          "text/markdown"
+        );
+
+        expect(result.title).toEqual("Title");
+        expect(result.icon).toBeUndefined();
+        expect(result.text).toContain("## 🔭 First heading");
+        expect(result.text).toContain("💡 Notice text");
       });
 
       it("should extract emoji leading the title", async () => {

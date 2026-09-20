@@ -50,4 +50,29 @@ describe("replaceMarkdownLinks", () => {
       "[a](ONE.MD) and [b](TWO.MD)"
     );
   });
+
+  // galadrim: balanced parentheses in the destination
+  it("replaces a destination that contains balanced parentheses", () => {
+    expect(
+      replaceMarkdownLinks("[Page](Folder/Page%20(v2)%20abc.md)", toUpper)
+    ).toBe("[Page](FOLDER/PAGE%20(V2)%20ABC.MD)");
+  });
+
+  it("keeps links apart when one sits inside parentheses", () => {
+    expect(
+      replaceMarkdownLinks("([a](one(1).md), then [b](two.md)) end", toUpper)
+    ).toBe("([a](ONE(1).MD), then [b](TWO.MD)) end");
+  });
+
+  it("preserves a title next to a destination with parentheses", () => {
+    expect(replaceMarkdownLinks('[x](doc(1).md "Title (a)")', toUpper)).toBe(
+      '[x](DOC(1).MD "Title (a)")'
+    );
+  });
+
+  it("leaves a destination with unbalanced parentheses alone", () => {
+    expect(replaceMarkdownLinks("[x](doc(1.md)", toUpper)).toBe(
+      "[x](doc(1.md)"
+    );
+  });
 });
