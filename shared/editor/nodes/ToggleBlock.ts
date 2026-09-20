@@ -134,14 +134,18 @@ export default class ToggleBlock extends Node {
 
         let tr: Transaction | null = null;
 
-        // Assign IDs to blocks that need them and default to unfolded in this browser
+        // Assign IDs to blocks that need them. A block the reader just typed opens (there is nothing to read in it
+        // yet); galadrim: one that arrives with a body -- every toggle of an imported Notion page -- gets no stored
+        // state, so collectFoldState leaves it FOLDED, which is how Notion shows it.
         const blocksNeedingIds = toggleBlocks.filter((b) => !b.node.attrs.id);
         if (blocksNeedingIds.length > 0) {
           tr = newState.tr;
           blocksNeedingIds.forEach((block) => {
             const id = v4();
             tr!.setNodeAttribute(block.pos, "id", id);
-            foldStateCache.set(id, { fold: false });
+            if (block.node.textContent.trim() === "") {
+              foldStateCache.set(id, { fold: false });
+            }
           });
         }
 
