@@ -7,7 +7,6 @@ import { s } from "@shared/styles";
 import { Action } from "~/components/Actions";
 import Empty from "~/components/Empty";
 import Heading from "~/components/Heading";
-import InputSearchPage from "~/components/InputSearchPage";
 import LanguagePrompt from "~/components/LanguagePrompt";
 import PaginatedDocumentList from "~/components/PaginatedDocumentList";
 import PinnedDocuments from "~/components/PinnedDocuments";
@@ -66,9 +65,11 @@ function Home() {
     <Scene
       icon={<HomeIcon />}
       title={t("Home")}
-      left={
-        <InputSearchPage source="dashboard" label={t("Search documents")} />
-      }
+      // galadrim: no search field on the home page. Notion has none either:
+      // search lives in the sidebar and opens the quick find over the page
+      // (see Sidebar/App.tsx). Two entry points behaving differently – a
+      // palette here, the full search page there – is exactly the kind of
+      // difference a Notion user trips on.
       actions={
         <Action>
           <NewDocumentMenu />

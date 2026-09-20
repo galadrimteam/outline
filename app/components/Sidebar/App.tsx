@@ -10,6 +10,7 @@ import { useTranslation } from "react-i18next";
 import styled from "styled-components";
 import { SidebarSection, UserPreference } from "@shared/types";
 import { metaDisplay } from "@shared/utils/keyboard";
+import { recentDocumentCount } from "~/components/CommandBar/useRecentDocumentActions";
 import Scrollable from "~/components/Scrollable";
 import { navigateToImport } from "~/actions/definitions/navigation";
 import { inviteUser } from "~/actions/definitions/users";
@@ -30,6 +31,7 @@ import DraggableSection, {
 import { DraftsLink } from "./components/DraftsLink";
 import DragPlaceholder from "./components/DragPlaceholder";
 import PrivateDocuments from "./components/PrivateDocuments";
+import RecentDocuments from "./components/RecentDocuments";
 import { DismissableSidebarAction } from "./components/DismissableSidebarAction";
 import HistoryNavigation from "./components/HistoryNavigation";
 import Section from "./components/Section";
@@ -53,13 +55,22 @@ function AppSidebar() {
   // galadrim: like Notion's quick find, search opens over the current page
   // (the command bar: recent documents, then instant title matches) instead of
   // replacing it. The full search page is one "Search documents for…" away.
+  // On mobile the drawer is only dismissed by a change of route, so it has to
+  // be closed here – opening the palette is not a navigation.
   const { query: commandBar } = useKBar();
   const handleSearchClick = useCallback(() => {
+    if (isMobile) {
+      ui.hideMobileSidebar();
+    }
     commandBar.toggle();
-  }, [commandBar]);
+  }, [commandBar, isMobile, ui]);
 
   useEffect(() => {
     void collections.fetchAll();
+    // galadrim: fills the "Récents" section and the command bar's list of
+    // recently viewed documents. Nothing else loads them on the web, so a
+    // session that starts on a document link would otherwise show neither.
+    void documents.fetchRecentlyViewed({ limit: recentDocumentCount });
 
     if (!user.isViewer) {
       void documents.fetchDrafts();
@@ -86,6 +97,8 @@ function AppSidebar() {
 
   const sectionContent = {
     [SidebarSection.Starred]: <Starred />,
+    // galadrim: Notion's "Recents" block, its first list of pages.
+    [SidebarSection.Recents]: <RecentDocuments />,
     [SidebarSection.SharedWithMe]: <SharedWithMe />,
     [SidebarSection.Collections]: (
       <Collections privateCollectionId={privateCollection?.id} />

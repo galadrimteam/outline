@@ -19,6 +19,13 @@ import Relative from "./Relative";
 import SidebarContext from "./SidebarContext";
 import SidebarLink from "./SidebarLink";
 
+/**
+ * galadrim: intentionally not mounted. Notion has no archive next to its
+ * trash, so the sidebar row moved to the account menu (see AccountMenu) and
+ * this component is kept only so that upstream changes to it keep applying
+ * cleanly. Dragging a document onto the sidebar to archive it went with it;
+ * archiving stays in the document menu.
+ */
 function ArchiveLink() {
   const { collections } = useStores();
   const { t } = useTranslation();

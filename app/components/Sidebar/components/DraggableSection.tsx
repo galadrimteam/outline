@@ -19,12 +19,13 @@ import Section from "./Section";
 export const SectionDragContext = createContext<ConnectDragSource | null>(null);
 
 /**
- * galadrim: the default order follows Notion's sidebar (favourites, teamspaces,
- * shared, private) instead of the declaration order of the enum. Sections that
- * a future upstream release adds are appended after these.
+ * galadrim: the default order follows Notion's sidebar (favourites, recents,
+ * teamspaces, shared, private) instead of the declaration order of the enum.
+ * Sections that a future upstream release adds are appended after these.
  */
 export const defaultSidebarSectionOrder: SidebarSection[] = [
   SidebarSection.Starred,
+  SidebarSection.Recents,
   SidebarSection.Collections,
   SidebarSection.SharedWithMe,
   SidebarSection.Private,
@@ -102,6 +103,7 @@ function DraggableSection({ section, children }: Props) {
     // galadrim: collections are presented as Notion's teamspaces.
     [SidebarSection.Collections]: t("Teamspaces"),
     [SidebarSection.Private]: t("Private"),
+    [SidebarSection.Recents]: t("Recents"),
   };
 
   const order = normalizeSidebarSectionOrder(

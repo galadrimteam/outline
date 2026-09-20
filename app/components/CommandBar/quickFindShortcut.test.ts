@@ -10,6 +10,14 @@ describe("isQuickFindShortcut", () => {
     );
   });
 
+  it("matches Ctrl+P with Caps Lock on", () => {
+    // The browser then reports "P" without a shift; missing it would let the
+    // print dialog through.
+    expect(isQuickFindShortcut(keydown({ key: "P", ctrlKey: true }))).toBe(
+      true
+    );
+  });
+
   it("ignores P without the modifier, and other keys with it", () => {
     expect(isQuickFindShortcut(keydown({ key: "p" }))).toBe(false);
     expect(isQuickFindShortcut(keydown({ key: "k", ctrlKey: true }))).toBe(

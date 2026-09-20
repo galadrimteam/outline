@@ -2,7 +2,9 @@ import type { ActionContext } from "~/types";
 
 export const CollectionSection = ({ t }: ActionContext) => t("Collection");
 
-export const CollectionsSection = ({ t }: ActionContext) => t("Collections");
+// galadrim: collections are presented as Notion's teamspaces, in the sidebar
+// heading and wherever the user picks one.
+export const CollectionsSection = ({ t }: ActionContext) => t("Teamspaces");
 
 export const ActiveCollectionSection = ({ t, stores }: ActionContext) => {
   const activeCollection = stores.collections.active;

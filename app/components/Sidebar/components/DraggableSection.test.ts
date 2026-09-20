@@ -6,9 +6,10 @@ import {
 } from "./DraggableSection";
 
 describe("normalizeSidebarSectionOrder", () => {
-  it("defaults to Notion's order: starred, teamspaces, shared, private", () => {
+  it("defaults to Notion's order: starred, recents, teamspaces, shared, private", () => {
     const expected = [
       SidebarSection.Starred,
+      SidebarSection.Recents,
       SidebarSection.Collections,
       SidebarSection.SharedWithMe,
       SidebarSection.Private,
@@ -24,7 +25,7 @@ describe("normalizeSidebarSectionOrder", () => {
     );
   });
 
-  it("keeps an order saved before the private section existed", () => {
+  it("keeps an order saved before the private and recents sections existed", () => {
     expect(
       normalizeSidebarSectionOrder([
         SidebarSection.Collections,
@@ -35,6 +36,7 @@ describe("normalizeSidebarSectionOrder", () => {
       SidebarSection.Collections,
       SidebarSection.SharedWithMe,
       SidebarSection.Starred,
+      SidebarSection.Recents,
       SidebarSection.Private,
     ]);
   });
@@ -48,6 +50,7 @@ describe("normalizeSidebarSectionOrder", () => {
     ).toEqual([
       SidebarSection.Private,
       SidebarSection.Starred,
+      SidebarSection.Recents,
       SidebarSection.Collections,
       SidebarSection.SharedWithMe,
     ]);
@@ -65,6 +68,7 @@ describe("moveSidebarSection", () => {
       )
     ).toEqual([
       SidebarSection.Starred,
+      SidebarSection.Recents,
       SidebarSection.Private,
       SidebarSection.Collections,
       SidebarSection.SharedWithMe,

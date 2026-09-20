@@ -68,6 +68,18 @@ function Collections({ privateCollectionId }: Props) {
     }),
   });
 
+  // galadrim: a member who belongs to no team collection – the normal state
+  // right after the import, when only their own "Privé" collection exists –
+  // gets no "Espaces d'équipe" heading at all, as in Notion, instead of an
+  // empty section. The section reappears as soon as they are added to one.
+  if (
+    collections.isLoaded &&
+    !orderedCollections.length &&
+    !showCreateCollection
+  ) {
+    return null;
+  }
+
   return (
     <SidebarContext.Provider value="collections">
       <Flex column>

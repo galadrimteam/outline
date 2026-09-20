@@ -356,6 +356,8 @@ export enum SidebarSection {
   Collections = "collections",
   /** galadrim: the documents of the member's own private collection ("Privé"). */
   Private = "private",
+  /** galadrim: the most recently viewed documents ("Récents"). */
+  Recents = "recent",
 }
 
 export enum UserPreference {
