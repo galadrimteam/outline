@@ -47,6 +47,10 @@ import Overview from "./components/Overview";
 import { Header } from "./components/Header";
 import useCurrentUser from "~/hooks/useCurrentUser";
 import { ProsemirrorDataHelper } from "@shared/utils/ProsemirrorDataHelper";
+import {
+  getLinkedDocumentKeys,
+  isLinkedDocument,
+} from "~/scenes/Document/components/linkedDocuments";
 
 const CollectionScene = observer(function CollectionScene_() {
   const params = useParams<{ collectionSlug?: string; tab?: string }>();
@@ -277,9 +281,20 @@ const CollectionDocuments = observer(
       );
     }
 
+    // galadrim: a page that lists its sub-pages keeps that list, as in Notion. When such a page becomes a collection
+    // its body becomes the overview, and Outline's own list underneath showed every one of them a second time.
+    const linkedKeys = getLinkedDocumentKeys(collection.data);
+    const roots = documents
+      .rootInCollection(collection.id)
+      .filter((node) => !isLinkedDocument(linkedKeys, node));
+
+    if (!roots.length) {
+      return null;
+    }
+
     return (
       <PaginatedDocumentList
-        documents={documents.rootInCollection(collection.id)}
+        documents={roots}
         fetch={documents.fetchPage}
         options={{
           collectionId: collection.id,
