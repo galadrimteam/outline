@@ -83,8 +83,10 @@ export const openCollection = createActionWithChildren({
 export const createCollection = dialogActionFactory({
   analyticsName: "New collection",
   section: CollectionSection,
-  name: (t) => t("New collection"),
-  title: (t) => t("Create a collection"),
+  // galadrim: a collection is a teamspace to a Notion user, which is what the
+  // sidebar heading above this very list says.
+  name: (t) => t("New teamspace"),
+  title: (t) => t("Create a teamspace"),
   content: (onSubmit) => <CollectionNew onSubmit={onSubmit} />,
   icon: <PlusIcon />,
   keywords: "create",

@@ -1,3 +1,4 @@
+import { useKBar } from "kbar";
 import { observer } from "mobx-react";
 import { SearchIcon, HomeIcon, SidebarIcon } from "outline-icons";
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -6,10 +7,10 @@ import {
   SidebarScrollProvider,
 } from "./components/DragActiveContext";
 import { useTranslation } from "react-i18next";
-import { useHistory } from "react-router-dom";
 import styled from "styled-components";
 import { SidebarSection, UserPreference } from "@shared/types";
 import { metaDisplay } from "@shared/utils/keyboard";
+import { recentDocumentCount } from "~/components/CommandBar/useRecentDocumentActions";
 import Scrollable from "~/components/Scrollable";
 import { navigateToImport } from "~/actions/definitions/navigation";
 import { inviteUser } from "~/actions/definitions/users";
@@ -19,17 +20,18 @@ import usePolicy from "~/hooks/usePolicy";
 import useStores from "~/hooks/useStores";
 import TeamMenu from "~/menus/TeamMenu";
 import * as Scenes from "~/routes/scenes";
-import { homePath, searchPath } from "~/utils/routeHelpers";
+import { homePath } from "~/utils/routeHelpers";
 import TeamLogo from "../TeamLogo";
 import Tooltip from "../Tooltip";
 import Sidebar from "./Sidebar";
-import ArchiveLink from "./components/ArchiveLink";
 import Collections from "./components/Collections";
 import DraggableSection, {
   normalizeSidebarSectionOrder,
 } from "./components/DraggableSection";
 import { DraftsLink } from "./components/DraftsLink";
 import DragPlaceholder from "./components/DragPlaceholder";
+import PrivateDocuments from "./components/PrivateDocuments";
+import RecentDocuments from "./components/RecentDocuments";
 import { DismissableSidebarAction } from "./components/DismissableSidebarAction";
 import HistoryNavigation from "./components/HistoryNavigation";
 import Section from "./components/Section";
@@ -40,6 +42,7 @@ import Starred from "./components/Starred";
 import ToggleButton from "./components/ToggleButton";
 import TrashLink from "./components/TrashLink";
 import useMobile from "~/hooks/useMobile";
+import usePrivateCollection from "./hooks/usePrivateCollection";
 
 function AppSidebar() {
   const { t } = useTranslation();
@@ -47,19 +50,27 @@ function AppSidebar() {
   const team = useCurrentTeam();
   const user = useCurrentUser();
   const can = usePolicy(team);
-  const history = useHistory();
   const isMobile = useMobile();
 
+  // galadrim: like Notion's quick find, search opens over the current page
+  // (the command bar: recent documents, then instant title matches) instead of
+  // replacing it. The full search page is one "Search documents for…" away.
+  // On mobile the drawer is only dismissed by a change of route, so it has to
+  // be closed here – opening the palette is not a navigation.
+  const { query: commandBar } = useKBar();
   const handleSearchClick = useCallback(() => {
-    const basePath = searchPath();
-    const { pathname, search } = history.location;
-    if (pathname.startsWith(basePath) && (search || pathname !== basePath)) {
-      history.push(basePath);
+    if (isMobile) {
+      ui.hideMobileSidebar();
     }
-  }, [history]);
+    commandBar.toggle();
+  }, [commandBar, isMobile, ui]);
 
   useEffect(() => {
     void collections.fetchAll();
+    // galadrim: fills the "Récents" section and the command bar's list of
+    // recently viewed documents. Nothing else loads them on the web, so a
+    // session that starts on a document link would otherwise show neither.
+    void documents.fetchRecentlyViewed({ limit: recentDocumentCount });
 
     if (!user.isViewer) {
       void documents.fetchDrafts();
@@ -80,10 +91,21 @@ function AppSidebar() {
     user.getPreference(UserPreference.SidebarSectionOrder, [])
   );
 
+  // galadrim: Notion's "Private" section – the member's own private
+  // collection is listed there instead of among the collections.
+  const privateCollection = usePrivateCollection();
+
   const sectionContent = {
     [SidebarSection.Starred]: <Starred />,
+    // galadrim: Notion's "Recents" block, its first list of pages.
+    [SidebarSection.Recents]: <RecentDocuments />,
     [SidebarSection.SharedWithMe]: <SharedWithMe />,
-    [SidebarSection.Collections]: <Collections />,
+    [SidebarSection.Collections]: (
+      <Collections privateCollectionId={privateCollection?.id} />
+    ),
+    [SidebarSection.Private]: (
+      <PrivateDocuments collection={privateCollection} />
+    ),
   };
 
   return (
@@ -121,6 +143,13 @@ function AppSidebar() {
         </TeamMenu>
         <Overflow>
           <Section>
+            {/* galadrim: search comes first, as in Notion. */}
+            <SidebarLink
+              icon={<SearchIcon />}
+              label={t("Search")}
+              onClick={handleSearchClick}
+              onClickIntent={Scenes.Search.preload}
+            />
             <SidebarLink
               to={homePath()}
               icon={<HomeIcon />}
@@ -128,15 +157,10 @@ function AppSidebar() {
               label={t("Home")}
               onClickIntent={Scenes.Home.preload}
             />
-            <SidebarLink
-              to={searchPath()}
-              icon={<SearchIcon />}
-              label={t("Search")}
-              exact={false}
-              onClick={handleSearchClick}
-              onClickIntent={Scenes.Search.preload}
-            />
-            {can.createDocument && <DraftsLink />}
+            {/* galadrim: Notion has no drafts – new documents are published to
+                the private collection (see DocumentNew), so the link only shows
+                while there are drafts. It stays in the account menu. */}
+            {can.createDocument && documents.totalDrafts > 0 && <DraftsLink />}
           </Section>
         </Overflow>
         <Scrollable flex shadow ref={scrollRef}>
@@ -146,21 +170,21 @@ function AppSidebar() {
                 {sectionContent[section]}
               </DraggableSection>
             ))}
-            {can.createDocument && (
-              <Section auto>
-                <ArchiveLink />
-              </Section>
-            )}
+            {/* galadrim: Notion has no archive next to its trash – the link
+                moved to the account menu. */}
             <Section>
               {can.createDocument && <TrashLink />}
               <DismissableSidebarAction
                 id="sidebar-import-hidden"
                 action={navigateToImport}
               />
-              <DismissableSidebarAction
-                id="sidebar-invite-hidden"
-                action={inviteUser}
-              />
+              {/* galadrim: inviting is an admin matter, as in Notion. */}
+              {user.isAdmin && (
+                <DismissableSidebarAction
+                  id="sidebar-invite-hidden"
+                  action={inviteUser}
+                />
+              )}
             </Section>
           </SidebarScrollProvider>
         </Scrollable>

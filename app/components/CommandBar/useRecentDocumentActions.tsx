@@ -9,8 +9,12 @@ import useStores from "~/hooks/useStores";
 import type Document from "~/models/Document";
 import { documentPath } from "~/utils/routeHelpers";
 
-/** The number of documents listed under "Recently viewed" in the command bar. */
-export const recentDocumentCount = 6;
+/**
+ * The number of documents listed under "Recently viewed" in the command bar.
+ * galadrim: 20 rather than 6 – the command bar doubles as Notion's quick find,
+ * which opens on a long list of recent pages.
+ */
+export const recentDocumentCount = 20;
 
 /**
  * Narrows recently viewed documents to those listed under "Recently viewed" in

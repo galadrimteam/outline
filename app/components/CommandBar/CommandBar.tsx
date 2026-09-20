@@ -9,7 +9,9 @@ import { depths, s } from "@shared/styles";
 import SearchActions from "~/components/SearchActions";
 import rootActions from "~/actions/root";
 import useCommandBarActions from "~/hooks/useCommandBarActions";
+import useKeyDown from "~/hooks/useKeyDown";
 import CommandBarResults from "./CommandBarResults";
+import { isQuickFindShortcut } from "./quickFindShortcut";
 import useRecentDocumentActions from "./useRecentDocumentActions";
 import useSettingsAction from "./useSettingsAction";
 import useTemplatesAction from "./useTemplatesAction";
@@ -30,6 +32,17 @@ function CommandBar() {
   );
 
   useCommandBarActions(commandBarActions);
+
+  // galadrim: Cmd/Ctrl+P opens the command bar too, as Notion's quick find.
+  const { query } = useKBar();
+  const handleQuickFind = React.useCallback(
+    (event: KeyboardEvent) => {
+      event.preventDefault();
+      query.toggle();
+    },
+    [query]
+  );
+  useKeyDown(isQuickFindShortcut, handleQuickFind);
 
   return (
     <>

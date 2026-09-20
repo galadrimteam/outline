@@ -22,11 +22,24 @@ import SidebarLink from "./SidebarLink";
 import Text from "@shared/components/Text";
 import usePolicy from "~/hooks/usePolicy";
 
-function Collections() {
+type Props = {
+  /**
+   * galadrim: the member's own private collection, which the "Privé" section
+   * renders instead – see usePrivateCollection.
+   */
+  privateCollectionId?: string;
+};
+
+function Collections({ privateCollectionId }: Props) {
   const { documents, auth, collections, policies } = useStores();
   const { t } = useTranslation();
   const can = usePolicy(auth.team?.id);
-  const orderedCollections = collections.allActive;
+  const orderedCollections = collections.allActive.filter(
+    (collection) => collection.id !== privateCollectionId
+  );
+  // galadrim: Notion has no "new teamspace" row for members; they find the
+  // action in the account menu and the command bar when they are allowed.
+  const showCreateCollection = can.createCollection && !!auth.user?.isAdmin;
 
   const params = useMemo(
     () => ({
@@ -55,14 +68,27 @@ function Collections() {
     }),
   });
 
+  // galadrim: a member who belongs to no team collection – the normal state
+  // right after the import, when only their own "Privé" collection exists –
+  // gets no "Espaces d'équipe" heading at all, as in Notion, instead of an
+  // empty section. The section reappears as soon as they are added to one.
+  if (
+    collections.isLoaded &&
+    !orderedCollections.length &&
+    !showCreateCollection
+  ) {
+    return null;
+  }
+
   return (
     <SidebarContext.Provider value="collections">
       <Flex column>
-        <Header id="collections" title={t("Collections")}>
+        {/* galadrim: collections are presented as Notion's teamspaces. */}
+        <Header id="collections" title={t("Teamspaces")}>
           <Relative>
             <PaginatedList<Collection>
               options={params}
-              aria-label={t("Collections")}
+              aria-label={t("Teamspaces")}
               items={orderedCollections}
               loading={<PlaceholderCollections />}
               heading={
@@ -76,7 +102,7 @@ function Collections() {
               }
               empty={
                 // No need for empty state if we're displaying the createCollection action
-                can.createCollection ? null : (
+                showCreateCollection ? null : (
                   <SidebarLink
                     label={
                       <Text type="tertiary" size="small" italic>
@@ -98,7 +124,9 @@ function Collections() {
                 />
               )}
             />
-            <SidebarAction action={createCollection} depth={0} />
+            {showCreateCollection && (
+              <SidebarAction action={createCollection} depth={0} />
+            )}
           </Relative>
         </Header>
       </Flex>

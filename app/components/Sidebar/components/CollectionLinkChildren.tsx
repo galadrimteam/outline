@@ -37,6 +37,17 @@ type Props = {
   prefetchDocument?: (documentId: string) => Promise<Document | void>;
   /** Element to display above the child documents */
   children?: React.ReactNode;
+  /**
+   * galadrim: render the documents at the root of the sidebar, as the
+   * "Privé" section does, instead of nested below a collection row.
+   */
+  rootLevel?: boolean;
+  /**
+   * galadrim: do not render the "Empty" row when the collection holds no
+   * document. That row navigates to the collection page itself, which the
+   * "Privé" section exists to hide – and Notion shows nothing there.
+   */
+  hideEmptyState?: boolean;
 };
 
 function CollectionLinkChildren({
@@ -45,10 +56,12 @@ function CollectionLinkChildren({
   depth = 0,
   prefetchDocument,
   children,
+  rootLevel,
+  hideEmptyState,
 }: Props) {
   // Documents sit one level below the collection, with a minimum that leaves
   // room for their own disclosure to the left of the label.
-  const childDepth = Math.max(depth + 1, 2);
+  const childDepth = rootLevel ? 0 : Math.max(depth + 1, 2);
   const pageSize = DEFAULT_PAGE_SIZE;
   const { documents, ui } = useStores();
   const { t } = useTranslation();
@@ -109,7 +122,7 @@ function CollectionLinkChildren({
               index={index}
             />
           ))}
-          {childDocuments?.length === 0 && !children && (
+          {childDocuments?.length === 0 && !children && !hideEmptyState && (
             <SidebarLink
               label={
                 <Text type="tertiary" size="small" italic>
