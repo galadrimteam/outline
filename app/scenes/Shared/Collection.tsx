@@ -21,6 +21,10 @@ import useMobile from "~/hooks/useMobile";
 import usePolicy from "~/hooks/usePolicy";
 import { collectionPath } from "~/utils/routeHelpers";
 import Overview from "../Collection/components/Overview";
+import {
+  pageIconSize,
+  pageTitleStyles,
+} from "../Document/components/pageTitle";
 import { AppearanceAction } from "~/components/Sharing/components/Actions";
 
 type Props = {
@@ -71,9 +75,15 @@ function SharedCollection({ collection }: Props) {
     >
       <CenteredContent withStickyHeader>
         <Flex column>
-          <CollectionHeading>
-            <IconTitleWrapper>
-              <CollectionIcon collection={collection} size={40} expanded />
+          {/* galadrim: the same title block as in the app — a page publicly
+              shared has to read like the page it is. */}
+          <CollectionHeading $containsIcon>
+            <IconTitleWrapper $above={pageIconSize}>
+              <CollectionIcon
+                collection={collection}
+                size={pageIconSize}
+                expanded
+              />
             </IconTitleWrapper>
             {collection.name}
           </CollectionHeading>
@@ -90,15 +100,17 @@ function SharedCollection({ collection }: Props) {
   );
 }
 
-const CollectionHeading = styled(Heading)`
+const CollectionHeading = styled(Heading)<{ $containsIcon: boolean }>`
   display: flex;
   align-items: center;
   position: relative;
-  margin-left: 40px;
+  margin-left: 16px;
 
   ${breakpoint("tablet")`
     margin-left: 0;
   `}
+
+  ${pageTitleStyles}
 `;
 
 const SharedMeta = styled(Text)`

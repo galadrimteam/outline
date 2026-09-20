@@ -25,7 +25,6 @@ import HeaderBranding from "~/components/Sharing/components/HeaderBranding";
 import { useTeamContext } from "~/components/TeamContext";
 import Tooltip from "~/components/Tooltip";
 import env from "~/env";
-import useEditingFocus from "~/hooks/useEditingFocus";
 import useKeyDown from "~/hooks/useKeyDown";
 import useMobile from "~/hooks/useMobile";
 import useStores from "~/hooks/useStores";
@@ -43,15 +42,17 @@ function SharedDocumentHeader({ document }: Props) {
   const { t } = useTranslation();
   const { ui, shares } = useStores();
   const isMobileMedia = useMobile();
-  const isEditingFocus = useEditingFocus();
 
-  // Set CSS variable for header offset (used by sticky table headers)
+  // Set CSS variable for header offset (used by sticky table headers).
+  // galadrim: as in the app header, the bar no longer fades out after 3s of
+  // typing ("editing focus") — the top bar of a Notion page never hides — so
+  // the offset is constant.
   useEffect(() => {
     window.document.documentElement.style.setProperty(
       "--header-offset",
-      isEditingFocus ? "0px" : `${HEADER_HEIGHT}px`
+      `${HEADER_HEIGHT}px`
     );
-  }, [isEditingFocus]);
+  }, []);
 
   const { hasHeadings } = useDocumentContext();
   const [measureRef, size] = useMeasure();
@@ -120,7 +121,6 @@ function SharedDocumentHeader({ document }: Props) {
   return (
     <StyledHeader
       ref={measureRef}
-      $hidden={isEditingFocus}
       $scrollbarWidth={scrollbarWidth}
       title={
         <Flex gap={4}>
@@ -172,7 +172,6 @@ function SharedDocumentHeader({ document }: Props) {
 }
 
 type StyledHeaderProps = {
-  $hidden: boolean;
   /** Width of the window scrollbar, which the header end edge falls behind. */
   $scrollbarWidth: number;
 };
@@ -187,9 +186,6 @@ const endPadding = (base: number) => (props: StyledHeaderProps) =>
   `calc(${base}px + ${props.$scrollbarWidth}px + var(--removed-body-scroll-bar-size, 0px))`;
 
 const StyledHeader = styled(Header)<StyledHeaderProps>`
-  transition: opacity 500ms ease-in-out;
-  ${(props) => props.$hidden && "opacity: 0;"}
-
   /* Doubled to take precedence over the padding shorthand of the header. */
   && {
     padding-right: ${endPadding(16)};

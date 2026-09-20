@@ -9,7 +9,9 @@ import {
   Redirect,
 } from "react-router-dom";
 import styled from "styled-components";
+import breakpoint from "styled-components-breakpoint";
 import { toError } from "@shared/utils/error";
+import { EditorStyleHelper } from "@shared/editor/styles/EditorStyleHelper";
 import { s } from "@shared/styles";
 import { StatusFilter } from "@shared/types";
 import type Collection from "~/models/Collection";
@@ -171,7 +173,7 @@ const CollectionScene = observer(function CollectionScene_() {
         disabled={!can.createDocument}
         collectionId={collection.id}
       >
-        <CenteredContent withStickyHeader>
+        <PageContent withStickyHeader maxWidth="var(--page-content-width)">
           <Notices collection={collection} />
           <Header
             collection={collection}
@@ -207,7 +209,7 @@ const CollectionScene = observer(function CollectionScene_() {
               documents={documents}
             />
           </Content>
-        </CenteredContent>
+        </PageContent>
       </DropToImport>
     </Scene>
   );
@@ -229,6 +231,21 @@ const KeyedCollection = () => {
   // _between_ collections, speeds up perceived performance.
   return <CollectionScene key={params.id} />;
 };
+
+// galadrim: a collection is as wide as a document, so that opening a page from
+// its collection does not shift every line sideways. A document's text column
+// is the middle track of the grid in Document.tsx: 46em until the desktopLarge
+// breakpoint, EditorStyleHelper.documentWidth (52em) past it, where
+// CenteredContent alone always takes the latter. Measured on the deployed
+// build at 1440x900: the document column was 736px at x=482 and the collection
+// 832px at x=434 — same centre, 48px apart on each side.
+const PageContent = styled(CenteredContent)`
+  --page-content-width: 46em;
+
+  ${breakpoint("desktopLarge")`
+    --page-content-width: ${EditorStyleHelper.documentWidth};
+  `}
+`;
 
 const Content = styled.div`
   position: relative;
@@ -259,6 +276,9 @@ const CollectionDocuments = observer(
       return <Empty collection={collection} />;
     }
 
+    // galadrim: the archived documents keep the upstream list — its meta line
+    // says when each was archived, and its checkboxes are how several are
+    // restored or deleted at once. Notion's own trash is a list apart too.
     if (collection.isArchived) {
       return (
         <PaginatedDocumentList
@@ -272,7 +292,6 @@ const CollectionDocuments = observer(
             statusFilter: [StatusFilter.Archived],
           }}
           showParentDocuments
-          compact
         />
       );
     }

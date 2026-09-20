@@ -141,12 +141,16 @@ export const buildLightTheme = (input: Partial<Colors>): DefaultTheme => {
     textDiffDeleted: colors.slateDark,
     textDiffDeletedBackground: "rgba(255, 180, 173, 0.25)",
     placeholder: "#a2b2c3",
-    // galadrim: Notion's warm greys instead of upstream's blue greys, sampled
-    // from a Notion screenshot: sidebar #f9f8f7, selected row #eeeceb, row
-    // label #5f5e59 (upstream: hsl(212 31% 95%), 90%, 85% and rgb(78, 92, 110)).
+    // galadrim: Notion's warm greys instead of upstream's blue greys. Its
+    // sidebar measures rgb(249, 248, 247) on app.notion.com, and it tints the
+    // rows over it with rgba(55, 53, 47, α): α=0.06 under the pointer, which
+    // resolves to #eeeceb, and twice that on the row of the page one is on,
+    // #e3e1de — the open page has to stay told apart from the row the mouse
+    // happens to be over. Row label #5f5e59. (Upstream: hsl(212 31% 95%), 90%,
+    // 85% and rgb(78, 92, 110).)
     sidebarBackground: "#f9f8f7",
     sidebarHoverBackground: "#eeeceb",
-    sidebarActiveBackground: "#eeeceb",
+    sidebarActiveBackground: "#e3e1de",
     sidebarControlHoverBackground: "rgba(55, 53, 47, 0.08)",
     sidebarDraftBorder: "hsl(212 31% 75% / 1)",
     sidebarText: "#5f5e59",

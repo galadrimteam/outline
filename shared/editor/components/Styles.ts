@@ -771,16 +771,20 @@ width: 100%;
        h2         24px / 600 / line-height 1.3, 36px above, 16px below
        h3         20px / 600 / line-height 1.3, 32px above, 16px below
        paragraph  16px from the previous paragraph (upstream: 8px)
-     Upstream: line-height 1.5, 1em above and 0.25em below every heading. */
-  h1,
-  h2,
-  h3 {
+     Upstream: line-height 1.5, 1em above and 0.25em below every heading. These
+     are the margins between the blocks of a page, so they are scoped to the
+     top level like the paragraph rule below: a heading inside a callout, a
+     table cell, a list item or a quote keeps upstream's em-based margins,
+     which is also what Notion does with its container spacing. */
+  & > h1,
+  & > h2,
+  & > h3 {
     line-height: 1.3;
     margin-bottom: 16px;
   }
-  h1 { margin-top: 40px; }
-  h2 { margin-top: 36px; }
-  h3 { margin-top: 32px; }
+  & > h1 { margin-top: 40px; }
+  & > h2 { margin-top: 36px; }
+  & > h3 { margin-top: 32px; }
 
   & > p + p {
     margin-top: 1em;
