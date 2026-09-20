@@ -46,11 +46,16 @@ describe("embeds markdown rule", () => {
     expect(findNodes(doc, "embed")).toHaveLength(0);
   });
 
-  it("does not convert urls that only match the generic embed", () => {
+  it("converts a url that only matches the generic embed, as Notion does", () => {
+    // galadrim: this is the shape our importer and Notion's own export both
+    // write for a plain embed block, e.g. a page Notion itself only embeds
+    // generically. See matchOnImport in shared/editor/embeds/index.tsx.
     const url = "https://example.com/some/page";
     const doc = parseToJSON(`[${url}](${url})`);
 
-    expect(findNodes(doc, "embed")).toHaveLength(0);
+    const nodes = findNodes(doc, "embed");
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].attrs?.href).toBe(url);
   });
 
   it("does not convert links within lists", () => {

@@ -70,6 +70,15 @@ export class EmbedDescriptor {
   hideToolbar?: boolean;
   /** Whether the embed should match automatically when pasting a URL (default to true) */
   matchOnInput?: boolean;
+  /**
+   * galadrim: whether a paragraph holding nothing but a link to itself
+   * (`[url](url)`, the shape our importer and Notion's own export both
+   * write for an embed block) becomes this embed when its Markdown is
+   * parsed – on import, and on re-opening an already-imported document.
+   * Separate from matchOnInput, which is about an interactive paste, so a
+   * plain paste of an arbitrary link is unaffected. Defaults to false.
+   */
+  matchOnImport?: boolean;
   /** A regex that will be used to match the embed from a URL. */
   regexMatch?: RegExp[];
   /**
@@ -108,6 +117,7 @@ export class EmbedDescriptor {
     this.defaultHidden = options.defaultHidden;
     this.hideToolbar = options.hideToolbar;
     this.matchOnInput = options.matchOnInput ?? true;
+    this.matchOnImport = options.matchOnImport ?? false;
     this.regexMatch = options.regexMatch;
     this.transformMatch = options.transformMatch;
     this.attrs = options.attrs;
@@ -755,6 +765,10 @@ const embeds: EmbedDescriptor[] = [
     icon: <BrowserIcon />,
     defaultHidden: false,
     matchOnInput: false,
+    // galadrim: Notion embeds a link left alone on its own line, rather than
+    // showing it as a bare underlined URL. Our importer writes such a link
+    // in exactly that shape, so it can become this generic iframe embed too.
+    matchOnImport: true,
     regexMatch: [new RegExp("^https?://(.*)$")],
     transformMatch: (matches: RegExpMatchArray) => matches[0],
     hideToolbar: true,

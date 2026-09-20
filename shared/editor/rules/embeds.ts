@@ -21,7 +21,9 @@ function isParagraphClose(token: Token | undefined) {
 export default function linksToEmbeds(getEmbeds: () => EmbedDescriptor[]) {
   function isEmbed(href: string) {
     for (const embed of getEmbeds()) {
-      if (!embed.matchOnInput || embed.disabled) {
+      // galadrim: matchOnImport also allows the generic embed here, see its
+      // doc comment in shared/editor/embeds/index.tsx.
+      if ((!embed.matchOnInput && !embed.matchOnImport) || embed.disabled) {
         continue;
       }
       if (embed.matcher(href)) {
