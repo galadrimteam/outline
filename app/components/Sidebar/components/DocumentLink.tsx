@@ -7,6 +7,7 @@ import type { match } from "react-router";
 import { useHistory } from "react-router-dom";
 import scrollIntoView from "scroll-into-view-if-needed";
 import Icon from "@shared/components/Icon";
+import { hasDatabaseEmbed } from "@shared/editor/embeds/teable";
 import type { NavigationNode } from "@shared/types";
 import { DocumentPermission, UserPreference } from "@shared/types";
 import { ProsemirrorDataHelper } from "@shared/utils/ProsemirrorDataHelper";
@@ -81,8 +82,16 @@ const DocumentLink = observer(function DocumentLink(props: Props) {
   const expansion = useSidebarExpansion();
   const expanded = expansion.isExpanded(node.id);
   const isActiveDocument = activeDocument && activeDocument.id === node.id;
+  // galadrim: a database page's rows are Notion sub-pages nowhere but inside
+  // the table, so don't offer to unfold them here either – same rule as the
+  // "Documents" tab at the bottom of the page itself (References.tsx). Only
+  // takes effect once this node's own document is loaded (usually true: it's
+  // the page the reader came from to reach one of its rows), otherwise falls
+  // back to the plain child count below.
+  const isDatabasePage = hasDatabaseEmbed(documents.get(node.id)?.data);
   const hasChildDocuments =
-    !!node.children.length || activeDocument?.parentDocumentId === node.id;
+    !isDatabasePage &&
+    (!!node.children.length || activeDocument?.parentDocumentId === node.id);
   const sidebarContext = useSidebarContext();
   const activeSidebarContext = useActiveSidebarContext();
   const { fetchChildDocuments } = documents;
@@ -120,16 +129,19 @@ const DocumentLink = observer(function DocumentLink(props: Props) {
     ? activeDocument?.asNavigationNode
     : undefined;
 
+  // galadrim: nothing renders under a database page – see isDatabasePage above.
   const nodeChildren = React.useMemo(
     () =>
-      collection && draftNavNode
-        ? sortNavigationNodes(
-            [draftNavNode, ...node.children],
-            collection.sort,
-            false
-          )
-        : node.children,
-    [draftNavNode, collection, node.children]
+      isDatabasePage
+        ? []
+        : collection && draftNavNode
+          ? sortNavigationNodes(
+              [draftNavNode, ...node.children],
+              collection.sort,
+              false
+            )
+          : node.children,
+    [isDatabasePage, draftNavNode, collection, node.children]
   );
 
   // The last child shares its bottom edge with this node's subtree, so a drop

@@ -21,6 +21,7 @@ import Trello from "./Trello";
 import Vimeo from "./Vimeo";
 import YouTube from "./YouTube";
 import PlantUmlDiagrams from "./PlantUml";
+import { TEABLE_FRAME_REGEX } from "./teable";
 
 export type EmbedProps = {
   isSelected: boolean;
@@ -740,9 +741,7 @@ const embeds: EmbedDescriptor[] = [
     keywords: "database table spreadsheet kanban",
     // Matches any self-hosted instance served from a "teable." subdomain, both
     // public share links and the /framed wrapper around a base.
-    regexMatch: [
-      new RegExp("^https?://teable\\.[a-z0-9.-]+/(framed\\?.+|share/.+)$"),
-    ],
+    regexMatch: [TEABLE_FRAME_REGEX],
     transformMatch: (matches: RegExpMatchArray) => matches[0],
     icon: <DatabaseIcon />,
     defaultHeight: 720,

@@ -11,6 +11,7 @@ import { useLocationSidebarContext } from "~/hooks/useLocationSidebarContext";
 import useStores from "~/hooks/useStores";
 import ReferenceListItem from "./ReferenceListItem";
 import { getLinkedDocumentKeys, isLinkedDocument } from "./linkedDocuments";
+import { hasDatabaseEmbed } from "@shared/editor/embeds/teable";
 import useShare from "@shared/hooks/useShare";
 import type { NavigationNode } from "@shared/types";
 import { flattenTree } from "@shared/utils/tree";
@@ -46,14 +47,21 @@ function References({ document }: Props) {
   // and nowhere else, and does not count its parent among its backlinks. So the
   // children that the body already links to (all of them for an imported page)
   // are not repeated here, nor are the ancestors among the backlinks, and the
-  // "New doc" row is gone. Children the body does not link to stay listed.
+  // "New doc" row is gone. Children the body does not link to stay listed. A
+  // database page's body is just its Teable embed, so it links to none of its
+  // rows: list none of them here either, rather than falling through to that
+  // "no link found" default. A row stays reachable from the table itself.
   const linkedKeys = useMemo(
     () => getLinkedDocumentKeys(document.data),
     [document.data]
   );
-  const children = allChildren.filter(
-    (node) => !isLinkedDocument(linkedKeys, node)
+  const isDatabasePage = useMemo(
+    () => hasDatabaseEmbed(document.data),
+    [document.data]
   );
+  const children = isDatabasePage
+    ? []
+    : allChildren.filter((node) => !isLinkedDocument(linkedKeys, node));
   const ancestorIds = document.pathTo.map((node) => node.id);
   const backlinks = allBacklinks.filter(
     (node) => !ancestorIds.includes(node.id)
