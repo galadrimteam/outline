@@ -24,9 +24,18 @@ const OPEN_TOKEN = "container_notice_open";
  * @returns The style name and the emoji that follows it, if any.
  */
 export function parseNoticeInfo(info: string | undefined): NoticeInfo {
-  const [style = "", ...rest] = (info ?? "").trim().split(/\s+/);
+  const [first = "", ...rest] = (info ?? "").trim().split(/\s+/);
+
+  // A fence whose first word is an emoji, ":::💡", names no style: the emoji is
+  // the icon and the callout is Notion's plain one. Reading the emoji as a
+  // style name would drop it, from the node and from the Markdown written back.
+  const leading = splitLeadingEmoji(first);
+  if (leading.emoji && !leading.rest) {
+    return { style: "", icon: leading.emoji };
+  }
+
   const { emoji } = splitLeadingEmoji(rest.join(" "));
-  return { style, icon: emoji };
+  return { style: first, icon: emoji };
 }
 
 /**
@@ -43,23 +52,30 @@ export function noticeInfo(token: Token): NoticeInfo {
 }
 
 /**
- * galadrim: takes the emoji that leads a notice's first paragraph out of the
+ * galadrim: takes the emoji that leads a notice's first block out of the
  * content. Notion's Markdown export writes a callout's icon as the first
  * character of its text — on a line of its own whenever the text does not
  * start with a plain word — so without this the icon is shown as content,
  * beside the notice's own icon and often alone on a first line.
  *
+ * The first block is a heading in a fifth of the callouts our importer writes:
+ * a callout whose text starts with a heading has no paragraph to carry the icon
+ * and the importer puts it inside the heading, "### 💡 Context". Notion shows
+ * that emoji as the callout's icon and the heading without it.
+ *
  * @param tokens The block token stream, edited in place.
  * @param index Index of the `container_notice_open` token.
- * @returns The emoji, when one led the first paragraph.
+ * @returns The emoji, when one led the first block.
  */
 function takeLeadingEmoji(tokens: Token[], index: number): string | undefined {
   const [open, inline, close] = tokens.slice(index + 1, index + 4);
-  if (
-    open?.type !== "paragraph_open" ||
-    inline?.type !== "inline" ||
-    close?.type !== "paragraph_close"
-  ) {
+  const block =
+    open?.type === "paragraph_open"
+      ? "paragraph"
+      : open?.type === "heading_open"
+        ? "heading"
+        : undefined;
+  if (!block || inline?.type !== "inline" || close?.type !== `${block}_close`) {
     return undefined;
   }
 
@@ -89,7 +105,9 @@ function takeLeadingEmoji(tokens: Token[], index: number): string | undefined {
   }
 
   if (!children.length) {
-    // The paragraph held nothing but the emoji, remove it entirely.
+    // The block held nothing but the emoji, remove it entirely. A notice left
+    // with no content at all is filled with an empty paragraph, which is what
+    // the content expression of the node begins with (Notice.tsx).
     tokens.splice(index + 1, 3);
   }
 

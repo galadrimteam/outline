@@ -40,6 +40,13 @@ describe("parseNoticeInfo", () => {
       icon: undefined,
     });
   });
+
+  // galadrim: a fence whose only word is an emoji names no style. Reading that
+  // emoji as a style name lost it, from the node and from the Markdown written
+  // back.
+  it("reads a fence that is only an emoji as an icon with no style", () => {
+    expect(parseNoticeInfo("💡")).toEqual({ style: "", icon: "💡" });
+  });
 });
 
 // galadrim: Notion's export writes a callout's icon as the first character of
@@ -83,6 +90,11 @@ describe("the emoji leading a notice", () => {
     expect(findNodes(node, "text").map((n) => n.text)).toEqual(["one", "two"]);
   });
 
+  // galadrim: a callout whose whole body is its icon — what Notion's export
+  // writes for a callout with no text. What is left must be an empty
+  // paragraph: a notice cannot be empty, and the content expression used to
+  // fill it with a to-do list, so the callout showed a stray checkbox and the
+  // next save wrote that checkbox into the Markdown for good.
   it("is the only thing a callout may hold", () => {
     const node = notice(`:::info
 ✅
@@ -90,6 +102,46 @@ describe("the emoji leading a notice", () => {
 
     expect(node.attrs.icon).toBe("✅");
     expect(findNodes(node, "text")).toHaveLength(0);
+    expect(findNodes(node, "paragraph")).toHaveLength(1);
+    expect(findNodes(node, "checkbox_list")).toHaveLength(0);
+    expect(findNodes(node, "checkbox_item")).toHaveLength(0);
+  });
+
+  // galadrim: a fifth of the callouts our importer writes start with a
+  // heading, and it is inside that heading that it puts the icon, "### 💡
+  // Contexte" — a callout's text has no paragraph to carry it. Notion shows
+  // that emoji as the callout's icon and the heading without it.
+  it("is taken from a first heading as well", () => {
+    const node = notice(`:::tip
+### 💡 Contexte
+
+Le texte
+:::`);
+
+    expect(node.attrs).toEqual({ style: "tip", icon: "💡" });
+    expect(findNodes(node, "heading")).toHaveLength(1);
+    expect(findNodes(node, "text").map((n) => n.text)).toEqual([
+      "Contexte",
+      "Le texte",
+    ]);
+  });
+
+  it("leaves a heading that starts with plain text alone", () => {
+    const node = notice(`:::tip
+### Contexte
+:::`);
+
+    expect(node.attrs).toEqual({ style: "tip", icon: null });
+    expect(findNodes(node, "text").map((n) => n.text)).toEqual(["Contexte"]);
+  });
+
+  it("is not taken from a heading when the fence carries one", () => {
+    const node = notice(`:::tip 🚀
+### 💡 Contexte
+:::`);
+
+    expect(node.attrs.icon).toBe("🚀");
+    expect(findNodes(node, "text").map((n) => n.text)).toEqual(["💡 Contexte"]);
   });
 
   it("is read from the fence when it is written there", () => {
@@ -134,6 +186,20 @@ First line
     const twice = notice(written);
     expect(twice.attrs).toEqual({ style: "info", icon: "💡" });
     expect(findNodes(twice, "text")[0].text).toBe("Something to know");
+  });
+
+  // galadrim: ":::💡" is a callout with an emoji and no style named. The emoji
+  // has to survive the trip, and it used to be read as the style and dropped.
+  it("survives a round trip when the fence is only an emoji", () => {
+    const node = notice(`:::💡
+Something to know
+:::`);
+
+    expect(node.attrs).toEqual({ style: "default", icon: "💡" });
+
+    const written = serializer.serialize(parser.parse(`:::💡\nSomething\n:::`));
+    expect(written).toContain("💡");
+    expect(notice(written).attrs).toEqual({ style: "default", icon: "💡" });
   });
 });
 

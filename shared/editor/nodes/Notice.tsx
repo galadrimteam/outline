@@ -81,15 +81,12 @@ export default class Notice extends Node {
     return {
       attrs: {
         style: {
-          // galadrim: the schema default stays upstream's "info", and every
-          // path that makes a notice says which style it wants instead: a
-          // notice with no style written is Notion's plain grey callout
-          // (parseMarkdown below), and so is one typed as ":::" (inputRules).
-          // The revision diff rebuilds nodes from JSON patches that do not
-          // always carry `attrs`, so those rebuilt nodes take this default;
-          // when it does not match the notice being compared, the diff reads a
-          // deleted notice as an attribute change and drops it from the
-          // rendered diff (ChangesetHelper, "modified").
+          // galadrim: the schema default stays upstream's "info" — it is only
+          // read when a notice is built without attributes, which is worth no
+          // deviation — and every path that makes a notice says which style it
+          // wants: a notice with no style written is Notion's plain grey
+          // callout (parseMarkdown below), and so is one typed as ":::"
+          // (inputRules).
           default: NoticeTypes.Info,
         },
         // galadrim: the callout's own emoji, shown in place of the style icon.
@@ -97,8 +94,13 @@ export default class Notice extends Node {
           default: null,
         },
       },
+      // galadrim: "paragraph" comes first so that a notice built with no
+      // content — a Notion callout whose whole body is its icon, which the
+      // rule lifts out — is filled with an empty paragraph. Upstream's order
+      // filled it with the first alternative instead, a to-do list, and the
+      // callout showed a checkbox nobody asked for. Same alternatives.
       content:
-        "(list | blockquote | hr | paragraph | heading | code_block | code_fence | attachment)+",
+        "(paragraph | list | blockquote | hr | heading | code_block | code_fence | attachment)+",
       group: "block",
       defining: true,
       draggable: true,
