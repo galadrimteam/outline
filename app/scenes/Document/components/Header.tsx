@@ -129,14 +129,12 @@ function DocumentHeader({
   }, [isMobile, showContents, ui]);
 
   const toc = (
+    // galadrim: the button is only mounted when there are headings to jump to
+    // (or when the panel is open on a page that has none), so the third
+    // tooltip upstream had here -- "available when headings are added" -- can
+    // no longer be reached.
     <Tooltip
-      content={
-        showContents
-          ? t("Hide contents")
-          : hasHeadings
-            ? t("Show contents")
-            : `${t("Show contents")} (${t("available when headings are added")})`
-      }
+      content={showContents ? t("Hide contents") : t("Show contents")}
       shortcut={`Ctrl+${altDisplay}+h`}
       placement="bottom"
     >
@@ -197,8 +195,10 @@ function DocumentHeader({
             <DocumentBreadcrumb document={document} showCurrent />
             {/* galadrim: Notion has no contents button on a page with no
                 headings to jump to, rather than one whose tooltip explains
-                that. */}
-            {hasHeadings && toc}
+                that. It stays when the panel is open on such a page though:
+                the reader turned it on somewhere else, and hiding the button
+                would leave that empty column with no way to close it. */}
+            {(hasHeadings || showContents) && toc}
           </Flex>
         )
       }
