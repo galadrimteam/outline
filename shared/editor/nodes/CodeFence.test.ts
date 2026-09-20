@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  */
 import { Schema } from "prosemirror-model";
-import { EditorState } from "prosemirror-state";
-import type { Plugin } from "prosemirror-state";
+import { EditorState, Plugin } from "prosemirror-state";
 import type { DecorationSet } from "prosemirror-view";
+import { multiplayerPluginKey } from "../lib/multiplayer";
 import CodeFence from "./CodeFence";
 
 const schema = new Schema({
@@ -53,6 +53,32 @@ function collapseStateFor(doc: ReturnType<typeof docWithLines>) {
   return state.plugins[0].getState(state) as CollapseState;
 }
 
+/** Stands in for the facade the multiplayer extension mounts, so that every
+ * transaction reads as one arriving from elsewhere -- a co-author's edit, or
+ * the document's content loading in. */
+const remoteFacade = new Plugin({
+  key: multiplayerPluginKey,
+  multiplayer: {
+    isRemoteTransaction: () => true,
+    stopCapturing: () => undefined,
+  },
+} as ConstructorParameters<typeof Plugin>[0]);
+
+/** Grows the document's code block to the given number of lines through a
+ * remote transaction, and returns the collapse state that results. */
+function collapseStateAfterRemoteGrowth(lines: number) {
+  const state = EditorState.create({
+    doc: docWithLines(1),
+    plugins: [...collapsePluginsOf(new CodeFence()), remoteFacade],
+  });
+  const text = Array.from({ length: lines }, (_, i) => `line ${i}`).join("\n");
+  const next = state.apply(state.tr.insertText(`\n${text}`, 2));
+  return {
+    doc: next.doc,
+    collapseState: next.plugins[0].getState(next) as CollapseState,
+  };
+}
+
 describe("CodeFence collapse", () => {
   it("still finds a tall block, so it can still be folded by hand", () => {
     const collapseState = collapseStateFor(docWithLines(200));
@@ -63,6 +89,14 @@ describe("CodeFence collapse", () => {
     // galadrim: Notion always renders a code block in full; a tall block
     // used to start collapsed with no visible way back to seeing it all.
     const collapseState = collapseStateFor(docWithLines(200));
+    expect(collapseState.collapsedBlocks.size).toBe(0);
+  });
+
+  it("does not auto-collapse a block that arrives tall from elsewhere", () => {
+    // galadrim: the other half of the same rule -- a block only becomes tall
+    // once its content loads, which reaches the editor as a remote change.
+    const { collapseState } = collapseStateAfterRemoteGrowth(200);
+    expect(collapseState.tallBlocks.size).toBe(1);
     expect(collapseState.collapsedBlocks.size).toBe(0);
   });
 
