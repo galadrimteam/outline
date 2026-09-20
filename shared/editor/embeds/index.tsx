@@ -746,6 +746,9 @@ const embeds: EmbedDescriptor[] = [
     transformMatch: (matches: RegExpMatchArray) => matches[0],
     icon: <DatabaseIcon />,
     defaultHeight: 720,
+    // galadrim: the /framed wrapper already draws its own "open in Teable" link, so Outline's
+    // toolbar above the iframe would only duplicate it (see deploy/caddy/teable-framed.html).
+    hideToolbar: true,
   }),
   /* The generic iframe embed should always be the last one */
   new EmbedDescriptor({
