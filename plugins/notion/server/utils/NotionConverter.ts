@@ -33,7 +33,7 @@ import type {
   LinkToPageBlockObjectResponse,
 } from "@notionhq/client/build/src/api-endpoints";
 import { isArray } from "es-toolkit/compat";
-import { NoticeTypes } from "@shared/editor/nodes/Notice";
+import { toNoticeType } from "@shared/editor/nodes/Notice";
 import type { ProsemirrorData, ProsemirrorDoc } from "@shared/types";
 import { MentionType } from "@shared/types";
 import Logger from "@server/logging/Logger";
@@ -165,22 +165,18 @@ export class NotionConverter {
   }
 
   private static callout(item: Block<CalloutBlockObjectResponse>) {
-    const colorToNoticeType: Record<string, NoticeTypes> = {
-      default_background: NoticeTypes.Info,
-      blue_background: NoticeTypes.Info,
-      purple_background: NoticeTypes.Info,
-      green_background: NoticeTypes.Success,
-      orange_background: NoticeTypes.Tip,
-      yellow_background: NoticeTypes.Tip,
-      pink_background: NoticeTypes.Warning,
-      red_background: NoticeTypes.Warning,
-    };
+    // galadrim: the same reading as the Markdown import — `toNoticeType` knows
+    // every Notion block colour, including the greys this had no entry for,
+    // and a callout's own emoji is its notice's icon (Notice.tsx). The table
+    // this replaces turned Notion's plain grey callout, two callouts out of
+    // three, into Outline's blue "info" one.
+    const { icon } = item.callout;
 
     return {
       type: "container_notice",
       attrs: {
-        style:
-          colorToNoticeType[item.callout.color as string] ?? NoticeTypes.Info,
+        style: toNoticeType(item.callout.color as string),
+        icon: icon?.type === "emoji" ? icon.emoji : null,
       },
       content: [
         {

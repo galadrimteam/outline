@@ -176,7 +176,8 @@ exports[`NotionConverter > converts a page 1`] = `
     },
     {
       "attrs": {
-        "style": "info",
+        "icon": "💡",
+        "style": "default",
       },
       "content": [
         {
@@ -207,7 +208,8 @@ exports[`NotionConverter > converts a page 1`] = `
     },
     {
       "attrs": {
-        "style": "info",
+        "icon": null,
+        "style": "default",
       },
       "content": [
         {
@@ -406,7 +408,8 @@ exports[`NotionConverter > converts a page 1`] = `
     },
     {
       "attrs": {
-        "style": "info",
+        "icon": "⚙",
+        "style": "default",
       },
       "content": [
         {
@@ -1484,7 +1487,8 @@ exports[`NotionConverter > converts a page 1`] = `
     },
     {
       "attrs": {
-        "style": "info",
+        "icon": "💡",
+        "style": "default",
       },
       "content": [
         {
@@ -1535,7 +1539,8 @@ exports[`NotionConverter > converts a page 1`] = `
     },
     {
       "attrs": {
-        "style": "info",
+        "icon": "💡",
+        "style": "default",
       },
       "content": [
         {
@@ -1985,7 +1990,8 @@ exports[`NotionConverter > converts a page 1`] = `
         },
         {
           "attrs": {
-            "style": "info",
+            "icon": "⚙",
+            "style": "default",
           },
           "content": [
             {
