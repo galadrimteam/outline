@@ -782,8 +782,17 @@ width: 100%;
   h2 { margin-top: 36px; }
   h3 { margin-top: 32px; }
 
-  & > p + p {
+  // galadrim: Notion keeps this same paragraph-to-paragraph spacing inside a
+  // callout, a list item or a quote -- a mail template dropped in a callout
+  // read as one dense block otherwise, its paragraphs touching. A table cell
+  // is not page rhythm though, so it opts back out.
+  p + p {
     margin-top: 1em;
+  }
+
+  td p + p,
+  th p + p {
+    margin-top: 0;
   }
 
   [data-heading-prefix]::before {
