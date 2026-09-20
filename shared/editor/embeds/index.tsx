@@ -80,6 +80,13 @@ export class EmbedDescriptor {
    * from) while turning on just for it here. A plain pasted URL never
    * reaches this rule at all – that goes through the separate, interactive
    * getMatchingEmbed/PasteMenu prompt instead. Defaults to false.
+   *
+   * Markdown is parsed when a document is imported or created, and when
+   * documents.update is given `text` – never when one is opened, which is
+   * served from the ProseMirror JSON stored at import time (see
+   * server/models/helpers/DocumentHelper.tsx). So this decides what a *new*
+   * import makes of such a link and changes nothing about the documents
+   * already in the database: those would need a pass of their own.
    */
   matchOnImport?: boolean;
   /** A regex that will be used to match the embed from a URL. */
@@ -774,7 +781,14 @@ const embeds: EmbedDescriptor[] = [
     matchOnImport: true,
     regexMatch: [new RegExp("^https?://(.*)$")],
     transformMatch: (matches: RegExpMatchArray) => matches[0],
-    hideToolbar: true,
+    // galadrim: and it keeps the bar under the frame, which carries the only
+    // link out to the source. This is the provider that takes any URL at all,
+    // including the many that refuse to be framed: of the 74 embed links in
+    // the Notion exports, 29 come from hosts that answer X-Frame-Options deny
+    // or a frame-ancestors we are not in (github.com, app.notion.com,
+    // marketplace.visualstudio.com, ...). Hiding the bar on those would leave
+    // an empty rectangle with no way through to the page – worse than the
+    // bare link it replaces. The embeds that do hide it all load.
   }),
 ];
 
