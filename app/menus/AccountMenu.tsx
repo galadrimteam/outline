@@ -24,7 +24,10 @@ type Props = {
 
 const AccountMenu: React.FC<Props> = ({ children }: Props) => {
   const { t } = useTranslation();
-  const team = useCurrentTeam();
+  // The menu is also rendered on a publicly shared page (AuthenticatedIsland),
+  // where the signed-in user's team may not have been loaded – hence
+  // rejectOnEmpty: false, which would otherwise throw there.
+  const team = useCurrentTeam({ rejectOnEmpty: false });
   const can = usePolicy(team);
 
   const actions = React.useMemo(
