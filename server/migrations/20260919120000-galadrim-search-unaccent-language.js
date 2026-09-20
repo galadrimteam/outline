@@ -15,7 +15,8 @@
 // configuration: french, english, simple, german…), otherwise "french" when
 // DEFAULT_LANGUAGE is a French locale, otherwise "english". It is only read
 // here: to change it later, re-run this migration (undo then migrate) with the
-// new value.
+// new value — and undo and re-run 20260920120000 with it, since that one only
+// completes the mapping of a configuration this migration has already made.
 //
 // Cost: one UPDATE per batch of 500 documents, a few seconds for thousands of
 // documents. Every statement is idempotent; nothing runs in a transaction, so
@@ -39,6 +40,20 @@
 const SEARCH_CONFIGURATION = "outline_search";
 const BATCH_SIZE = 500;
 const IDENTIFIER = /^[a-z][a-z0-9_]*$/;
+// The token types whose dictionary gets `unaccent` in front of it. A word that
+// holds a digit has a type of its own ("Réunion2024" is a numword, "Q1-Été" a
+// numhword made of hword_numparts) and its own dictionary, so each type keeps
+// the one its language gives it and only gains the accent folding. Databases
+// where this migration had already run are brought here by
+// 20260920120000-galadrim-search-unaccent-numbers.
+const TOKEN_TYPES = [
+  "word",
+  "hword",
+  "hword_part",
+  "numword",
+  "numhword",
+  "hword_numpart",
+];
 
 function baseLanguage() {
   const explicit = (process.env.SEARCH_LANGUAGE || "").trim().toLowerCase();
@@ -113,22 +128,36 @@ module.exports = {
       'CREATE EXTENSION IF NOT EXISTS "unaccent";'
     );
 
-    // The dictionaries the base configuration uses for words, e.g.
-    // "french_stem"; unaccent is a filtering dictionary that goes first.
+    // The dictionaries the base configuration uses for each token type, e.g.
+    // "french_stem" for a word and "simple" for a word with a digit in it;
+    // unaccent is a filtering dictionary that goes in front of them.
+    // ("dictname::text", because the driver hands a name[] back as a string.)
     const [dictionaries] = await queryInterface.sequelize.query(`
-SELECT d.dictname AS name
+SELECT t.alias AS alias, array_agg(d.dictname::text ORDER BY m.mapseqno) AS dicts
 FROM pg_ts_config c
 JOIN pg_ts_config_map m ON m.mapcfg = c.oid
 JOIN pg_ts_dict d ON d.oid = m.mapdict
 JOIN ts_token_type('default') t ON t.tokid = m.maptokentype
-WHERE c.cfgname = '${base}' AND c.cfgnamespace = 'pg_catalog'::regnamespace AND t.alias = 'word'
-ORDER BY m.mapseqno
+WHERE c.cfgname = '${base}' AND c.cfgnamespace = 'pg_catalog'::regnamespace
+  AND t.alias IN (${TOKEN_TYPES.map((token) => `'${token}'`).join(", ")})
+GROUP BY t.alias
     `);
-    const names = dictionaries.map((row) => String(row.name));
-    if (!names.length || !names.every((name) => IDENTIFIER.test(name))) {
+    const mapping = new Map(
+      dictionaries.map((row) => [
+        String(row.alias),
+        row.dicts.map((name) => String(name)),
+      ])
+    );
+    const words = mapping.get("word");
+    if (!words?.length) {
       throw new Error(
         `SEARCH_LANGUAGE "${base}" is not a text search configuration of this Postgres (see \\dF in psql)`
       );
+    }
+    for (const names of mapping.values()) {
+      if (!names.every((name) => IDENTIFIER.test(name))) {
+        throw new Error(`Unexpected dictionaries: ${names.join(", ")}`);
+      }
     }
 
     await queryInterface.sequelize.query(
@@ -137,9 +166,11 @@ ORDER BY m.mapseqno
     await queryInterface.sequelize.query(
       `CREATE TEXT SEARCH CONFIGURATION ${SEARCH_CONFIGURATION} (COPY = pg_catalog.${base});`
     );
-    await queryInterface.sequelize.query(
-      `ALTER TEXT SEARCH CONFIGURATION ${SEARCH_CONFIGURATION} ALTER MAPPING FOR hword, hword_part, word WITH unaccent, ${names.join(", ")};`
-    );
+    for (const [token, names] of mapping) {
+      await queryInterface.sequelize.query(
+        `ALTER TEXT SEARCH CONFIGURATION ${SEARCH_CONFIGURATION} ALTER MAPPING FOR ${token} WITH unaccent, ${names.join(", ")};`
+      );
+    }
 
     await queryInterface.sequelize.query(triggerFunction(SEARCH_CONFIGURATION));
     await rebuildSearchVectors(queryInterface);
