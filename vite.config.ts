@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import react from "@vitejs/plugin-react";
@@ -7,6 +8,37 @@ import type { ConfigEnv, ServerOptions } from "vite";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import environment from "./server/utils/environment";
+
+/**
+ * galadrim: a short hash of every translation file, handed to the client so it
+ * can ask for `/locales/<lng>.json?v=<hash>`. Those files are served with a
+ * seven day max-age and no version in their URL, so without this a browser
+ * that loaded the app before a deploy keeps the previous translations and
+ * shows the strings the fork has just added in English in the middle of a
+ * French page. Computed from the files themselves rather than from a constant
+ * someone has to remember to bump.
+ *
+ * @returns The first 12 characters of the hash, or "dev" if the files cannot
+ * be read.
+ */
+function translationsVersion(): string {
+  try {
+    const root = path.resolve(__dirname, "./shared/i18n/locales");
+    const hash = crypto.createHash("md5");
+
+    for (const locale of fs.readdirSync(root).sort()) {
+      const file = path.join(root, locale, "translation.json");
+      if (fs.existsSync(file)) {
+        hash.update(locale);
+        hash.update(fs.readFileSync(file));
+      }
+    }
+
+    return hash.digest("hex").slice(0, 12);
+  } catch (_err) {
+    return "dev";
+  }
+}
 
 let httpsConfig: ServerOptions["https"] | undefined;
 let host: string | undefined;
@@ -35,6 +67,8 @@ export default ({ mode }: ConfigEnv) =>
       "process.env.NODE_ENV": JSON.stringify(
         mode === "development" ? "development" : "production"
       ),
+      // galadrim: see translationsVersion() above and app/utils/i18n.ts.
+      "process.env.TRANSLATIONS_VERSION": JSON.stringify(translationsVersion()),
     },
     root: "./",
     publicDir: "./server/static",
