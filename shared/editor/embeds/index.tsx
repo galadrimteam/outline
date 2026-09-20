@@ -74,12 +74,15 @@ export class EmbedDescriptor {
    * galadrim: whether a paragraph holding nothing but a link to itself
    * (`[url](url)`, the shape our importer and Notion's own export both
    * write for an embed block) becomes this embed when its Markdown is
-   * parsed, in linksToEmbeds. Kept apart from matchOnInput, which the same
-   * rule also reads, so it can stay off for the generic provider there
-   * (typed/pasted markdown is not where this class of bare link comes
-   * from) while turning on just for it here. A plain pasted URL never
-   * reaches this rule at all – that goes through the separate, interactive
-   * getMatchingEmbed/PasteMenu prompt instead. Defaults to false.
+   * parsed, in linksToEmbeds. Kept apart from matchOnInput, which that rule
+   * also reads, so it can stay off for the generic provider there (typed or
+   * pasted markdown is not where this class of bare link comes from) while
+   * turning on just for it here. matchOnInput has one other reader,
+   * isEmbedUrl in server/utils/embeds.ts, which decides whether a *bare* URL
+   * alone on its line is rewritten to `[url](url)` before a document created
+   * through the API is parsed; leaving matchOnInput false keeps the generic
+   * provider out of that, so an ordinary link in an API-created document
+   * stays a link. Defaults to false.
    *
    * Markdown is parsed when a document is imported or created, and when
    * documents.update is given `text` – never when one is opened, which is
