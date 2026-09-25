@@ -181,6 +181,14 @@ export class ConvertTeableEmbedsTask extends BaseTask<ConvertTeableEmbedsProps> 
         document,
         Node.fromJSON(schema, doc)
       );
+      // A page that is nothing but its database is drawn edge to edge, as in Notion.
+      if (
+        doc.content?.some(
+          (node) => node.type === "database" && node.attrs?.fullPage === true
+        )
+      ) {
+        document.fullWidth = true;
+      }
       // With the user in the context, the notifyCollaborationServer hook
       // pushes the new state into open editing sessions once committed; with
       // no event in it, nothing else hears about the change.

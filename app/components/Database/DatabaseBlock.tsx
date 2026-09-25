@@ -173,6 +173,7 @@ const EmptyBlock = observer(function EmptyBlock({
   const { t } = useTranslation();
   const { databases, documents } = useStores();
   const editor = useEditor();
+  const makeHostFullWidth = useFullWidthHost();
   const pending = attrs.id ? pendingDatabases.get(attrs.id) : undefined;
   const [error, setError] = React.useState<string>();
   const [isCreating, setIsCreating] = React.useState(
@@ -209,6 +210,9 @@ const EmptyBlock = observer(function EmptyBlock({
       request
         .then((databaseId) => {
           pendingDatabases.delete(key);
+          if (attrs.fullPage) {
+            makeHostFullWidth();
+          }
           updateAttrs({
             databaseId,
             title: databases.get(databaseId)?.title ?? null,
@@ -220,7 +224,16 @@ const EmptyBlock = observer(function EmptyBlock({
           setError(t("Couldn’t create the database, try again?"));
         });
     },
-    [attrs.id, databases, documents, editor, updateAttrs, t]
+    [
+      attrs.id,
+      attrs.fullPage,
+      databases,
+      documents,
+      editor,
+      makeHostFullWidth,
+      updateAttrs,
+      t,
+    ]
   );
 
   React.useEffect(() => {
@@ -282,6 +295,26 @@ interface FrameProps {
   isEditable: boolean;
   isSelected: boolean;
   actions: NodeActions;
+}
+
+/**
+ * Returns a function that makes the page holding the block full width: a
+ * full-page database is drawn edge to edge, as in Notion.
+ *
+ * @returns the function.
+ */
+function useFullWidthHost() {
+  const editor = useEditor();
+  const { documents } = useStores();
+  return React.useCallback(() => {
+    const document = editor.props.id
+      ? documents.get(editor.props.id)
+      : undefined;
+    if (document && !document.fullWidth) {
+      document.fullWidth = true;
+      void document.save({ fullWidth: true });
+    }
+  }, [editor, documents]);
 }
 
 const DatabaseFrame = observer(function DatabaseFrame({
@@ -364,11 +397,15 @@ const DatabaseFrame = observer(function DatabaseFrame({
   return (
     <Frame $fullPage={fullPage} $selected={isSelected}>
       <HeaderRow>
-        <DatabaseHeader
-          database={database}
-          readOnly={readOnly}
-          fullPage={fullPage}
-        />
+        {fullPage ? (
+          <Spacer />
+        ) : (
+          <DatabaseHeader
+            database={database}
+            readOnly={readOnly}
+            fullPage={fullPage}
+          />
+        )}
         <BlockOptions
           databaseId={database.id}
           fullPage={fullPage}
@@ -596,6 +633,7 @@ const BlockOptions = observer(function BlockOptions({
   floating?: boolean;
 }) {
   const { t } = useTranslation();
+  const makeHostFullWidth = useFullWidthHost();
 
   const menu = useMenuAction([
     createAction({
@@ -612,7 +650,12 @@ const BlockOptions = observer(function BlockOptions({
       section: "Database",
       icon: <AlignFullWidthIcon />,
       visible: isEditable,
-      perform: () => actions.updateAttrs({ fullPage: !fullPage }),
+      perform: () => {
+        if (!fullPage) {
+          makeHostFullWidth();
+        }
+        actions.updateAttrs({ fullPage: !fullPage });
+      },
     }),
     createAction({
       name: t("Remove from page"),
@@ -969,4 +1012,8 @@ const SkeletonBar = styled.div<{ $width: number; $height: number }>`
       opacity: 0.55;
     }
   }
+`;
+
+const Spacer = styled.div`
+  flex: 1;
 `;
