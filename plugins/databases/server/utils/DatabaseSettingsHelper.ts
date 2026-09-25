@@ -87,10 +87,15 @@ export class DatabaseSettingsHelper {
   ): DatabaseSettings {
     const next: DatabaseSettings = { ...settings };
     if (patch.viewOverrides) {
-      next.viewOverrides = mergeEntries(
-        next.viewOverrides,
-        patch.viewOverrides
-      );
+      const current = next.viewOverrides;
+      next.viewOverrides = mergeEntries(current, patch.viewOverrides);
+      // A form's sharing is only changed through databaseForms.share.
+      for (const [viewId, entry] of Object.entries(patch.viewOverrides)) {
+        const form = current?.[viewId]?.form;
+        if (entry && form && !("form" in entry)) {
+          next.viewOverrides[viewId] = { ...entry, form };
+        }
+      }
     }
     if (patch.fieldMeta) {
       next.fieldMeta = mergeEntries(next.fieldMeta, patch.fieldMeta);

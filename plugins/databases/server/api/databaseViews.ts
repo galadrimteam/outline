@@ -152,11 +152,13 @@ router.post(
       refFor(database),
       viewId
     );
-    const sourceOverrides = database.settings?.viewOverrides?.[viewId];
-    if (sourceOverrides) {
+    // A shared form keeps its public link: the copy starts unshared.
+    const { form: _form, ...copiedOverrides } =
+      database.settings?.viewOverrides?.[viewId] ?? {};
+    if (Object.keys(copiedOverrides).length) {
       await updateDatabaseSettings(database, (settings) =>
         DatabaseSettingsHelper.merge(settings, {
-          viewOverrides: { [view.id]: sourceOverrides },
+          viewOverrides: { [view.id]: copiedOverrides },
         })
       );
     }

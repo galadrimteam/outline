@@ -15,6 +15,11 @@ const Shared = lazy(() => import("~/scenes/Shared"));
 const Login = lazy(() => import("~/scenes/Login"));
 const Logout = lazy(() => import("~/scenes/Logout"));
 const OAuthAuthorize = lazy(() => import("~/scenes/Login/OAuthAuthorize"));
+const DatabaseForm = lazy(() =>
+  import("~/scenes/DatabaseForm").then((module) => ({
+    default: module.DatabaseFormScene,
+  }))
+);
 
 export default function Routes() {
   useAutoRefresh();
@@ -45,6 +50,7 @@ export default function Routes() {
           <Route exact path="/logout" component={Logout} />
           <Route exact path="/desktop-redirect" component={DesktopRedirect} />
           <Route exact path="/oauth/authorize" component={OAuthAuthorize} />
+          <Route exact path="/f/:slug" component={DatabaseForm} />
 
           <Redirect exact from="/share/:shareId" to="/s/:shareId" />
           <Route exact path="/s/:shareId" component={Shared} />

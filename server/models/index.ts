@@ -18,6 +18,8 @@ export { default as Document } from "./Document";
 
 export { default as Database } from "./Database";
 
+export { default as DatabaseAutomation } from "./DatabaseAutomation";
+
 export { default as DocumentInsight } from "./DocumentInsight";
 
 export { default as Event } from "./Event";

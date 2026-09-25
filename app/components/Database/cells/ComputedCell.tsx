@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import styled from "styled-components";
-import { s } from "@shared/styles";
+import { AutomationButton } from "../automations/AutomationButton";
 import { CheckboxBox } from "./CheckboxCell";
 import { CellText, EmptyValue } from "./components/styles";
 import { cellValueToText, toArray } from "./format";
@@ -16,9 +16,9 @@ export const computedCell: CellDefinition = {
   isEditable: () => false,
 };
 
-/** Buttons, drawn with their label; clicking them runs automations (later). */
+/** Buttons, drawn with their label; clicking one runs the automations it triggers. */
 export const buttonCell: CellDefinition = {
-  Renderer: ButtonRenderer,
+  Renderer: AutomationButton,
   isEditable: () => false,
 };
 
@@ -58,11 +58,6 @@ function ComputedRenderer({ field, value, variant, wrap }: CellRendererProps) {
   );
 }
 
-function ButtonRenderer({ field }: CellRendererProps) {
-  const { t } = useTranslation();
-  return <ButtonLabel>{field.options.label ?? t("Button")}</ButtonLabel>;
-}
-
 const Row = styled.span`
   display: inline-flex;
   gap: 4px;
@@ -72,14 +67,4 @@ const ComputedText = styled(CellText)<{ $numeric: boolean }>`
   font-variant-numeric: ${(props) => (props.$numeric ? "tabular-nums" : "normal")};
   text-align: ${(props) =>
     props.$numeric && props.$variant === "table" ? "right" : "left"};
-`;
-
-const ButtonLabel = styled.span`
-  display: inline-block;
-  padding: 0 8px;
-  border-radius: 4px;
-  font-size: 13px;
-  line-height: 22px;
-  color: ${s("textSecondary")};
-  border: 1px solid ${s("divider")};
 `;
