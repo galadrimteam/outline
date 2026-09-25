@@ -183,6 +183,8 @@ export function databaseTools(server: McpServer, scopes: string[]) {
             .describe(
               'Conditions on properties, combined with conjunction. An item may also be a group {"conjunction":"or","conditions":[…]}.'
             ),
+          // Models often pluralize the key; silently dropping it would return unfiltered rows.
+          filters: zFilter.optional().describe("Same as filter."),
           conjunction: z
             .enum(["and", "or"])
             .optional()
@@ -228,7 +230,7 @@ export function databaseTools(server: McpServer, scopes: string[]) {
               // Without a view named, the first view only gives the order.
               replaceFilter: !input.view,
               filter: await session.inputs.filter(
-                input.filter,
+                input.filter ?? input.filters,
                 input.conjunction
               ),
               sort: session.inputs.sort(input.sort),
