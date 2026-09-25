@@ -20,6 +20,7 @@ import { RateLimiterStrategy } from "@server/utils/RateLimiter";
 import { attachmentTools } from "@server/tools/attachments";
 import { collectionTools } from "@server/tools/collections";
 import { commentTools } from "@server/tools/comments";
+import { databaseTools } from "@server/tools/databases";
 import { documentTools } from "@server/tools/documents";
 import { fetchTool } from "@server/tools/fetch";
 import { templateTools } from "@server/tools/templates";
@@ -123,6 +124,7 @@ function createMcpServer(scopes: string[], guidance?: string): McpServer {
   attachmentTools(server, scopes);
   collectionTools(server, scopes);
   commentTools(server, scopes);
+  databaseTools(server, scopes);
   documentTools(server, scopes);
   fetchTool(server, scopes);
   templateTools(server, scopes);
