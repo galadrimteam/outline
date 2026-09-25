@@ -3,6 +3,7 @@ import copy from "copy-to-clipboard";
 import {
   AlignFullWidthIcon,
   CloseIcon,
+  LightningIcon,
   LinkIcon,
   MoreIcon,
   SearchIcon,
@@ -41,6 +42,9 @@ import { DatabaseHeader } from "./DatabaseHeader";
 import { DatabasePicker } from "./DatabasePicker";
 import { pendingDatabases } from "./pendingDatabases";
 import { NewRecordMenu } from "./templates/NewRecordMenu";
+import { openDatabaseAutomations } from "./automations/openDatabaseAutomations";
+import { useDatabaseShare } from "./useDatabaseShare";
+import { FormSharing } from "~/scenes/DatabaseForm/FormSharing";
 import { DatabaseToolbar } from "./toolbar/DatabaseToolbar";
 import {
   canSaveView,
@@ -330,6 +334,7 @@ const DatabaseFrame = observer(function DatabaseFrame({
   const { updateAttrs } = actions;
   const { t } = useTranslation();
   const { databases, policies } = useStores();
+  const share = useDatabaseShare();
   const [loadError, setLoadError] = React.useState<Error>();
   const database = databases.get(databaseId);
   const isLoaded = !!database?.isSchemaLoaded;
@@ -393,7 +398,8 @@ const DatabaseFrame = observer(function DatabaseFrame({
     );
   }
 
-  const readOnly = !isEditable || !policies.abilities(database.id).update;
+  const readOnly =
+    share.readOnly || !isEditable || !policies.abilities(database.id).update;
 
   return (
     <Frame $fullPage={fullPage} $selected={isSelected}>
@@ -460,6 +466,7 @@ const LoadedView = observer(function LoadedView({
   onSelectView,
   onViewCreated,
 }: LoadedViewProps) {
+  const share = useDatabaseShare();
   const { t } = useTranslation();
   const { databaseRecords } = useStores();
   const history = useHistory();
@@ -482,14 +489,16 @@ const LoadedView = observer(function LoadedView({
     async (recordId: string) => {
       try {
         const document = await databaseRecords.open(database.id, recordId);
+        const path = share.rowPath(document.path);
         if (
+          !share.canOpenInSplit ||
           view.overrides.openPagesIn === "fullPage" ||
           pane === "secondary" ||
           isMobile
         ) {
-          history.push(document.path);
+          history.push(path);
         } else {
-          openRouteInSplit(browserHistory, document.path);
+          openRouteInSplit(browserHistory, path);
         }
       } catch (_err) {
         toast.error(t("Couldn’t open the page"));
@@ -502,6 +511,7 @@ const LoadedView = observer(function LoadedView({
       pane,
       isMobile,
       history,
+      share,
       t,
     ]
   );
@@ -640,12 +650,15 @@ const BlockOptions = observer(function BlockOptions({
 }) {
   const { t } = useTranslation();
   const makeHostFullWidth = useFullWidthHost();
+  const share = useDatabaseShare();
+  const { dialogs, databases, policies } = useStores();
 
   const menu = useMenuAction([
     createAction({
       name: t("Copy link to database"),
       section: "Database",
       icon: <LinkIcon />,
+      visible: share.canLinkToDatabase,
       perform: () => {
         copy(`${window.location.origin}${databasePath(databaseId)}`);
         toast.success(t("Link copied to clipboard"));
@@ -661,6 +674,21 @@ const BlockOptions = observer(function BlockOptions({
           makeHostFullWidth();
         }
         actions.updateAttrs({ fullPage: !fullPage });
+      },
+    }),
+    createAction({
+      name: t("Automations"),
+      section: "Database",
+      icon: <LightningIcon />,
+      visible:
+        !share.isShare &&
+        !!policies.abilities(databaseId).update &&
+        !!databases.get(databaseId)?.isSchemaLoaded,
+      perform: () => {
+        const database = databases.get(databaseId);
+        if (database) {
+          openDatabaseAutomations({ dialogs, database, t });
+        }
       },
     }),
     createAction({
@@ -702,6 +730,12 @@ function renderView(
       return <ListView {...props} />;
     case DatabaseLayout.Timeline:
       return <TimelineView {...props} />;
+    case DatabaseLayout.Form:
+      return props.readOnly ? (
+        <Notice>{t("This kind of view is not supported yet.")}</Notice>
+      ) : (
+        <FormSharing database={props.database} view={props.view} />
+      );
     default:
       return <Notice>{t("This kind of view is not supported yet.")}</Notice>;
   }

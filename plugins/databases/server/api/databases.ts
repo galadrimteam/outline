@@ -9,7 +9,7 @@ import { transaction } from "@server/middlewares/transaction";
 import validate from "@server/middlewares/validate";
 import { Collection, Database, Document } from "@server/models";
 import { authorize, can } from "@server/policies";
-import { presentPolicies } from "@server/presenters";
+import { presentDatabase, presentPolicies } from "@server/presenters";
 import { QueryHelper } from "@server/storage/QueryHelper";
 import type { APIContext } from "@server/types";
 import { databaseCreator } from "../commands/databaseCreator";
@@ -17,8 +17,8 @@ import { ConvertTeableEmbedsTask } from "../tasks/ConvertTeableEmbedsTask";
 import { engineFor, refFor } from "../engine";
 import { presentDatabaseForUser } from "../presenters/database";
 import { presentDatabaseSchema } from "../presenters/databaseSchema";
-import { actorFor } from "../utils/actor";
 import { DatabaseSettingsHelper } from "../utils/DatabaseSettingsHelper";
+import { loadDatabaseForRead } from "../utils/shareAccess";
 import {
   DatabaseRateLimit,
   authenticatedUser,
@@ -35,20 +35,25 @@ router.post(
   auth({ optional: true }),
   validate(T.DatabasesInfoSchema),
   async (ctx: APIContext<T.DatabasesInfoReq>) => {
-    const user = authenticatedUser(ctx);
-    const database = await loadDatabase(user, ctx.input.body.id, "read");
+    const { id, shareId } = ctx.input.body;
+    const access = await loadDatabaseForRead(ctx, id, shareId);
+    const { database, user } = access;
 
     const schema = await engineFor(database).getSchema(
-      actorFor(user),
+      access.actor,
       refFor(database)
     );
 
     ctx.body = {
       data: {
-        database: presentDatabaseForUser(user, database),
+        database:
+          user && !access.shareId
+            ? presentDatabaseForUser(user, database)
+            : presentDatabase(database),
         ...(await presentDatabaseSchema(database, schema)),
       },
-      policies: presentPolicies(user, [database]),
+      policies:
+        user && !access.shareId ? presentPolicies(user, [database]) : undefined,
     };
   }
 );

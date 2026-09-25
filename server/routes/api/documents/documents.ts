@@ -28,6 +28,7 @@ import documentCreator, {
   authorizeDocumentPublish,
 } from "@server/commands/documentCreator";
 import documentDuplicator from "@server/commands/documentDuplicator";
+import { documentDatabasesDuplicator } from "plugins/databases/server/commands/documentDatabasesDuplicator";
 import documentLoader from "@server/commands/documentLoader";
 import documentMover from "@server/commands/documentMover";
 import documentPermanentDeleter from "@server/commands/documentPermanentDeleter";
@@ -1571,6 +1572,11 @@ router.post(
       publish,
       recursive,
       parentDocumentId,
+    });
+    await documentDatabasesDuplicator({
+      user,
+      documents: response,
+      transaction,
     });
 
     ctx.body = {

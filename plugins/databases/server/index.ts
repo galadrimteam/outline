@@ -1,12 +1,16 @@
 import { Hook, PluginManager } from "@server/utils/PluginManager";
 import config from "../plugin.json";
+import databaseAutomations from "./api/databaseAutomations";
+import databaseDuplicate from "./api/databaseDuplicate";
 import databaseFields from "./api/databaseFields";
+import databaseForms from "./api/databaseForms";
 import databaseRecordPages from "./api/databaseRecordPages";
 import databaseRecords from "./api/databaseRecords";
 import databases from "./api/databases";
 import databaseViews from "./api/databaseViews";
 import teableHooks from "./api/teableHooks";
 import { DatabaseRecordAssignedEmail } from "./email/templates/DatabaseRecordAssignedEmail";
+import { DatabaseAutomationProcessor } from "./automations/DatabaseAutomationProcessor";
 import env from "./env";
 import { ConvertImportedEmbedsProcessor } from "./processors/ConvertImportedEmbedsProcessor";
 import { DatabaseAnchorMoveProcessor } from "./processors/DatabaseAnchorMoveProcessor";
@@ -26,6 +30,10 @@ if (enabled) {
     { type: Hook.API, value: databaseFields },
     { type: Hook.API, value: databaseViews },
     { type: Hook.API, value: teableHooks },
+    { type: Hook.API, value: databaseAutomations },
+    { type: Hook.API, value: databaseForms },
+    { type: Hook.API, value: databaseDuplicate },
+    { type: Hook.Processor, value: DatabaseAutomationProcessor },
     { type: Hook.Processor, value: DatabaseRowTitleProcessor },
     { type: Hook.Processor, value: DatabaseChangeTitleProcessor },
     { type: Hook.Processor, value: DatabaseAnchorMoveProcessor },

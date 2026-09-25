@@ -10,6 +10,7 @@ import {
   DatabaseStatusGroup,
 } from "@shared/databases/types";
 import { BaseSchema } from "@server/routes/api/schema";
+import { zodShareIdType } from "@server/utils/zod";
 
 /** An engine id (table, field, view, record): never trusted beyond its format. */
 const zEngineId = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, {
@@ -347,7 +348,7 @@ const zOffset = z.number().int().min(0).default(0);
 // databases.*
 
 export const DatabasesInfoSchema = BaseSchema.extend({
-  body: z.object({ id: z.uuid() }),
+  body: z.object({ id: z.uuid(), shareId: zodShareIdType().optional() }),
 });
 
 export type DatabasesInfoReq = z.infer<typeof DatabasesInfoSchema>;
@@ -432,6 +433,7 @@ export type DatabasesConvertEmbedsReq = z.infer<
 export const DatabaseRecordsListSchema = BaseSchema.extend({
   body: z.object({
     databaseId: z.uuid(),
+    shareId: zodShareIdType().optional(),
     viewId: zEngineId,
     filter: zFilter.nullish(),
     /** The filter replaces the view's instead of narrowing it (editors only). */
@@ -446,7 +448,11 @@ export const DatabaseRecordsListSchema = BaseSchema.extend({
 export type DatabaseRecordsListReq = z.infer<typeof DatabaseRecordsListSchema>;
 
 export const DatabaseRecordsInfoSchema = BaseSchema.extend({
-  body: z.object({ databaseId: z.uuid(), recordId: zEngineId }),
+  body: z.object({
+    databaseId: z.uuid(),
+    recordId: zEngineId,
+    shareId: zodShareIdType().optional(),
+  }),
 });
 
 export type DatabaseRecordsInfoReq = z.infer<typeof DatabaseRecordsInfoSchema>;
@@ -518,7 +524,11 @@ export type DatabaseRecordsDuplicateReq = z.infer<
 >;
 
 export const DatabaseRecordsOpenSchema = BaseSchema.extend({
-  body: z.object({ databaseId: z.uuid(), recordId: zEngineId }),
+  body: z.object({
+    databaseId: z.uuid(),
+    recordId: zEngineId,
+    shareId: zodShareIdType().optional(),
+  }),
 });
 
 export type DatabaseRecordsOpenReq = z.infer<typeof DatabaseRecordsOpenSchema>;
@@ -526,6 +536,7 @@ export type DatabaseRecordsOpenReq = z.infer<typeof DatabaseRecordsOpenSchema>;
 export const DatabaseRecordsGroupsSchema = BaseSchema.extend({
   body: z.object({
     databaseId: z.uuid(),
+    shareId: zodShareIdType().optional(),
     viewId: zEngineId,
     groupBy: zGroup.nullish(),
     filter: zFilter.nullish(),
@@ -540,6 +551,7 @@ export type DatabaseRecordsGroupsReq = z.infer<
 export const DatabaseRecordsAggregateSchema = BaseSchema.extend({
   body: z.object({
     databaseId: z.uuid(),
+    shareId: zodShareIdType().optional(),
     viewId: zEngineId,
     fieldStats: z
       .record(zEngineId, zStatisticFunc)

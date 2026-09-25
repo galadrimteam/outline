@@ -7,12 +7,12 @@ import multipart from "@server/middlewares/multipart";
 import { rateLimiter } from "@server/middlewares/rateLimiter";
 import validate from "@server/middlewares/validate";
 import { ValidationError } from "@server/errors";
-import type { Database, User } from "@server/models";
+import type { Database } from "@server/models";
 import { Document } from "@server/models";
 import { authorize, can } from "@server/policies";
 import { presentDocument, presentPolicies } from "@server/presenters";
 import type { APIContext } from "@server/types";
-import type { DatabaseEngine } from "../engine/DatabaseEngine";
+import type { DatabaseActor, DatabaseEngine } from "../engine/DatabaseEngine";
 import { engineFor, refFor } from "../engine";
 import {
   presentDatabaseRecord,
@@ -21,6 +21,12 @@ import {
 import { actorFor } from "../utils/actor";
 import { cellText } from "../utils/cellText";
 import { DatabaseUserMapper } from "../utils/DatabaseUserMapper";
+import {
+  loadDatabaseForRead,
+  redactGroupPointsForShare,
+  redactRecordsForShare,
+  rowPageAuthorFor,
+} from "../utils/shareAccess";
 import {
   DatabaseRateLimit,
   authenticatedUser,
@@ -36,7 +42,6 @@ router.post(
   auth({ optional: true }),
   validate(T.DatabaseRecordsListSchema),
   async (ctx: APIContext<T.DatabaseRecordsListReq>) => {
-    const user = authenticatedUser(ctx);
     const {
       databaseId,
       viewId,
@@ -46,16 +51,22 @@ router.post(
       search,
       offset,
       limit,
+      shareId,
     } = ctx.input.body;
-    const database = await loadDatabase(user, databaseId, "read");
+    const access = await loadDatabaseForRead(ctx, databaseId, shareId);
+    const { database, user } = access;
 
     const page = await engineFor(database).listRecords(
-      actorFor(user),
+      access.actor,
       refFor(database),
       {
         viewId,
         filter,
-        replaceFilter: replaceFilter && can(user, "update", database) === true,
+        replaceFilter:
+          replaceFilter &&
+          !access.shareId &&
+          !!user &&
+          can(user, "update", database) === true,
         sort,
         search,
         skip: offset,
@@ -65,7 +76,10 @@ router.post(
 
     ctx.body = {
       pagination: { offset, limit, total: page.total },
-      data: await presentDatabaseRecords(database, page.records),
+      data: redactRecordsForShare(
+        access,
+        await presentDatabaseRecords(database, page.records)
+      ),
     };
   }
 );
@@ -76,17 +90,20 @@ router.post(
   auth({ optional: true }),
   validate(T.DatabaseRecordsInfoSchema),
   async (ctx: APIContext<T.DatabaseRecordsInfoReq>) => {
-    const user = authenticatedUser(ctx);
-    const { databaseId, recordId } = ctx.input.body;
-    const database = await loadDatabase(user, databaseId, "read");
+    const { databaseId, recordId, shareId } = ctx.input.body;
+    const access = await loadDatabaseForRead(ctx, databaseId, shareId);
+    const { database } = access;
 
     const record = await engineFor(database).getRecord(
-      actorFor(user),
+      access.actor,
       refFor(database),
       recordId
     );
 
-    ctx.body = { data: await presentDatabaseRecord(database, record) };
+    const [presented] = redactRecordsForShare(access, [
+      await presentDatabaseRecord(database, record),
+    ]);
+    ctx.body = { data: presented };
   }
 );
 
@@ -227,9 +244,9 @@ router.post(
   auth({ optional: true }),
   validate(T.DatabaseRecordsOpenSchema),
   async (ctx: APIContext<T.DatabaseRecordsOpenReq>) => {
-    const user = authenticatedUser(ctx);
-    const { databaseId, recordId } = ctx.input.body;
-    const database = await loadDatabase(user, databaseId, "read");
+    const { databaseId, recordId, shareId } = ctx.input.body;
+    const access = await loadDatabaseForRead(ctx, databaseId, shareId);
+    const { database, user } = access;
 
     const existing = await Document.unscoped().findOne({
       attributes: ["id"],
@@ -237,14 +254,34 @@ router.post(
     });
     const document = existing
       ? await Document.findByPk(existing.id, {
-          userId: user.id,
+          userId: user?.id,
           rejectOnEmpty: true,
         })
-      : await databaseRowDocumentCreator(ctx.context, {
-          database,
-          recordId,
-          ...(await rowTitle(engineFor(database), database, user, recordId)),
-        });
+      : await databaseRowDocumentCreator(
+          access.shareId
+            ? { user: await rowPageAuthorFor(access) }
+            : ctx.context,
+          {
+            database,
+            recordId,
+            ...(await rowTitle(
+              engineFor(database),
+              database,
+              access.actor,
+              recordId
+            )),
+          }
+        );
+
+    if (access.shareId || !user) {
+      ctx.body = {
+        data: await presentDocument(ctx, document, {
+          isPublic: true,
+          shareId: access.shareId ?? undefined,
+        }),
+      };
+      return;
+    }
     authorize(user, "read", document);
 
     ctx.body = {
@@ -260,12 +297,13 @@ router.post(
   auth({ optional: true }),
   validate(T.DatabaseRecordsGroupsSchema),
   async (ctx: APIContext<T.DatabaseRecordsGroupsReq>) => {
-    const user = authenticatedUser(ctx);
-    const { databaseId, viewId, groupBy, filter, search } = ctx.input.body;
-    const database = await loadDatabase(user, databaseId, "read");
+    const { databaseId, viewId, groupBy, filter, search, shareId } =
+      ctx.input.body;
+    const access = await loadDatabaseForRead(ctx, databaseId, shareId);
+    const { database } = access;
 
     const points = await engineFor(database).groupPoints(
-      actorFor(user),
+      access.actor,
       refFor(database),
       { viewId, groupBy, filter, search }
     );
@@ -278,7 +316,7 @@ router.post(
       )
     );
 
-    ctx.body = { data: points };
+    ctx.body = { data: redactGroupPointsForShare(access, points) };
   }
 );
 
@@ -288,12 +326,13 @@ router.post(
   auth({ optional: true }),
   validate(T.DatabaseRecordsAggregateSchema),
   async (ctx: APIContext<T.DatabaseRecordsAggregateReq>) => {
-    const user = authenticatedUser(ctx);
-    const { databaseId, viewId, fieldStats, filter, search } = ctx.input.body;
-    const database = await loadDatabase(user, databaseId, "read");
+    const { databaseId, viewId, fieldStats, filter, search, shareId } =
+      ctx.input.body;
+    const access = await loadDatabaseForRead(ctx, databaseId, shareId);
+    const { database } = access;
 
     const data = Object.keys(fieldStats).length
-      ? await engineFor(database).aggregate(actorFor(user), refFor(database), {
+      ? await engineFor(database).aggregate(access.actor, refFor(database), {
           viewId,
           fieldStats,
           filter,
@@ -393,10 +432,9 @@ router.post(
 async function rowTitle(
   engine: DatabaseEngine,
   database: Database,
-  user: User,
+  actor: DatabaseActor,
   recordId: string
 ): Promise<{ title: string; icon: string | null }> {
-  const actor = actorFor(user);
   const ref = refFor(database);
   const [schema, record] = await Promise.all([
     engine.getSchema(actor, ref),

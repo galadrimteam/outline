@@ -43,7 +43,9 @@ function DocumentLink(
   const isActiveDocument = activeDocumentId === node.id;
 
   const hasChildDocuments =
-    !!node.children.length || activeDocument?.parentDocumentId === node.id;
+    !!node.children.length ||
+    (activeDocument?.parentDocumentId === node.id &&
+      !activeDocument.databaseId);
   const document = documents.get(node.id);
 
   // Auto-expand top-level nodes (depth <= 1) on initial render

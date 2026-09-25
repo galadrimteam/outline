@@ -81,8 +81,12 @@ const DocumentLink = observer(function DocumentLink(props: Props) {
   const expansion = useSidebarExpansion();
   const expanded = expansion.isExpanded(node.id);
   const isActiveDocument = activeDocument && activeDocument.id === node.id;
+  // A database row page is a child of its database's page but never listed
+  // under it, so opening one must not give its parent an expand arrow.
   const hasChildDocuments =
-    !!node.children.length || activeDocument?.parentDocumentId === node.id;
+    !!node.children.length ||
+    (activeDocument?.parentDocumentId === node.id &&
+      !activeDocument.databaseId);
   const sidebarContext = useSidebarContext();
   const activeSidebarContext = useActiveSidebarContext();
   const { fetchChildDocuments } = documents;
