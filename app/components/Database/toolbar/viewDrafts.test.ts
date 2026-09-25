@@ -70,6 +70,7 @@ describe("viewDrafts", () => {
         conjunction: "and",
         filterSet: [{ fieldId: "status", operator: "is", value: "Doing" }],
       },
+      replaceFilter: true,
     });
   });
 

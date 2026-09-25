@@ -32,8 +32,10 @@ import type RootStore from "./RootStore";
 
 /** What narrows the rows of a view for one reader, on top of the view's own settings. */
 export interface RecordQueryParams {
-  /** The reader's temporary filter, ANDed with the view's. */
+  /** The reader's temporary filter, ANDed with the view's unless `replaceFilter`. */
   filter?: DatabaseFilter | null;
+  /** The filter replaces the view's (honoured for people who can edit the database). */
+  replaceFilter?: boolean;
   /** The reader's temporary sort, replacing the view's. */
   sort?: DatabaseSort | null;
   search?: string;
@@ -417,6 +419,7 @@ export class RecordQuery {
       databaseId: this.databaseId,
       viewId: this.viewId,
       filter: combineFilters(this.params.filter, this.params.extraFilter),
+      replaceFilter: this.params.replaceFilter || undefined,
       sort: this.params.sort ?? undefined,
       search: this.params.search || undefined,
       offset,
@@ -458,6 +461,7 @@ export default class DatabaseRecordsStore {
       viewId,
       JSON.stringify([
         params.filter ?? null,
+        params.replaceFilter ?? false,
         params.sort ?? null,
         params.search ?? "",
         params.extraFilter ?? null,

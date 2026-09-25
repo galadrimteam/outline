@@ -135,7 +135,9 @@ export class TeableEngine implements DatabaseEngine {
     const fieldIds = await this.fieldIds(actor, ref);
     const base: TeableQuery = {
       viewId: query.viewId,
-      filter: query.filter ? JSON.stringify(query.filter) : undefined,
+      filter: query.filter?.filterSet.length
+        ? JSON.stringify(query.filter)
+        : undefined,
       search: searchTuple(query.search),
     };
     let sortObjs = query.sort?.sortObjs ?? [];

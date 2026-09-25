@@ -122,12 +122,13 @@ const Board = observer(function Board({
   const justDraggedRef = React.useRef(false);
 
   const queries = React.useMemo(() => {
-    const { filter, sort, search } = query.params;
+    const { filter, replaceFilter, sort, search } = query.params;
     return new Map<string, RecordQuery>(
       columnsSignature.split("\u0000").map((key) => [
         key,
         databaseRecords.query(database.id, view.id, {
           filter,
+          replaceFilter,
           sort,
           search,
           extraFilter: stackFilter(field.id, key),

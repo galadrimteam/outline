@@ -26,6 +26,7 @@ import {
   RowLabel,
   RowValue,
 } from "./components";
+import { useDatabaseBlock } from "../DatabaseBlockContext";
 import { LayoutIcon } from "../LayoutIcon";
 import { FieldKindIcon } from "../fields/FieldKindIcon";
 import type { DatabaseViewPatch } from "./useViewUpdate";
@@ -364,6 +365,7 @@ const LayoutPage = observer(function LayoutPage({
 }: LayoutPageProps) {
   const { t } = useTranslation();
   const { databases } = useStores();
+  const block = useDatabaseBlock();
 
   const handleSelect = React.useCallback(
     async (layout: DatabaseLayout) => {
@@ -380,10 +382,11 @@ const LayoutPage = observer(function LayoutPage({
           name: view.name,
           layout,
         });
-        await databases.updateView(database.id, created.id, {
+        const copied = await databases.updateView(database.id, created.id, {
           filter: view.filter,
           sort: view.sort,
         });
+        block?.onViewCreated(copied ?? created);
         toast.success(
           t("A {{ layout }} view named “{{ name }}” was added to the tabs", {
             layout: layoutLabel(layout, t).toLocaleLowerCase(),
@@ -398,7 +401,7 @@ const LayoutPage = observer(function LayoutPage({
         );
       }
     },
-    [databases, database.id, view, onUpdate, t]
+    [databases, database.id, view, onUpdate, block, t]
   );
 
   return (

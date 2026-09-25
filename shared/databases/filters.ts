@@ -949,6 +949,8 @@ export function dateFilterModeLabel(
     case "exactDate":
     case "exactFormatDate":
       return t("Exact date");
+    case "dateRange":
+      return t("Date range");
     case "pastWeek":
       return t("The past week");
     case "pastMonth":

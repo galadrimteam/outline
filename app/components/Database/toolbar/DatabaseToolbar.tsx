@@ -35,6 +35,7 @@ import {
   viewDrafts,
 } from "./viewDrafts";
 import { ViewSettings } from "./ViewSettings";
+import { useDatabaseBlock } from "../DatabaseBlockContext";
 
 interface Props {
   /** The database shown by the block. */
@@ -64,6 +65,7 @@ export const DatabaseToolbar = observer(function DatabaseToolbar({
   readOnly,
 }: Props) {
   const { t } = useTranslation();
+  const block = useDatabaseBlock();
   const update = useViewUpdate(database.id, view);
   const canSave = canSaveView(view, readOnly);
   const draft = viewDrafts.get(database.id, view.id);
@@ -134,6 +136,7 @@ export const DatabaseToolbar = observer(function DatabaseToolbar({
 
       <ToolbarPopover
         label={t("Filter")}
+        openRequest={block?.filterRequest?.at}
         count={filterCount}
         icon={<FilterIcon size={20} />}
         width={filter?.filterSet.length ? 680 : 300}
@@ -216,6 +219,8 @@ interface ToolbarPopoverProps {
   width: number;
   /** The popover content. */
   children: React.ReactNode;
+  /** Opens the popover each time it changes, eg « Filter » in a column menu. */
+  openRequest?: number;
 }
 
 function ToolbarPopover({
@@ -225,8 +230,15 @@ function ToolbarPopover({
   active,
   width,
   children,
+  openRequest,
 }: ToolbarPopoverProps) {
   const [open, setOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (openRequest) {
+      setOpen(true);
+    }
+  }, [openRequest]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

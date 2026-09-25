@@ -28,6 +28,8 @@ export interface ViewDraft {
 export interface ViewQueryParams {
   filter?: DatabaseFilter;
   sort?: DatabaseSort;
+  /** The draft is the whole edited filter of someone who can save the view. */
+  replaceFilter?: boolean;
 }
 
 /** What the helpers need from the database model. */
@@ -213,7 +215,10 @@ export function viewQueryParams(
 
   if (isFilterDirty(view, draft, canSave)) {
     const filter = sanitizeFilter(draftFilter(view, draft, canSave), fieldById);
-    if (filter) {
+    if (canSave) {
+      params.replaceFilter = true;
+      params.filter = filter ?? { conjunction: "and", filterSet: [] };
+    } else if (filter) {
       params.filter = filter;
     }
   }
