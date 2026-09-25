@@ -126,9 +126,10 @@ class Database extends ParanoidModel<
             transaction: options.transaction,
           })
         : Promise.resolve(null),
-      Collection.scope(
-        userId ? { method: ["withMembership", userId] } : "defaultScope"
-      ).findByPk(this.collectionId, { transaction: options.transaction }),
+      Collection.findByPk(this.collectionId, {
+        userId,
+        transaction: options.transaction,
+      }),
     ]);
     this.document = document;
     this.collection = collection;

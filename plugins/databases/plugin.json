@@ -1,0 +1,6 @@
+{
+  "id": "databases",
+  "name": "Databases",
+  "priority": 50,
+  "description": "Native Notion-like databases (tables, boards, calendars…) backed by an external engine, Teable."
+}

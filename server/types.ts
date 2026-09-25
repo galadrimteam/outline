@@ -14,6 +14,10 @@ import type {
   ProsemirrorData,
   UnfurlResponse,
 } from "@shared/types";
+import type {
+  DatabaseCellValue,
+  DatabaseChangeKind,
+} from "@shared/databases/types";
 import type { BaseSchema } from "@server/routes/api/schema";
 import type { AccountProvisionerResult } from "./commands/accountProvisioner";
 import type { OAuthIntent, OAuthState } from "./utils/oauthState";
@@ -492,6 +496,38 @@ export type ImportEvent = BaseEvent<Import<any>> & {
   modelId: string;
 };
 
+/** A cell of a database row before and after a change made in the engine. */
+export type DatabaseCellChange = {
+  recordId: string;
+  fieldId: string;
+  before: DatabaseCellValue;
+  after: DatabaseCellValue;
+};
+
+/**
+ * The data of a database changed in its engine (not persisted: sent from the
+ * engine's webhook to the websockets and the plugin's processors).
+ */
+export type DatabaseEvent = {
+  name: "databases.change";
+  teamId: string;
+  /** The Outline user who made the change, or "" when it is not one of the team. */
+  actorId: string;
+  /** The database id. */
+  modelId: string;
+  collectionId: string;
+  documentId: string | null;
+  ip?: string | null;
+  data: {
+    kinds: DatabaseChangeKind[];
+    recordIds?: string[];
+    fieldIds?: string[];
+    viewIds?: string[];
+    origin?: string | null;
+    changes?: DatabaseCellChange[];
+  };
+};
+
 export type Event =
   | ApiKeyEvent
   | AttachmentEvent
@@ -523,7 +559,8 @@ export type Event =
   | OAuthClientEvent
   | UserPasskeyEvent
   | EmptyTrashEvent
-  | ImportEvent;
+  | ImportEvent
+  | DatabaseEvent;
 
 export type NotificationMetadata = {
   notificationId?: string;

@@ -79,6 +79,8 @@ export interface DatabaseFieldOptions {
   isMultiple?: boolean;
   shouldNotify?: boolean;
   foreignTableId?: string;
+  /** The Outline database of the linked table, filled by the server; set it to create a link. */
+  foreignDatabaseId?: string;
   baseId?: string;
   relationship?: "oneOne" | "oneMany" | "manyOne" | "manyMany";
   lookupFieldId?: string;
