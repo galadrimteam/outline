@@ -20,6 +20,7 @@ import {
   recordIcon,
   visibleCardFields,
 } from "../GalleryView/cards";
+import { CommentCount } from "../../comments/CommentCount";
 
 /**
  * Notion-like list: one compact line per row, its page icon and title on the
@@ -142,6 +143,11 @@ const ListRow = observer(function ListRow({
             record={record}
             fields={fields}
             inline
+          />
+          <CommentCount
+            databaseId={database.id}
+            recordId={record.id}
+            documentId={record.documentId}
           />
         </Right>
       </RowButton>

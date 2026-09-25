@@ -22,6 +22,7 @@ import {
   recordCover,
   visibleCardFields,
 } from "./cards";
+import { CommentCount } from "../../comments/CommentCount";
 
 /**
  * Notion-like gallery: cards with a cover image (the view's cover property),
@@ -228,6 +229,11 @@ const GalleryCard = observer(function GalleryCard({
           record={record}
           fields={fields}
           showNames={showNames}
+        />
+        <CommentCount
+          databaseId={database.id}
+          recordId={record.id}
+          documentId={record.documentId}
         />
       </CardBody>
     </Card>

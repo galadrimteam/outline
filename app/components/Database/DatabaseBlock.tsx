@@ -40,6 +40,7 @@ import { DatabaseBlockContext } from "./DatabaseBlockContext";
 import { DatabaseHeader } from "./DatabaseHeader";
 import { DatabasePicker } from "./DatabasePicker";
 import { pendingDatabases } from "./pendingDatabases";
+import { NewRecordMenu } from "./templates/NewRecordMenu";
 import { DatabaseToolbar } from "./toolbar/DatabaseToolbar";
 import {
   canSaveView,
@@ -599,9 +600,14 @@ const LoadedView = observer(function LoadedView({
             />
             <SearchBox value={search} onChange={setSearch} />
             {!readOnly && (
-              <NewButton type="button" onClick={() => void handleNew()}>
-                {t("New")}
-              </NewButton>
+              <NewRecordMenu
+                database={database}
+                view={view}
+                canEditView={!readOnly}
+                defaults={newRecordDefaults(database, view)}
+                onCreateEmpty={handleNew}
+                onOpenRecord={handleOpenRecord}
+              />
             )}
           </>
         }
@@ -907,30 +913,6 @@ const NoticeButton = styled.button`
   font: inherit;
   font-size: 13px;
   cursor: var(--pointer);
-`;
-
-const NewButton = styled.button`
-  height: 28px;
-  margin-left: 4px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 6px;
-  background: ${s("accent")};
-  color: ${s("accentText")};
-  font: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: var(--pointer);
-  transition: filter 100ms ease-in-out;
-
-  &:hover {
-    filter: brightness(0.92);
-  }
-
-  &:focus-visible {
-    outline: 2px solid ${s("accent")};
-    outline-offset: 2px;
-  }
 `;
 
 const IconButton = styled.button`

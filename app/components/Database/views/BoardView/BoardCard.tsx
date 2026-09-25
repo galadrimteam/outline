@@ -23,6 +23,7 @@ import type Database from "~/models/Database";
 import { isEmptyCell } from "~/stores/DatabaseRecordsStore";
 import { cellTitle } from "../../boardModel";
 import { getCell } from "../../cells/registry";
+import { CommentCount } from "../../comments/CommentCount";
 
 /** Drag data of a card, read by the board's collision detection. */
 export interface CardDragData {
@@ -258,6 +259,11 @@ const CardContent = observer(function CardContent({
             </Property>
           );
         })}
+        <CommentCount
+          databaseId={database.id}
+          recordId={record.id}
+          documentId={record.documentId}
+        />
       </Body>
     </>
   );

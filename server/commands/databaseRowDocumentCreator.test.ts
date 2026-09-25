@@ -16,6 +16,7 @@ import {
   buildDocument,
   buildGroup,
   buildTeam,
+  buildTemplate,
   buildUser,
 } from "@server/test/factories";
 import { withAPIContext } from "@server/test/support";
@@ -225,6 +226,51 @@ describe("databaseRowDocumentCreator", () => {
     expect((await loadStructure(collection.id)).documentStructure).toEqual(
       before
     );
+  });
+
+  it("starts a new page from a template, variables replaced", async () => {
+    const { user, collection, database } = await setup();
+    const template = await buildTemplate({
+      teamId: user.teamId,
+      userId: user.id,
+      collectionId: collection.id,
+      text: "Rédigé par {author}",
+      icon: "📋",
+      fullWidth: true,
+    });
+
+    const document = await databaseRowDocumentCreator(
+      { user },
+      { database, recordId: "rec1", title: "Carte", template }
+    );
+
+    expect(document.title).toEqual("Carte");
+    expect(document.templateId).toEqual(template.id);
+    expect(document.icon).toEqual("📋");
+    expect(document.fullWidth).toBe(true);
+    expect(document.text).toContain(`Rédigé par ${user.name}`);
+    expect(JSON.stringify(template.content)).toContain("{author}");
+  });
+
+  it("keeps an existing page when given a template", async () => {
+    const { user, database } = await setup();
+    const first = await databaseRowDocumentCreator(
+      { user },
+      { database, recordId: "rec1", title: "Carte" }
+    );
+    const template = await buildTemplate({
+      teamId: user.teamId,
+      userId: user.id,
+      text: "Corps du modèle",
+    });
+
+    const second = await databaseRowDocumentCreator(
+      { user },
+      { database, recordId: "rec1", title: "Carte", template }
+    );
+
+    expect(second.id).toEqual(first.id);
+    expect(second.text).not.toContain("Corps du modèle");
   });
 
   it("fails when the home document is deleted", async () => {

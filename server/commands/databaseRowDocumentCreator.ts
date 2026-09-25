@@ -1,10 +1,12 @@
+import { cloneDeep } from "es-toolkit/compat";
 import type { Transaction } from "sequelize";
-import type { NavigationNode } from "@shared/types";
+import type { NavigationNode, ProsemirrorData } from "@shared/types";
 import { DocumentValidation } from "@shared/validations";
 import { createContext } from "@server/context";
 import { NotFoundError } from "@server/errors";
-import type { Database, User } from "@server/models";
+import type { Database, Template, User } from "@server/models";
 import { Collection, Document } from "@server/models";
+import { DocumentHelper } from "@server/models/helpers/DocumentHelper";
 import { ProsemirrorHelper } from "@server/models/helpers/ProsemirrorHelper";
 import { sequelize } from "@server/storage/database";
 import { LockHelper } from "@server/storage/LockHelper";
@@ -31,6 +33,11 @@ interface RowDocumentProps {
   title: string;
   /** The row's emoji or icon, if any. */
   icon?: string | null;
+  /**
+   * The template the page starts from, when it is created: its body, icon and
+   * width are copied, template variables replaced. The caller authorizes it.
+   */
+  template?: Template | null;
 }
 
 interface RowLink {
@@ -59,12 +66,13 @@ interface RowsLinkerProps {
  * @param props.recordId the engine id of the row.
  * @param props.title the row's title.
  * @param props.icon the row's icon, if any.
+ * @param props.template the template of a new page's body, if any.
  * @returns the row's document, loaded with the user's memberships.
  * @throws NotFoundError when the database's home document no longer exists.
  */
 export async function databaseRowDocumentCreator(
   ctx: DatabaseCommandContext,
-  { database, recordId, title, icon }: RowDocumentProps
+  { database, recordId, title, icon, template }: RowDocumentProps
 ): Promise<Document> {
   const { user, transaction, ip } = resolveContext(ctx);
 
@@ -103,12 +111,22 @@ export async function databaseRowDocumentCreator(
       collectionId,
       teamId: database.teamId,
       title: title.slice(0, DocumentValidation.maxTitleLength),
-      icon: icon ?? null,
-      content: ProsemirrorHelper.toProsemirror("").toJSON(),
+      icon: icon ?? template?.icon ?? null,
+      color: template?.color ?? null,
+      fullWidth: template?.fullWidth,
+      templateId: template?.id,
+      content: template
+        ? await templateContent(template, user)
+        : ProsemirrorHelper.toProsemirror("").toJSON(),
       text: "",
       createdById: user.id,
       lastModifiedById: user.id,
     });
+    if (template) {
+      document.text = await DocumentHelper.toMarkdown(document, {
+        includeTitle: false,
+      });
+    }
     await document.save({ transaction: t });
     await document.publish(createContext({ user, transaction: t, ip }), {
       collectionId,
@@ -208,6 +226,17 @@ export async function databaseRowsLinker(
 
     return linkedIds.size;
   });
+}
+
+/** A template's body with its variables replaced, as `documentCreator` does. */
+async function templateContent(
+  template: Template,
+  user: User
+): Promise<ProsemirrorData> {
+  return ProsemirrorHelper.replaceTemplateVariables(
+    cloneDeep(await DocumentHelper.toJSON(template)),
+    user
+  );
 }
 
 function resolveContext(ctx: DatabaseCommandContext): DatabaseActorContext {

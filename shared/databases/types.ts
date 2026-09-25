@@ -293,13 +293,20 @@ export interface DatabaseViewOverrides {
   cardSize?: DatabaseCardSize;
   openPagesIn?: DatabaseOpenPagesIn;
   /** Outline template document used by "New" in this view. */
-  defaultTemplateId?: string;
+  defaultTemplateId?: string | null;
   timeline?: {
     startFieldId?: string;
     endFieldId?: string;
     zoom?: DatabaseTimelineZoom;
     dependencyFieldId?: string;
     showTable?: boolean;
+  };
+  /** Sharing of a form view: public at `/f/<slug>` once `public` is set. */
+  form?: {
+    public?: boolean;
+    requireLogin?: boolean;
+    slug?: string;
+    successMessage?: string;
   };
 }
 

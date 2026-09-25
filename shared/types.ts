@@ -579,6 +579,7 @@ export enum NotificationEventType {
   Features = "emails.features",
   ExportCompleted = "emails.export_completed",
   RequestDocumentAccess = "access_requests.create",
+  AddedToDatabaseRecord = "database_records.add_user",
 }
 
 export enum NotificationChannelType {
@@ -589,6 +590,14 @@ export enum NotificationChannelType {
 
 export type NotificationData = {
   emoji?: string;
+  /** The database of the row someone was added to (a row may have no page yet). */
+  databaseId?: string;
+  /** The engine id of the row someone was added to. */
+  recordId?: string;
+  /** The row's title when the notification was sent. */
+  recordTitle?: string;
+  /** The database's title when the notification was sent. */
+  databaseTitle?: string;
 };
 
 export type NotificationSettings = {
@@ -619,6 +628,7 @@ export const NotificationEventDefaults: Record<NotificationEventType, boolean> =
     [NotificationEventType.AddUserToDocument]: true,
     [NotificationEventType.AddUserToCollection]: true,
     [NotificationEventType.RequestDocumentAccess]: true,
+    [NotificationEventType.AddedToDatabaseRecord]: true,
   };
 
 export enum UnfurlResourceType {

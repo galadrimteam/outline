@@ -77,6 +77,13 @@ function NotificationListItem({ notification, onNavigate }: Props) {
               </Text>{" "}
               {notification.eventText(t)}{" "}
               <Text weight="bold">{notification.subject}</Text>
+              {notification.subjectContainer && (
+                <>
+                  {" "}
+                  {t("in")}{" "}
+                  <Text weight="bold">{notification.subjectContainer}</Text>
+                </>
+              )}
             </Text>
             <Text type="tertiary" size="xsmall">
               <Time dateTime={notification.createdAt} addSuffix />{" "}

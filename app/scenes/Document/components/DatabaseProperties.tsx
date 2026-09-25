@@ -2,6 +2,7 @@ import { observer } from "mobx-react";
 import {
   CollapsedIcon,
   DatabaseIcon,
+  HistoryIcon,
   PlusIcon,
   SettingsIcon,
 } from "outline-icons";
@@ -19,6 +20,7 @@ import {
   splitPageProperties,
 } from "~/components/Database/fields/pageLayout";
 import { PropertyRow } from "~/components/Database/fields/PropertyRow";
+import { PropertyHistory } from "~/components/Database/history/PropertyHistory";
 import useStores from "~/hooks/useStores";
 import type Document from "~/models/Document";
 
@@ -44,6 +46,7 @@ export const DatabaseProperties = observer(function DatabaseProperties_({
   const { t } = useTranslation();
   const { databases, databaseRecords } = useStores();
   const [showHidden, setShowHidden] = React.useState(false);
+  const [showHistory, setShowHistory] = React.useState(false);
   const databaseId = document.databaseId ?? "";
   const recordId = document.databaseRecordId ?? "";
   const database = databases.get(databaseId);
@@ -143,7 +146,23 @@ export const DatabaseProperties = observer(function DatabaseProperties_({
             </Action>
           </CustomizePageMenu>
         )}
+        <Action
+          type="button"
+          aria-expanded={showHistory}
+          onClick={() => setShowHistory((value) => !value)}
+        >
+          <HistoryIcon size={18} />
+          {t("Property history")}
+        </Action>
       </Actions>
+
+      {showHistory && (
+        <PropertyHistory
+          database={database}
+          recordId={recordId}
+          version={record.lastModifiedTime}
+        />
+      )}
     </Wrapper>
   );
 });
