@@ -164,10 +164,11 @@ export type DatabaseDateFilterMode =
   | "oneWeekFromNow"
   | "oneMonthAgo"
   | "oneMonthFromNow"
-  | "numberOfDaysAgo"
-  | "numberOfDaysFromNow"
+  | "daysAgo"
+  | "daysFromNow"
   | "exactDate"
   | "exactFormatDate"
+  | "dateRange"
   | "pastWeek"
   | "pastMonth"
   | "pastYear"
@@ -279,8 +280,8 @@ export type DatabaseTimelineZoom = "week" | "month" | "quarter" | "year";
 
 /** What Outline adds to a view the engine does not know about. */
 export interface DatabaseViewOverrides {
-  /** Draw the engine's grid view as a list or a timeline. */
-  layout?: DatabaseLayout.List | DatabaseLayout.Timeline;
+  /** Draw the engine's grid view as a list or a timeline; null goes back to the table. */
+  layout?: DatabaseLayout.List | DatabaseLayout.Timeline | null;
   /** Second level of grouping on a board (swimlanes). */
   subGroupFieldId?: string;
   /** Board column order when it differs from the select's choices (choice names; "" is the empty column). */
