@@ -202,7 +202,7 @@ const NotifyEditor = observer(function NotifyEditor_({
       />
       <Hint>
         {t(
-          "They get a notification and an email: a comment mentioning them is posted on the row's page."
+          "They get a notification and an email, through a comment mentioning them on the row's page."
         )}
       </Hint>
     </Stack>

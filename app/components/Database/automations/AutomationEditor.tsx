@@ -111,7 +111,7 @@ export const AutomationEditor = observer(function AutomationEditor_({
       />
       {lastError && (
         <ErrorNote role="alert">
-          {t("The last run failed:")} {lastError}
+          {t("The last run failed")} · {lastError}
         </ErrorNote>
       )}
 

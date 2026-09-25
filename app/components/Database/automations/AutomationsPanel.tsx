@@ -108,7 +108,7 @@ export const AutomationsPanel = observer(function AutomationsPanel_({
     <Wrapper>
       <Intro>
         {t(
-          "Automations run on their own when rows are added or edited: fill in a date when a status changes, notify the assignee, post to Slack…"
+          "Automations run on their own when rows are added or edited, for example to fill in a date when a status changes, notify the assignee or post to Slack."
         )}
       </Intro>
       {error ? (
