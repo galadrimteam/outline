@@ -10,6 +10,7 @@ import { DatabaseRecordAssignedEmail } from "./email/templates/DatabaseRecordAss
 import env from "./env";
 import { ConvertImportedEmbedsProcessor } from "./processors/ConvertImportedEmbedsProcessor";
 import { DatabaseAnchorMoveProcessor } from "./processors/DatabaseAnchorMoveProcessor";
+import { DatabaseAnchorTitleProcessor } from "./processors/DatabaseAnchorTitleProcessor";
 import { DatabaseAssignmentNotificationsProcessor } from "./processors/DatabaseAssignmentNotificationsProcessor";
 import { DatabaseChangeTitleProcessor } from "./processors/DatabaseChangeTitleProcessor";
 import { DatabaseRowTitleProcessor } from "./processors/DatabaseRowTitleProcessor";
@@ -28,6 +29,7 @@ if (enabled) {
     { type: Hook.Processor, value: DatabaseRowTitleProcessor },
     { type: Hook.Processor, value: DatabaseChangeTitleProcessor },
     { type: Hook.Processor, value: DatabaseAnchorMoveProcessor },
+    { type: Hook.Processor, value: DatabaseAnchorTitleProcessor },
     { type: Hook.Processor, value: ConvertImportedEmbedsProcessor },
     { type: Hook.Processor, value: DatabaseAssignmentNotificationsProcessor },
     { type: Hook.EmailTemplate, value: DatabaseRecordAssignedEmail },
