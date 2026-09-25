@@ -194,6 +194,28 @@ const Question = observer(function Question_({
   const isChoice =
     field.type === DatabaseFieldType.SingleSelect ||
     field.type === DatabaseFieldType.MultipleSelect;
+  // Typed answers get a plain field, as in Notion's forms, rather than a cell to click into.
+  const isTyped =
+    field.type === DatabaseFieldType.SingleLineText ||
+    field.type === DatabaseFieldType.LongText ||
+    field.type === DatabaseFieldType.Number;
+  const text =
+    typeof value === "string" || typeof value === "number" ? String(value) : "";
+  const handleTyped = React.useCallback(
+    (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const raw = event.target.value;
+      if (field.type !== DatabaseFieldType.Number) {
+        onChange(field.id, raw);
+        return;
+      }
+      const number = Number(raw.replace(",", "."));
+      onChange(
+        field.id,
+        raw.trim() === "" || Number.isNaN(number) ? null : number
+      );
+    },
+    [field.id, field.type, onChange]
+  );
 
   return (
     <Field>
@@ -202,7 +224,29 @@ const Question = observer(function Question_({
         {required && <Required aria-label={t("Required")}> *</Required>}
       </QuestionLabel>
       {field.description && <Help>{field.description}</Help>}
-      {isChoice ? (
+      {isTyped ? (
+        field.type === DatabaseFieldType.LongText ? (
+          <TextAnswer
+            as="textarea"
+            rows={4}
+            aria-labelledby={labelId}
+            aria-invalid={invalid}
+            value={text}
+            onChange={handleTyped}
+          />
+        ) : (
+          <TextAnswer
+            type="text"
+            inputMode={
+              field.type === DatabaseFieldType.Number ? "decimal" : undefined
+            }
+            aria-labelledby={labelId}
+            aria-invalid={invalid}
+            value={text}
+            onChange={handleTyped}
+          />
+        )
+      ) : isChoice ? (
         <ChoiceQuestion
           field={field}
           value={value}
@@ -285,6 +329,27 @@ const Help = styled.div`
   color: ${s("textTertiary")};
   font-size: 13px;
   white-space: pre-wrap;
+`;
+
+const TextAnswer = styled.input`
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 15px;
+  color: ${s("text")};
+  background: ${s("background")};
+  border: 1px solid ${s("inputBorder")};
+  border-radius: 6px;
+  resize: vertical;
+
+  &:focus {
+    outline: none;
+    border-color: ${s("inputBorderFocused")};
+  }
+
+  &[aria-invalid="true"] {
+    border-color: ${s("danger")};
+  }
 `;
 
 const Missing = styled.p`
