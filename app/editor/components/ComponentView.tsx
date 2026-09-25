@@ -19,6 +19,8 @@ type ComponentViewConstructor = {
   getPos: () => number;
   /** The decorations applied to the node. */
   decorations: Decoration[];
+  /** Decides which events ProseMirror ignores, instead of the default rule. */
+  stopEvent?: (event: Event) => boolean;
 };
 
 export default class ComponentView {
@@ -46,6 +48,8 @@ export default class ComponentView {
   contentDOM: HTMLElement | null = null;
   /** The base class name for the node's DOM element. */
   className?: string;
+  /** Replaces the default event rule, eg for a view that handles its own clicks and drags. */
+  stopEventOverride?: (event: Event) => boolean;
 
   // See https://prosemirror.net/docs/ref/#view.NodeView
   constructor(
@@ -57,9 +61,11 @@ export default class ComponentView {
       view,
       getPos,
       decorations,
+      stopEvent,
     }: ComponentViewConstructor
   ) {
     this.component = component;
+    this.stopEventOverride = stopEvent;
     this.editor = editor;
     this.extension = extension;
     this.getPos = getPos;
@@ -173,6 +179,9 @@ export default class ComponentView {
   };
 
   stopEvent(event: Event) {
+    if (this.stopEventOverride) {
+      return this.stopEventOverride(event);
+    }
     if (
       this.contentDOM &&
       event.target instanceof globalThis.Node &&

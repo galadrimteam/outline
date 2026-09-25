@@ -26,12 +26,16 @@ import {
   matchCollectionSlug as collectionSlug,
   trashPath,
   debugPath,
+  matchDatabaseId,
 } from "~/utils/routeHelpers";
 import env from "~/env";
 
 const SettingsRoutes = lazy(() => import("./settings"));
 const Debug = lazy(() => import("~/scenes/Developer/Debug"));
 const Changesets = lazy(() => import("~/scenes/Developer/Changesets"));
+const DatabaseRedirect = lazy(
+  () => import("~/scenes/Database/DatabaseRedirect")
+);
 
 const RedirectDocument = ({
   match,
@@ -135,6 +139,16 @@ function AuthenticatedRoutes() {
               <Route
                 path={`/doc/${documentSlug}`}
                 component={Scenes.Document.Component}
+              />
+              <Route
+                exact
+                path={`/db/${matchDatabaseId}/row/:recordId`}
+                component={DatabaseRedirect}
+              />
+              <Route
+                exact
+                path={`/db/${matchDatabaseId}`}
+                component={DatabaseRedirect}
               />
               <Route
                 exact

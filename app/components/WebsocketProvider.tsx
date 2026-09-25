@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
 import { toast } from "sonner";
+import type { DatabaseChangeEvent } from "@shared/databases/types";
 import {
   FileOperationState,
   FileOperationType,
@@ -893,6 +894,16 @@ function useImportHandlers() {
   };
 }
 
+function useDatabaseHandlers() {
+  const { databaseRecords } = useStores();
+
+  return (socket: SocketWithAuthentication) => {
+    socket.on("databases.change", (event: DatabaseChangeEvent) => {
+      databaseRecords.handleChange(event);
+    });
+  };
+}
+
 function WebsocketProvider({ children }: React.PropsWithChildren<object>) {
   const [socket, setSocket] = useState<SocketWithAuthentication | null>(null);
 
@@ -908,6 +919,7 @@ function WebsocketProvider({ children }: React.PropsWithChildren<object>) {
   const registerPinHandlers = usePinHandlers();
   const registerStarHandlers = useStarHandlers();
   const registerImportHandlers = useImportHandlers();
+  const registerDatabaseHandlers = useDatabaseHandlers();
 
   useEffect(() => {
     let currentSocket: SocketWithAuthentication | null = null;
@@ -936,6 +948,7 @@ function WebsocketProvider({ children }: React.PropsWithChildren<object>) {
       registerPinHandlers(currentSocket);
       registerStarHandlers(currentSocket);
       registerImportHandlers(currentSocket);
+      registerDatabaseHandlers(currentSocket);
 
       setSocket(currentSocket);
     }

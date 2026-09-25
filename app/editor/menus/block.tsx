@@ -22,6 +22,8 @@ import {
   DoneIcon,
   EmbedIcon,
   CollapseIcon,
+  DatabaseIcon,
+  LinkIcon,
 } from "outline-icons";
 import * as React from "react";
 import styled from "styled-components";
@@ -29,9 +31,12 @@ import { v4 as uuidv4 } from "uuid";
 import type { TFunction } from "i18next";
 import Image from "@shared/editor/components/Img";
 import type { MenuItem } from "@shared/editor/types";
+import { DatabaseLayout } from "@shared/databases/types";
 import { MentionType } from "@shared/types";
 import { toISODate } from "@shared/utils/date";
 import { metaDisplay } from "@shared/utils/keyboard";
+import { LayoutIcon } from "~/components/Database/LayoutIcon";
+import { pendingDatabases } from "~/components/Database/pendingDatabases";
 import Desktop from "~/utils/Desktop";
 
 const Img = styled(Image)`
@@ -203,6 +208,10 @@ export default function blockMenuItems(
     {
       name: "separator",
     },
+    ...databaseMenuItems(t),
+    {
+      name: "separator",
+    },
     {
       name: "container_toggle",
       title: t("Toggle block"),
@@ -290,4 +299,65 @@ export default function blockMenuItems(
   return Desktop.isElectron()
     ? items.filter((item) => item.name !== "editDiagram")
     : items;
+}
+
+/**
+ * The block menu items that insert a database: a new one, inline or full
+ * page, a linked view of an existing one, and one per layout.
+ *
+ * @param t the translation function.
+ * @returns the menu items.
+ */
+function databaseMenuItems(t: TFunction): MenuItem[] {
+  const insert =
+    (layout: DatabaseLayout, fullPage = false) =>
+    () => {
+      const id = uuidv4();
+      pendingDatabases.set(id, { kind: "create", layout });
+      return { id, fullPage };
+    };
+
+  const layouts: [DatabaseLayout, string, string][] = [
+    [DatabaseLayout.Table, t("Table view"), "spreadsheet grid rows"],
+    [DatabaseLayout.Board, t("Board view"), "kanban cards columns status"],
+    [DatabaseLayout.Calendar, t("Calendar view"), "dates events month"],
+    [DatabaseLayout.Gallery, t("Gallery view"), "cards grid images"],
+    [DatabaseLayout.List, t("List view"), "rows pages"],
+    [DatabaseLayout.Timeline, t("Timeline view"), "gantt roadmap dates"],
+  ];
+
+  return [
+    {
+      name: "database",
+      title: t("Database – inline"),
+      icon: <DatabaseIcon />,
+      keywords: "database table notion inline",
+      attrs: insert(DatabaseLayout.Table),
+    },
+    {
+      name: "database",
+      title: t("Database – full page"),
+      icon: <DatabaseIcon />,
+      keywords: "database table notion page full",
+      attrs: insert(DatabaseLayout.Table, true),
+    },
+    {
+      name: "database",
+      title: t("Linked view of a database"),
+      icon: <LinkIcon />,
+      keywords: "database linked view existing source",
+      attrs: () => {
+        const id = uuidv4();
+        pendingDatabases.set(id, { kind: "link" });
+        return { id };
+      },
+    },
+    ...layouts.map(([layout, title, keywords]) => ({
+      name: "database",
+      title,
+      icon: <LayoutIcon layout={layout} />,
+      keywords: `database ${keywords}`,
+      attrs: insert(layout),
+    })),
+  ];
 }

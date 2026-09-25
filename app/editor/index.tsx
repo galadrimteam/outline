@@ -66,6 +66,7 @@ import type { Properties } from "~/types";
 import Logger from "~/utils/Logger";
 import ComponentView from "./components/ComponentView";
 import EditorContext from "./components/EditorContext";
+import { nodeViewOverrides } from "./nodeViews";
 import { NodeViewRenderer } from "./components/NodeViewRenderer";
 import type { PortalRenderer } from "./components/NodeViewRenderer";
 
@@ -418,24 +419,31 @@ export class Editor extends React.PureComponent<
   private createNodeViews(): { [name: string]: NodeViewConstructor } {
     return Object.fromEntries(
       this.extensions.extensions
-        .filter((extension: ReactNode) => extension.component)
-        .map((extension: ReactNode) => [
-          extension.name,
-          (
-            node: ProsemirrorNode,
-            view: EditorView,
-            getPos: () => number,
-            decorations: Decoration[]
-          ) =>
-            new ComponentView(extension.component, {
-              editor: this,
-              extension,
-              node,
-              view,
-              getPos,
-              decorations,
-            }),
-        ])
+        .filter(
+          (extension: ReactNode) =>
+            nodeViewOverrides[extension.name] || extension.component
+        )
+        .map((extension: ReactNode) => {
+          const override = nodeViewOverrides[extension.name];
+          return [
+            extension.name,
+            (
+              node: ProsemirrorNode,
+              view: EditorView,
+              getPos: () => number,
+              decorations: Decoration[]
+            ) =>
+              new ComponentView(override?.component ?? extension.component, {
+                editor: this,
+                extension,
+                node,
+                view,
+                getPos,
+                decorations,
+                stopEvent: override?.stopEvent,
+              }),
+          ];
+        })
     ) as { [name: string]: NodeViewConstructor };
   }
 
@@ -1138,8 +1146,8 @@ const EditorContainer = styled(Styles)<{
         }
       }
       a#comment-${props.focusedCommentId}
-        ~ span.component-image
-        div.image-wrapper {
+      ~ span.component-image
+      div.image-wrapper {
         outline: ${props.theme.commentedImageOutlineDark} solid 2px;
       }
     `}
@@ -1156,8 +1164,8 @@ const EditorContainer = styled(Styles)<{
         }
       }
       a#comment-${props.hoveredCommentId}
-        ~ span.component-image
-        div.image-wrapper {
+      ~ span.component-image
+      div.image-wrapper {
         outline: ${props.theme.commentedImageOutlineDark} solid 2px;
       }
     `}
@@ -1170,9 +1178,11 @@ const EditorContainer = styled(Styles)<{
         background: ${props.theme.textHighlight};
 
         &.ProseMirror-selectednode {
-          outline-color: ${props.readOnly
-            ? "transparent"
-            : darken(0.2, props.theme.textHighlight)};
+          outline-color: ${
+            props.readOnly
+              ? "transparent"
+              : darken(0.2, props.theme.textHighlight)
+          };
         }
       }
     `}
