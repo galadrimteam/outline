@@ -115,7 +115,9 @@ export async function loadPublicShare({
 
     if (share.includeChildDocuments) {
       const allIdsInSharedTree = getAllIdsInSharedTree(sharedTree);
-      isDocumentAccessible = allIdsInSharedTree.includes(document.id);
+      isDocumentAccessible =
+        allIdsInSharedTree.includes(document.id) ||
+        (await isRowPageInShare(document, share, allIdsInSharedTree));
     }
 
     if (!isDocumentAccessible) {
@@ -211,7 +213,10 @@ export async function loadShareWithParent({
     if (collectionShare && can(user, "read", collectionShare)) {
       parentShare = collectionShare;
     } else {
-      const parentDocIds = docCollection.getDocumentParents(documentId);
+      const parentDocIds = await getDocumentParentIds(
+        docCollection,
+        share.document
+      );
 
       const allParentShares = parentDocIds
         ? await Share.scope({
@@ -253,5 +258,85 @@ export function getAllIdsInSharedTree(
   for (const child of sharedTree.children) {
     ids.push(...getAllIdsInSharedTree(child));
   }
+  return ids;
+}
+
+/**
+ * Whether a database row page belongs to a share. Row pages are not in the
+ * document tree, so they belong to the share of the page their database lives
+ * in, found through their chain of parents.
+ *
+ * @param document the requested document.
+ * @param share the share it is requested through.
+ * @param idsInSharedTree the ids of the documents in the shared tree.
+ * @returns true when the document is a row page under the shared tree.
+ */
+async function isRowPageInShare(
+  document: Document,
+  share: Share,
+  idsInSharedTree: string[]
+): Promise<boolean> {
+  if (!document.databaseId) {
+    return false;
+  }
+  if (share.collectionId) {
+    return document.collectionId === share.collectionId && !document.archivedAt;
+  }
+
+  const ancestorIds = await getRowPageAncestorIds(document);
+  return ancestorIds.some(
+    (id) => id === share.documentId || idsInSharedTree.includes(id)
+  );
+}
+
+/**
+ * Returns the ids of the documents above a document, from the collection
+ * root down to its parent, including when the document is a database row page
+ * that the collection's tree does not hold.
+ *
+ * @param collection the collection with its document structure loaded.
+ * @param document the document.
+ * @returns the ids of the ancestors, or undefined when none can be found.
+ */
+async function getDocumentParentIds(
+  collection: Collection,
+  document: Document
+): Promise<string[] | undefined> {
+  if (!document.databaseId) {
+    return collection.getDocumentParents(document.id) || undefined;
+  }
+
+  const ancestorIds = await getRowPageAncestorIds(document);
+  const topId = ancestorIds[ancestorIds.length - 1];
+  const treeParentIds = topId
+    ? (collection.getDocumentParents(topId) ?? [])
+    : [];
+  return [...treeParentIds, ...ancestorIds.reverse()];
+}
+
+/**
+ * Walks up from a database row page to the first ancestor that is not a row
+ * page itself, which is where the page would sit in the document tree.
+ *
+ * @param document the row page.
+ * @returns the ids of the ancestors, nearest first.
+ */
+async function getRowPageAncestorIds(document: Document): Promise<string[]> {
+  const ids: string[] = [];
+  let current: Pick<Document, "databaseId" | "parentDocumentId"> | null =
+    document;
+
+  while (
+    current?.databaseId &&
+    current.parentDocumentId &&
+    !ids.includes(current.parentDocumentId)
+  ) {
+    ids.push(current.parentDocumentId);
+    current = await Document.unscoped().findOne({
+      attributes: ["id", "databaseId", "parentDocumentId"],
+      where: { id: current.parentDocumentId },
+    });
+  }
+
   return ids;
 }

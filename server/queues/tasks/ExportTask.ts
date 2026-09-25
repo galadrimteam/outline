@@ -137,13 +137,19 @@ export default abstract class ExportTask extends BaseTask<Props> {
         })
       );
 
-      const documentStructure = document.collection?.getDocumentTree(
-        document.id
-      );
+      const treeNode = document.databaseId
+        ? toNavigationNode(document)
+        : document.collection?.getDocumentTree(document.id);
 
-      if (!documentStructure) {
+      if (!treeNode || !document.collectionId) {
         throw new Error("Document not found in collection tree");
       }
+
+      const [documentStructure] = await this.addRowPages(
+        document.collectionId,
+        [treeNode],
+        { atRoot: false, underRowPage: !!document.databaseId }
+      );
 
       return this.exportDocument(
         document,
@@ -198,6 +204,19 @@ export default abstract class ExportTask extends BaseTask<Props> {
         transaction,
       })
     );
+
+    // The structure is only read from here on, never saved.
+    for (const collection of collections) {
+      const documentStructure = collection.documentStructure ?? [];
+      const completed = await this.addRowPages(
+        collection.id,
+        documentStructure,
+        { atRoot: true, underRowPage: false }
+      );
+      if (completed !== documentStructure) {
+        collection.documentStructure = completed;
+      }
+    }
 
     return this.exportCollections(collections, fileOperation);
   }
@@ -271,6 +290,97 @@ export default abstract class ExportTask extends BaseTask<Props> {
   }
 
   /**
+   * Places the pages of database rows, which the collection's document
+   * structure never holds, under their parent in a copy of the structure, with
+   * the sub-pages they have.
+   *
+   * @param collectionId the collection the structure belongs to.
+   * @param nodes the structure to complete.
+   * @param options.atRoot whether the nodes are the collection's root, which
+   * receives the rows of a database anchored on the collection itself.
+   * @param options.underRowPage whether the nodes are a row page, none of whose
+   * children are in the structure.
+   * @returns the completed structure.
+   */
+  private async addRowPages(
+    collectionId: string,
+    nodes: NavigationNode[],
+    options: { atRoot: boolean; underRowPage: boolean }
+  ): Promise<NavigationNode[]> {
+    const documents = await sequelizeReadOnly.transaction((transaction) =>
+      Document.unscoped().findAll({
+        attributes: [
+          "id",
+          "title",
+          "urlId",
+          "icon",
+          "color",
+          "parentDocumentId",
+          "databaseId",
+        ],
+        where: {
+          collectionId,
+          publishedAt: { [Op.ne]: null },
+          archivedAt: { [Op.is]: null },
+        },
+        order: [["createdAt", "ASC"]],
+        transaction,
+      })
+    );
+    if (!documents.some((document) => document.databaseId)) {
+      return nodes;
+    }
+
+    const inStructure = new Set<string>();
+    const collectIds = (list: NavigationNode[]) => {
+      for (const node of list) {
+        inStructure.add(node.id);
+        collectIds(node.children);
+      }
+    };
+    collectIds(nodes);
+
+    const missingByParentId = new Map<string, Document[]>();
+    for (const document of documents) {
+      if (inStructure.has(document.id)) {
+        continue;
+      }
+      const key = document.parentDocumentId ?? "";
+      const siblings = missingByParentId.get(key);
+      if (siblings) {
+        siblings.push(document);
+      } else {
+        missingByParentId.set(key, [document]);
+      }
+    }
+
+    const graft = (
+      parentId: string,
+      children: NavigationNode[],
+      underRowPage: boolean
+    ): NavigationNode[] => [
+      ...children.map((child) => ({
+        ...child,
+        children: graft(child.id, child.children, false),
+      })),
+      ...(missingByParentId.get(parentId) ?? [])
+        .filter((document) => underRowPage || document.databaseId)
+        .map((document) => ({
+          ...toNavigationNode(document),
+          children: graft(document.id, [], true),
+        })),
+    ];
+
+    if (options.atRoot) {
+      return graft("", nodes, false);
+    }
+    return nodes.map((node) => ({
+      ...node,
+      children: graft(node.id, node.children, options.underRowPage),
+    }));
+  }
+
+  /**
    * Update the state of the underlying FileOperation in the database and send
    * an event to the client.
    *
@@ -310,4 +420,15 @@ export default abstract class ExportTask extends BaseTask<Props> {
       attempts: 1,
     };
   }
+}
+
+function toNavigationNode(document: Document): NavigationNode {
+  return {
+    id: document.id,
+    title: document.title,
+    url: document.url,
+    icon: document.icon ?? undefined,
+    color: document.color ?? undefined,
+    children: [],
+  };
 }

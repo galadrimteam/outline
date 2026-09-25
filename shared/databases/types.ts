@@ -1,0 +1,451 @@
+/**
+ * Engine-neutral shapes of a database (a table of rows shown as table, board,
+ * calendar… views). The server's DatabaseEngine maps an external engine
+ * (Teable today) onto them; the app and the MCP tools only ever see these.
+ * Field types, filter operators and view options keep Teable's vocabulary so
+ * that the Teable engine is a thin mapping, not a translation layer.
+ */
+
+export enum DatabaseFieldType {
+  SingleLineText = "singleLineText",
+  LongText = "longText",
+  Number = "number",
+  Rating = "rating",
+  Checkbox = "checkbox",
+  SingleSelect = "singleSelect",
+  MultipleSelect = "multipleSelect",
+  Date = "date",
+  User = "user",
+  Attachment = "attachment",
+  Link = "link",
+  Rollup = "rollup",
+  ConditionalRollup = "conditionalRollup",
+  Formula = "formula",
+  AutoNumber = "autoNumber",
+  CreatedTime = "createdTime",
+  LastModifiedTime = "lastModifiedTime",
+  CreatedBy = "createdBy",
+  LastModifiedBy = "lastModifiedBy",
+  Button = "button",
+}
+
+/** How a view is drawn. Teable stores table/board/calendar/gallery/form natively, list and timeline are Outline overlays on a grid view. */
+export enum DatabaseLayout {
+  Table = "table",
+  Board = "board",
+  Calendar = "calendar",
+  Gallery = "gallery",
+  List = "list",
+  Timeline = "timeline",
+  Form = "form",
+}
+
+/** The engine's own view type. */
+export type DatabaseEngineViewType =
+  | "grid"
+  | "kanban"
+  | "calendar"
+  | "gallery"
+  | "form"
+  | "plugin";
+
+export type DatabaseCellValueType =
+  | "string"
+  | "number"
+  | "boolean"
+  | "dateTime";
+
+export interface DatabaseSelectChoice {
+  id?: string;
+  name: string;
+  color: string;
+}
+
+export interface DatabaseFieldFormatting {
+  type?: "decimal" | "percent" | "currency";
+  precision?: number;
+  symbol?: string;
+  date?: string;
+  time?: string;
+  timeZone?: string;
+}
+
+/** Options of a field; which keys are set depends on the field type. */
+export interface DatabaseFieldOptions {
+  choices?: DatabaseSelectChoice[];
+  defaultValue?: string | number | boolean | string[] | null;
+  formatting?: DatabaseFieldFormatting;
+  showAs?: { type: string; [key: string]: string | number | boolean };
+  isMultiple?: boolean;
+  shouldNotify?: boolean;
+  foreignTableId?: string;
+  baseId?: string;
+  relationship?: "oneOne" | "oneMany" | "manyOne" | "manyMany";
+  lookupFieldId?: string;
+  symmetricFieldId?: string;
+  isOneWay?: boolean;
+  expression?: string;
+  timeZone?: string;
+  max?: number;
+  icon?: string;
+  color?: string;
+  label?: string;
+}
+
+/** Status groups of a Notion-like status field, kept by Outline next to a single select. */
+export enum DatabaseStatusGroup {
+  ToDo = "to_do",
+  InProgress = "in_progress",
+  Complete = "complete",
+}
+
+/** What Outline adds to a field the engine does not know about. */
+export interface DatabaseFieldMeta {
+  /** Choice name → status group, when the single select is a Notion status. */
+  statusGroups?: Record<string, DatabaseStatusGroup>;
+  /** The field holding the end of a date range whose start is this field. */
+  endFieldId?: string;
+}
+
+export interface DatabaseField {
+  id: string;
+  name: string;
+  type: DatabaseFieldType;
+  description?: string | null;
+  options: DatabaseFieldOptions;
+  isPrimary: boolean;
+  isComputed: boolean;
+  isLookup: boolean;
+  cellValueType: DatabaseCellValueType;
+  isMultipleCellValue: boolean;
+  meta?: DatabaseFieldMeta;
+}
+
+export type DatabaseFilterConjunction = "and" | "or";
+
+export type DatabaseFilterOperator =
+  | "is"
+  | "isNot"
+  | "contains"
+  | "doesNotContain"
+  | "isGreater"
+  | "isGreaterEqual"
+  | "isLess"
+  | "isLessEqual"
+  | "isEmpty"
+  | "isNotEmpty"
+  | "isAnyOf"
+  | "isNoneOf"
+  | "hasAnyOf"
+  | "hasAllOf"
+  | "hasNoneOf"
+  | "isExactly"
+  | "isNotExactly"
+  | "isWithIn"
+  | "isBefore"
+  | "isAfter"
+  | "isOnOrBefore"
+  | "isOnOrAfter";
+
+export type DatabaseDateFilterMode =
+  | "today"
+  | "tomorrow"
+  | "yesterday"
+  | "currentWeek"
+  | "currentMonth"
+  | "currentYear"
+  | "lastWeek"
+  | "lastMonth"
+  | "lastYear"
+  | "nextWeekPeriod"
+  | "nextMonthPeriod"
+  | "nextYearPeriod"
+  | "oneWeekAgo"
+  | "oneWeekFromNow"
+  | "oneMonthAgo"
+  | "oneMonthFromNow"
+  | "numberOfDaysAgo"
+  | "numberOfDaysFromNow"
+  | "exactDate"
+  | "exactFormatDate"
+  | "pastWeek"
+  | "pastMonth"
+  | "pastYear"
+  | "nextWeek"
+  | "nextMonth"
+  | "nextYear"
+  | "pastNumberOfDays"
+  | "nextNumberOfDays";
+
+export interface DatabaseDateFilterValue {
+  mode: DatabaseDateFilterMode;
+  timeZone: string;
+  exactDate?: string;
+  exactDateEnd?: string;
+  numberOfDays?: number;
+}
+
+/** `"Me"` stands for the signed-in person in user filters. */
+export type DatabaseFilterValue =
+  | string
+  | number
+  | boolean
+  | null
+  | string[]
+  | DatabaseDateFilterValue;
+
+export interface DatabaseFilterItem {
+  fieldId: string;
+  operator: DatabaseFilterOperator;
+  value: DatabaseFilterValue;
+}
+
+export interface DatabaseFilter {
+  conjunction: DatabaseFilterConjunction;
+  filterSet: (DatabaseFilterItem | DatabaseFilter)[];
+}
+
+export type DatabaseSortOrder = "asc" | "desc";
+
+export interface DatabaseSortItem {
+  fieldId: string;
+  order: DatabaseSortOrder;
+}
+
+export interface DatabaseSort {
+  sortObjs: DatabaseSortItem[];
+  manualSort?: boolean;
+}
+
+export type DatabaseGroup = DatabaseSortItem[];
+
+export type DatabaseStatisticFunc =
+  | "count"
+  | "empty"
+  | "filled"
+  | "unique"
+  | "max"
+  | "min"
+  | "sum"
+  | "average"
+  | "checked"
+  | "unChecked"
+  | "percentEmpty"
+  | "percentFilled"
+  | "percentUnique"
+  | "percentChecked"
+  | "percentUnChecked"
+  | "earliestDate"
+  | "latestDate"
+  | "dateRangeOfDays"
+  | "dateRangeOfMonths"
+  | "totalAttachmentSize";
+
+export interface DatabaseColumnMeta {
+  order: number;
+  width?: number;
+  /** Grid views hide with `hidden`. */
+  hidden?: boolean;
+  /** Board, gallery, calendar and form views show with `visible`. */
+  visible?: boolean;
+  required?: boolean;
+  statisticFunc?: DatabaseStatisticFunc | null;
+}
+
+/** Options stored by the engine, per view type. */
+export interface DatabaseViewOptions {
+  stackFieldId?: string;
+  coverFieldId?: string;
+  isCoverFit?: boolean;
+  isFieldNameHidden?: boolean;
+  isEmptyStackHidden?: boolean;
+  startDateFieldId?: string;
+  endDateFieldId?: string;
+  titleFieldId?: string;
+  colorConfig?: { type: "field" | "custom"; fieldId?: string; color?: string };
+  rowHeight?: "short" | "medium" | "tall" | "extraTall" | "autoFit";
+  frozenFieldId?: string;
+  fieldNameDisplayLines?: number;
+  coverUrl?: string;
+  logoUrl?: string;
+  submitLabel?: string;
+}
+
+export type DatabaseCardSize = "small" | "medium" | "large";
+
+export type DatabaseOpenPagesIn = "sidePeek" | "centerPeek" | "fullPage";
+
+export type DatabaseTimelineZoom = "week" | "month" | "quarter" | "year";
+
+/** What Outline adds to a view the engine does not know about. */
+export interface DatabaseViewOverrides {
+  /** Draw the engine's grid view as a list or a timeline. */
+  layout?: DatabaseLayout.List | DatabaseLayout.Timeline;
+  /** Second level of grouping on a board (swimlanes). */
+  subGroupFieldId?: string;
+  /** Board column order when it differs from the select's choices (choice names; "" is the empty column). */
+  stackOrder?: string[];
+  /** Board columns folded away (choice names; "" is the empty column). */
+  hiddenStacks?: string[];
+  cardSize?: DatabaseCardSize;
+  openPagesIn?: DatabaseOpenPagesIn;
+  /** Outline template document used by "New" in this view. */
+  defaultTemplateId?: string;
+  timeline?: {
+    startFieldId?: string;
+    endFieldId?: string;
+    zoom?: DatabaseTimelineZoom;
+    dependencyFieldId?: string;
+    showTable?: boolean;
+  };
+}
+
+export interface DatabaseView {
+  id: string;
+  name: string;
+  type: DatabaseEngineViewType;
+  /** `overrides.layout` when set, else the engine type mapped to a layout. */
+  layout: DatabaseLayout;
+  order: number;
+  description?: string | null;
+  filter: DatabaseFilter | null;
+  sort: DatabaseSort | null;
+  group: DatabaseGroup | null;
+  columnMeta: Record<string, DatabaseColumnMeta>;
+  options: DatabaseViewOptions;
+  overrides: DatabaseViewOverrides;
+  isLocked: boolean;
+}
+
+export interface DatabaseUserValue {
+  /** The engine's user id. */
+  id: string;
+  title: string;
+  email?: string;
+  avatarUrl?: string | null;
+  /** The matching Outline user, resolved by email on the server. */
+  outlineUserId?: string | null;
+}
+
+export interface DatabaseLinkValue {
+  /** The linked record id. */
+  id: string;
+  title?: string;
+}
+
+export interface DatabaseAttachmentValue {
+  id: string;
+  name: string;
+  mimetype: string;
+  size: number;
+  width?: number;
+  height?: number;
+  /** A URL the browser can load. */
+  url?: string;
+  thumbnailUrl?: string;
+  token?: string;
+  path?: string;
+}
+
+export type DatabaseCellValue =
+  | string
+  | number
+  | boolean
+  | null
+  | string[]
+  | number[]
+  | DatabaseUserValue
+  | DatabaseUserValue[]
+  | DatabaseLinkValue
+  | DatabaseLinkValue[]
+  | DatabaseAttachmentValue[];
+
+/** What the app sends to write a person field: Outline user ids, resolved to engine users on the server. */
+export interface DatabaseUserInput {
+  outlineUserId: string;
+}
+
+export type DatabaseCellInput =
+  | DatabaseCellValue
+  | DatabaseUserInput
+  | DatabaseUserInput[];
+
+export interface DatabaseRecord {
+  id: string;
+  fields: Record<string, DatabaseCellValue>;
+  createdTime?: string;
+  lastModifiedTime?: string;
+  createdBy?: string;
+  lastModifiedBy?: string;
+  /** The Outline document of this row, when it has been opened once. */
+  documentId?: string | null;
+}
+
+export interface DatabaseGroupHeader {
+  type: "header";
+  id: string;
+  depth: number;
+  value: DatabaseCellValue;
+  isCollapsed: boolean;
+}
+
+export interface DatabaseGroupRow {
+  type: "row";
+  count: number;
+}
+
+export type DatabaseGroupPoint = DatabaseGroupHeader | DatabaseGroupRow;
+
+export type DatabaseRecordPosition = "before" | "after";
+
+export interface DatabaseRecordOrder {
+  viewId: string;
+  anchorId: string;
+  position: DatabaseRecordPosition;
+}
+
+export interface DatabaseHistoryEntry {
+  id: string;
+  fieldId: string;
+  fieldName: string;
+  fieldType: DatabaseFieldType;
+  before: DatabaseCellValue;
+  after: DatabaseCellValue;
+  createdTime: string;
+  createdBy: DatabaseUserValue | null;
+}
+
+/** Settings Outline keeps on a database (column `databases.settings`). */
+export interface DatabaseSettings {
+  viewOverrides?: Record<string, DatabaseViewOverrides>;
+  fieldMeta?: Record<string, DatabaseFieldMeta>;
+  /** Row page customisation (Notion's "Customize page"). */
+  pageLayout?: {
+    hiddenFieldIds?: string[];
+    hideWhenEmptyFieldIds?: string[];
+    /** Hide every empty property on row pages. */
+    hideEmpty?: boolean;
+  };
+  /** The field holding a row's emoji (the migration writes one called « Icon »). */
+  iconFieldId?: string;
+}
+
+/** Websocket event sent to the readers of a database when its data changes. */
+export interface DatabaseChangeEvent {
+  databaseId: string;
+  kinds: DatabaseChangeKind[];
+  recordIds?: string[];
+  fieldIds?: string[];
+  viewIds?: string[];
+  /** The Outline user who made the change, when known. */
+  actorId?: string | null;
+  /** Echo of the `origin` the change was made with, so a client can ignore its own writes. */
+  origin?: string | null;
+}
+
+export type DatabaseChangeKind =
+  | "record.create"
+  | "record.update"
+  | "record.delete"
+  | "field"
+  | "view";

@@ -296,6 +296,12 @@ router.post(
       where[Op.and].push({ archivedAt: { [Op.eq]: null } });
     }
 
+    // The children of a page are its sub-pages: the row pages of a database it
+    // holds are listed by the database instead.
+    if (parentDocumentId) {
+      where[Op.and].push({ databaseId: { [Op.is]: null } });
+    }
+
     // Sort=index needs the collection's documentStructure for ordering and
     // pagination. Only meaningful when the filter targets a single collection.
     let documentIds: string[] = [];

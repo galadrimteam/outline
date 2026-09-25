@@ -4,6 +4,7 @@ import slugify from "@shared/utils/slugify";
 import { parser } from "@server/editor";
 import Document from "@server/models/Document";
 import {
+  buildDatabase,
   buildDocument,
   buildDraftDocument,
   buildCollection,
@@ -131,6 +132,41 @@ describe("#save", () => {
     document.title = "test";
     await document.save();
     expect(document.previousTitles.length).toBe(3);
+  });
+});
+
+describe("#toNavigationNode", () => {
+  test("should leave out the row pages of a database", async () => {
+    const team = await buildTeam();
+    const collection = await buildCollection({ teamId: team.id });
+    const parent = await buildDocument({
+      teamId: team.id,
+      collectionId: collection.id,
+    });
+    const child = await buildDocument({
+      teamId: team.id,
+      collectionId: collection.id,
+      parentDocumentId: parent.id,
+    });
+    const database = await buildDatabase({
+      teamId: team.id,
+      documentId: parent.id,
+    });
+    await buildDocument({
+      teamId: team.id,
+      collectionId: collection.id,
+      parentDocumentId: parent.id,
+      databaseId: database.id,
+      databaseRecordId: "rec1",
+    });
+
+    const node = await parent.toNavigationNode();
+    expect(node.children.map((c) => c.id)).toEqual([child.id]);
+
+    const withArchived = await parent.toNavigationNode({
+      includeArchived: true,
+    });
+    expect(withArchived.children.map((c) => c.id)).toEqual([child.id]);
   });
 });
 

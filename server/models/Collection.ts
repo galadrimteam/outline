@@ -1043,6 +1043,11 @@ class Collection extends ParanoidModel<
       insertOrder?: "prepend" | "append";
     } = {}
   ) => {
+    // Row pages of a database are reached through the database, never the tree.
+    if (document.databaseId) {
+      return this;
+    }
+
     if (!this.documentStructure) {
       this.documentStructure = [];
     }

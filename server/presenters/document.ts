@@ -91,6 +91,8 @@ async function presentDocument(
     lastViewedAt: undefined,
     isCollectionDeleted: undefined,
     backlinkIds: options?.backlinkIds,
+    databaseId: document.databaseId,
+    databaseRecordId: document.databaseRecordId,
   };
 
   if (!!document.views && document.views.length > 0) {

@@ -6,6 +6,7 @@ import {
   buildUser,
   buildGroup,
   buildCollection,
+  buildDatabase,
   buildTeam,
   buildDocument,
 } from "@server/test/factories";
@@ -254,6 +255,35 @@ describe("#addDocumentToStructure", () => {
       nestedDocument.id
     );
   });
+  it("should not add a database row page", async () => {
+    const collection = await buildCollection();
+    const parent = await buildDocument({
+      teamId: collection.teamId,
+      collectionId: collection.id,
+    });
+    const database = await buildDatabase({
+      teamId: collection.teamId,
+      documentId: parent.id,
+    });
+    const rowPage = await buildDocument({
+      teamId: collection.teamId,
+      collectionId: collection.id,
+      parentDocumentId: parent.id,
+      databaseId: database.id,
+      databaseRecordId: "rec1",
+    });
+
+    const reloaded = await Collection.findByPk(collection.id, {
+      includeDocumentStructure: true,
+      rejectOnEmpty: true,
+    });
+    expect(reloaded.getDocumentTree(rowPage.id)).toBeNull();
+
+    await reloaded.addDocumentToStructure(rowPage);
+    expect(reloaded.getDocumentTree(parent.id)?.children).toEqual([]);
+    expect(reloaded.getDocumentTree(rowPage.id)).toBeNull();
+  });
+
   describe("options: documentJson", () => {
     it("should append supplied json over document's own", async () => {
       const collection = await buildCollection();

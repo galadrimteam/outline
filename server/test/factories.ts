@@ -26,6 +26,7 @@ import {
   User,
   UserPasskey,
   Event,
+  Database,
   Document,
   Emoji,
   Star,
@@ -431,6 +432,41 @@ export async function buildDocument(
   }
 
   return document;
+}
+
+/**
+ * Builds a database. Without a collection, it lands in the collection of its
+ * home document when one is given, else in a new collection.
+ *
+ * @param overrides the attributes to set on the database.
+ * @returns the database.
+ */
+export async function buildDatabase(overrides: Partial<Database> = {}) {
+  if (!overrides.teamId) {
+    const team = await buildTeam();
+    overrides.teamId = team.id;
+  }
+
+  if (!overrides.collectionId && overrides.documentId) {
+    const document = await Document.unscoped().findOne({
+      attributes: ["collectionId"],
+      where: { id: overrides.documentId },
+      rejectOnEmpty: true,
+    });
+    overrides.collectionId = document.collectionId ?? undefined;
+  }
+
+  if (!overrides.collectionId) {
+    const collection = await buildCollection({ teamId: overrides.teamId });
+    overrides.collectionId = collection.id;
+  }
+
+  return Database.create({
+    title: faker.lorem.words(2),
+    externalBaseId: `bse${randomString(16)}`,
+    externalTableId: `tbl${randomString(16)}`,
+    ...overrides,
+  });
 }
 
 export async function buildTemplate(

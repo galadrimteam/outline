@@ -4,6 +4,7 @@ import presentAuthenticationProvider from "./authenticationProvider";
 import presentAvailableTeam from "./availableTeam";
 import presentCollection from "./collection";
 import presentComment from "./comment";
+import { presentDatabase } from "./database";
 import presentDocument, { presentDocuments } from "./document";
 import presentDocumentInsight from "./documentInsight";
 import presentEvent from "./event";
@@ -42,6 +43,7 @@ export {
   presentAvailableTeam,
   presentCollection,
   presentComment,
+  presentDatabase,
   presentDocument,
   presentDocuments,
   presentDocumentInsight,
