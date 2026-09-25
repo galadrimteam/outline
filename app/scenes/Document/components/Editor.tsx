@@ -31,6 +31,7 @@ import useQuery from "~/hooks/useQuery";
 import useStores from "~/hooks/useStores";
 import { decodeURIComponentSafe } from "~/utils/urls";
 import MultiplayerEditor from "./AsyncMultiplayerEditor";
+import { DatabaseProperties } from "./DatabaseProperties";
 import DocumentTitle from "./DocumentTitle";
 import { first } from "es-toolkit/compat";
 import useShare from "@shared/hooks/useShare";
@@ -226,6 +227,11 @@ function DocumentEditor(props: Props, ref: React.ForwardedRef<SharedEditor>) {
         onBlur={handleBlur}
         placeholder={t("Untitled")}
       />
+      {document instanceof Document &&
+        document.databaseId &&
+        document.databaseRecordId && (
+          <DatabaseProperties document={document} readOnly={!!readOnly} />
+        )}
       {/* galadrim: no meta line under the title (last update, task count,
           "Comment", "Viewed by"), a Notion page has nothing there. The header
           shows when the document was edited and links to its history, comments

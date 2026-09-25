@@ -197,6 +197,18 @@ export default class Document extends ArchivableModel implements Searchable {
   parentDocument?: Document;
 
   /**
+   * The database this document is a row page of, if any.
+   */
+  @observable
+  databaseId?: string | null = undefined;
+
+  /**
+   * The engine record this document is the page of, set with `databaseId`.
+   */
+  @observable
+  databaseRecordId?: string | null = undefined;
+
+  /**
    * The ids of users that have edited this document.
    */
   @observable

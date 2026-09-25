@@ -1,0 +1,76 @@
+import { DatabaseFieldType, DatabaseLayout } from "@shared/databases/types";
+import { makeField, makeView } from "../views/TableView/testFixtures";
+import {
+  pageFields,
+  propertyVisibility,
+  splitPageProperties,
+  withPropertyVisibility,
+} from "./pageLayout";
+
+const title = makeField({ id: "title", isPrimary: true });
+const icon = makeField({ id: "icon" });
+const status = makeField({
+  id: "status",
+  type: DatabaseFieldType.SingleSelect,
+});
+const notes = makeField({ id: "notes", type: DatabaseFieldType.LongText });
+const fields = [title, icon, status, notes];
+
+describe("pageFields", () => {
+  it("follows the first table and leaves out the title and the icon", () => {
+    const board = makeView({
+      id: "board",
+      layout: DatabaseLayout.Board,
+      type: "kanban",
+      order: 0,
+      columnMeta: { status: { order: 0 }, notes: { order: 1 } },
+    });
+    const table = makeView({
+      id: "table",
+      order: 1,
+      columnMeta: { notes: { order: 0 }, status: { order: 1 } },
+    });
+    expect(
+      pageFields(fields, [board, table], "icon").map((field) => field.id)
+    ).toEqual(["notes", "status"]);
+  });
+});
+
+describe("visibility", () => {
+  it("reads and writes the page layout", () => {
+    const layout = withPropertyVisibility(undefined, "status", "hidden");
+    expect(propertyVisibility(layout, "status")).toBe("hidden");
+    const next = withPropertyVisibility(layout, "status", "hideWhenEmpty");
+    expect(next.hiddenFieldIds).toEqual([]);
+    expect(propertyVisibility(next, "status")).toBe("hideWhenEmpty");
+    expect(propertyVisibility(next, "notes")).toBe("always");
+  });
+});
+
+describe("splitPageProperties", () => {
+  const record = { id: "rec", fields: { status: "A", notes: null } };
+
+  it("hides hidden properties and empty ones when asked", () => {
+    expect(
+      splitPageProperties([status, notes], record, {
+        hideWhenEmptyFieldIds: ["notes"],
+      }).hidden.map((field) => field.id)
+    ).toEqual(["notes"]);
+    expect(
+      splitPageProperties([status, notes], record, {
+        hiddenFieldIds: ["status"],
+      }).shown.map((field) => field.id)
+    ).toEqual(["notes"]);
+    expect(
+      splitPageProperties([status, notes], record, {
+        hideEmpty: true,
+      }).shown.map((field) => field.id)
+    ).toEqual(["status"]);
+  });
+
+  it("shows everything by default", () => {
+    expect(
+      splitPageProperties([status, notes], record, undefined).hidden
+    ).toEqual([]);
+  });
+});
