@@ -1911,5 +1911,8 @@
   "Add content": "Ajouter du contenu",
   "Tomorrow": "Demain",
   "Group admin": "Admin du groupe",
-  "Member": "Membre"
+  "Member": "Membre",
+  "Formula": "Formule",
+  "Edit formula": "Modifier la formule",
+  "Press Enter to apply. Read other columns with prop(\"Name\"), as in Notion. Empty the field to turn the column back into plain text.": "Entrée pour appliquer. Les autres colonnes se lisent avec prop(\"Nom\"), comme dans Notion. Videz le champ pour revenir à une colonne de texte."
 }

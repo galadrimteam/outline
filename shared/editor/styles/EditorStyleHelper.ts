@@ -125,6 +125,9 @@ export class EditorStyleHelper {
   /** "Plus" to add column on tables */
   static readonly tableAddColumn = "table-add-column";
 
+  /** Cell of a formula column, computed rather than typed */
+  static readonly tableFormulaCell = "table-formula-cell";
+
   /** "Plus" to add row on tables */
   static readonly tableAddRow = "table-add-row";
 
