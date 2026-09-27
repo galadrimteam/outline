@@ -260,6 +260,11 @@ function tokenize(source: string): Token[] {
       i++;
       continue;
     }
+    if (source.startsWith("/*", i)) {
+      const end = source.indexOf("*/", i + 2);
+      i = end === -1 ? source.length : end + 2;
+      continue;
+    }
     if (/\d/.test(c) || (c === "." && /\d/.test(source[i + 1] ?? ""))) {
       const m = source.slice(i).match(/^\d*\.?\d+(?:e[-+]?\d+)?/i)!;
       tokens.push({ kind: "number", value: Number(m[0]) });
@@ -307,6 +312,7 @@ function tokenize(source: string): Token[] {
 
 type Expr =
   | { type: "literal"; value: Value }
+  | { type: "variable"; name: string }
   | { type: "call"; name: string; args: Expr[] }
   | { type: "unary"; op: string; arg: Expr }
   | { type: "binary"; op: string; left: Expr; right: Expr }
@@ -394,9 +400,8 @@ export function parseFormula(source: string): Expr {
       if (isOp("(")) {
         return { type: "call", name: t.value, args: args() };
       }
-      throw new FormulaError(
-        `« ${t.value} » inconnu : prop("Nom de la colonne") pour lire une colonne`
-      );
+      // a name given by let() or lets(), checked when computing
+      return { type: "variable", name: t.value };
     }
     throw new FormulaError(`« ${t.value} » inattendu`);
   };
@@ -602,7 +607,10 @@ const FUNCTIONS: Record<string, Fn> = {
   slice: ([a, start, end]) =>
     text(a).slice(num(start), end === undefined ? undefined : num(end)),
   test: ([a, b]) => new RegExp(text(b)).test(text(a)),
-  empty: ([a]) => a === null || a === "" || a === 0 || a === false,
+  empty: (xs) =>
+    xs.length === 0
+      ? null
+      : xs[0] === null || xs[0] === "" || xs[0] === 0 || xs[0] === false,
   // conditions
   if: ([cond, a, b]) => (truthy(cond) ? a : (b ?? null)),
   ifs: (xs) => {
@@ -647,6 +655,9 @@ const FUNCTIONS: Record<string, Fn> = {
     d === null ? null : addTo(date(d), num(n), unitOf(unit ?? "days")),
   dateSubtract: ([d, n, unit]) =>
     d === null ? null : addTo(date(d), -num(n), unitOf(unit ?? "days")),
+  // a date cell holds one date, which is both its start and its end
+  dateStart: ([d]) => (d === null ? null : date(d)),
+  dateEnd: ([d]) => (d === null ? null : date(d)),
   year: ([d]) => (d === null ? null : date(d).getFullYear()),
   month: ([d]) => (d === null ? null : date(d).getMonth() + 1),
   date: ([d]) => (d === null ? null : date(d).getDate()),
@@ -712,6 +723,7 @@ export function evaluate(
 ): Value {
   const tree = typeof formula === "string" ? parseFormula(formula) : formula;
   let steps = 0;
+  let scope: Record<string, Value> = {};
 
   const run = (expr: Expr): Value => {
     if (++steps > 10000) {
@@ -720,6 +732,13 @@ export function evaluate(
     switch (expr.type) {
       case "literal":
         return expr.value;
+      case "variable":
+        if (!(expr.name in scope)) {
+          throw new FormulaError(
+            `« ${expr.name} » inconnu : prop("Nom de la colonne") pour lire une colonne`
+          );
+        }
+        return scope[expr.name];
       case "ternary":
         return truthy(run(expr.cond)) ? run(expr.yes) : run(expr.no);
       case "unary":
@@ -739,6 +758,30 @@ export function evaluate(
             throw new FormulaError('prop("Nom de la colonne") attend un nom');
           }
           return row(text(run(expr.args[0])));
+        }
+        if (expr.name === "let" || expr.name === "lets") {
+          // let(name, value, result), lets(name1, value1, name2, value2, …, result)
+          if (expr.args.length < 3 || expr.args.length % 2 === 0) {
+            throw new FormulaError(
+              `${expr.name}() attend des noms, des valeurs et un résultat`
+            );
+          }
+          const outer = scope;
+          scope = { ...scope };
+          try {
+            for (let i = 0; i < expr.args.length - 1; i += 2) {
+              const name = expr.args[i];
+              if (name.type !== "variable") {
+                throw new FormulaError(
+                  `${expr.name}() attend un nom de variable`
+                );
+              }
+              scope[name.name] = run(expr.args[i + 1]);
+            }
+            return run(expr.args[expr.args.length - 1]);
+          } finally {
+            scope = outer;
+          }
         }
         if (expr.name === "if") {
           // only the branch that is taken is computed, like Notion

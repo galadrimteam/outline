@@ -137,6 +137,35 @@ describe("evaluate", () => {
     expect(evaluate('prop("Nom").upper()', r)).toBe("ACME");
   });
 
+  it("let, lets, comments, dateStart and empty(): Galadrim's longest formulas", () => {
+    const r = row({
+      "Date du Kick Off": "1 septembre 2026",
+      "Jours design prévus": "3",
+      "Jours design consommés": "",
+    });
+    const formula = `if(empty(prop("Date du Kick Off")), empty(),
+  /* Add weeks to the kickoff date (1 design day = 1 week) */
+  let(
+    joursRestants, if(empty(prop("Jours design prévus")), 0, prop("Jours design prévus")) -
+                   if(empty(prop("Jours design consommés")), 0, prop("Jours design consommés")),
+    if(joursRestants <= 0,
+      prop("Date du Kick Off").dateAdd(1, "weeks"),
+      prop("Date du Kick Off").dateAdd(joursRestants, "weeks")
+    )
+  )
+)`;
+    expect(formatValue(evaluate(formula, r))).toBe("22 septembre 2026");
+    expect(evaluate("lets(a, 2, b, a * 3, a + b)", row({}))).toBe(8);
+    expect(
+      evaluate(
+        'dateBetween(today(), dateStart(prop("d")), "days")',
+        row({ d: "20 septembre 2026" }),
+        NOW
+      )
+    ).toBe(7);
+    expect(() => evaluate("inconnu + 1", row({}))).toThrow(/inconnu/);
+  });
+
   it("reports what it cannot read", () => {
     expect(() => parseFormula("1 +")).toThrow(FormulaError);
     expect(() => parseFormula('prop("A"')).toThrow(FormulaError);
