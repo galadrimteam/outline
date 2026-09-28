@@ -428,6 +428,18 @@ export type DatabasesConvertEmbedsReq = z.infer<
   typeof DatabasesConvertEmbedsSchema
 >;
 
+export const DatabasesMoveToOutlineEngineSchema = BaseSchema.extend({
+  body: z.object({
+    /** A database of the Teable base to move: the whole base moves. */
+    id: z.uuid(),
+    dryRun: z.boolean().default(false),
+  }),
+});
+
+export type DatabasesMoveToOutlineEngineReq = z.infer<
+  typeof DatabasesMoveToOutlineEngineSchema
+>;
+
 // databaseRecords.*
 
 export const DatabaseRecordsListSchema = BaseSchema.extend({

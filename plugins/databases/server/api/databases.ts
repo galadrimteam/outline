@@ -2,7 +2,7 @@ import Router from "koa-router";
 import { Op } from "sequelize";
 import { UserRole } from "@shared/types";
 import { databaseRowsLinker } from "@server/commands/databaseRowDocumentCreator";
-import { ValidationError } from "@server/errors";
+import { NotFoundError, ValidationError } from "@server/errors";
 import auth from "@server/middlewares/authentication";
 import { rateLimiter } from "@server/middlewares/rateLimiter";
 import { transaction } from "@server/middlewares/transaction";
@@ -13,8 +13,10 @@ import { presentDatabase, presentPolicies } from "@server/presenters";
 import { QueryHelper } from "@server/storage/QueryHelper";
 import type { APIContext } from "@server/types";
 import { databaseCreator } from "../commands/databaseCreator";
-import { ConvertTeableEmbedsTask } from "../tasks/ConvertTeableEmbedsTask";
 import { engineFor, refFor } from "../engine";
+import env from "../env";
+import { ConvertTeableEmbedsTask } from "../tasks/ConvertTeableEmbedsTask";
+import { MoveDatabaseEngineTask } from "../tasks/MoveDatabaseEngineTask";
 import { presentDatabaseForUser } from "../presenters/database";
 import { presentDatabaseSchema } from "../presenters/databaseSchema";
 import { DatabaseSettingsHelper } from "../utils/DatabaseSettingsHelper";
@@ -138,7 +140,6 @@ router.post(
       document,
       title,
       layout,
-      engine: engineFor({ engine: "teable" }),
     });
     await database.loadAnchor(user.id);
 
@@ -160,6 +161,7 @@ router.post(
     const { transaction } = ctx.state;
     const { collectionId, documentId, externalBaseId, externalTableId, title } =
       ctx.input.body;
+    requireTeable();
 
     const collection = await Collection.findByPk(collectionId, {
       userId: user.id,
@@ -294,6 +296,7 @@ router.post(
   async (ctx: APIContext<T.DatabasesConvertEmbedsReq>) => {
     const { user } = ctx.state.auth;
     const { documentId, collectionId, dryRun } = ctx.input.body;
+    requireTeable();
 
     if (documentId) {
       const document = await Document.findByPk(documentId, {
@@ -323,5 +326,48 @@ router.post(
     ctx.body = { success: true };
   }
 );
+
+router.post(
+  "databases.moveToOutlineEngine",
+  rateLimiter(DatabaseRateLimit.Create),
+  auth({ role: UserRole.Admin }),
+  validate(T.DatabasesMoveToOutlineEngineSchema),
+  async (ctx: APIContext<T.DatabasesMoveToOutlineEngineReq>) => {
+    const { user } = ctx.state.auth;
+    const { id, dryRun } = ctx.input.body;
+    requireTeable();
+
+    const database = await Database.findOne({
+      where: { id, teamId: user.teamId },
+    });
+    if (!database) {
+      throw NotFoundError("Database not found");
+    }
+    if (database.engine !== "teable") {
+      throw ValidationError("This database is not on Teable");
+    }
+
+    const props = { databaseId: database.id, actorId: user.id, dryRun };
+    // A dry run only reads, and answers; a move copies files and outlasts a
+    // request, so it runs in the worker and logs its result.
+    if (dryRun) {
+      ctx.body = { data: await new MoveDatabaseEngineTask().perform(props) };
+      return;
+    }
+    await new MoveDatabaseEngineTask().schedule(props);
+    ctx.body = { success: true };
+  }
+);
+
+/**
+ * Refuses a route that reads Teable on a server without Teable.
+ *
+ * @throws ValidationError when Teable is not configured.
+ */
+function requireTeable() {
+  if (!env.isTeableConfigured) {
+    throw ValidationError("Teable is not configured on this server");
+  }
+}
 
 export default router;

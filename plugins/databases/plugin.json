@@ -2,5 +2,5 @@
   "id": "databases",
   "name": "Databases",
   "priority": 50,
-  "description": "Native Notion-like databases (tables, boards, calendars…) backed by an external engine, Teable."
+  "description": "Native Notion-like databases (tables, boards, calendars…) stored by Outline itself or, for tables not moved yet, by Teable."
 }

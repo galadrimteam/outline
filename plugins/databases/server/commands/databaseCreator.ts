@@ -13,10 +13,9 @@ import type { Collection, User } from "@server/models";
 import { Database, Document } from "@server/models";
 import { opts } from "@server/utils/i18n";
 import { MutexLock } from "@server/utils/MutexLock";
-import type {
-  DatabaseEngine,
-  DatabaseTableFieldCreate,
-} from "../engine/DatabaseEngine";
+import { engineFor } from "../engine";
+import type { DatabaseTableFieldCreate } from "../engine/DatabaseEngine";
+import env from "../env";
 import { actorFor } from "../utils/actor";
 import { DatabaseSettingsHelper } from "../utils/DatabaseSettingsHelper";
 
@@ -29,7 +28,8 @@ interface DatabaseCreatorProps {
   document?: Document | null;
   title?: string;
   layout: DatabaseLayout;
-  engine: DatabaseEngine;
+  /** The engine the data goes to; `DATABASES_ENGINE` when not given. */
+  engine?: string;
 }
 
 interface CreatedDatabase {
@@ -44,9 +44,11 @@ interface CreatedDatabase {
  * layout, anchored on a document or a collection.
  *
  * The table goes into the base of the nearest ancestor document that anchors
- * a database, else into the base the collection already uses, else into a new
- * base named after the collection. Creations in a collection are serialized,
- * so that two first databases do not create two bases.
+ * a database of the same engine, else into the base the collection already
+ * uses on that engine, else into a new base named after the collection: a
+ * base never spans two engines, since links stay inside a base. Creations in
+ * a collection are serialized, so that two first databases do not create two
+ * bases.
  *
  * @param props the creation parameters.
  * @returns the database with its schema, overrides applied.
@@ -57,8 +59,9 @@ export async function databaseCreator({
   document,
   title,
   layout,
-  engine,
+  engine: engineName = env.DATABASES_ENGINE,
 }: DatabaseCreatorProps): Promise<CreatedDatabase> {
+  const engine = engineFor({ engine: engineName, teamId: collection.teamId });
   const i18n = opts(user);
   const name = title || t("Untitled", i18n);
   const fields = defaultFields(layout, user);
@@ -68,8 +71,8 @@ export async function databaseCreator({
     MutexLock.defaultLockTimeout,
     async () => {
       const externalBaseId =
-        (await baseOfAncestors(document)) ??
-        (await baseOfCollection(collection)) ??
+        (await baseOfAncestors(document, engineName)) ??
+        (await baseOfCollection(collection, engineName)) ??
         (await engine.createBase(collection.name || name));
 
       const table = await engine.createTable(actorFor(user), externalBaseId, {
@@ -94,7 +97,7 @@ export async function databaseCreator({
         collectionId: collection.id,
         documentId: document?.id ?? null,
         title: name,
-        engine: "teable",
+        engine: engineName,
         externalBaseId,
         externalTableId: table.externalTableId,
         settings,
@@ -209,7 +212,8 @@ function initialSettings(
 }
 
 async function baseOfAncestors(
-  document: Document | null | undefined
+  document: Document | null | undefined,
+  engine: string
 ): Promise<string | null> {
   if (!document) {
     return null;
@@ -226,7 +230,7 @@ async function baseOfAncestors(
 
   const databases = await Database.findAll({
     attributes: ["documentId", "externalBaseId"],
-    where: { teamId: document.teamId, documentId: ancestorIds },
+    where: { teamId: document.teamId, documentId: ancestorIds, engine },
   });
   for (const id of ancestorIds) {
     const match = databases.find((database) => database.documentId === id);
@@ -238,11 +242,12 @@ async function baseOfAncestors(
 }
 
 async function baseOfCollection(
-  collection: Collection
+  collection: Collection,
+  engine: string
 ): Promise<string | null> {
   const database = await Database.findOne({
     attributes: ["externalBaseId"],
-    where: { teamId: collection.teamId, collectionId: collection.id },
+    where: { teamId: collection.teamId, collectionId: collection.id, engine },
     order: [["createdAt", "ASC"]],
   });
   return database?.externalBaseId ?? null;

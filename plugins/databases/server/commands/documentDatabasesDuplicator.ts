@@ -8,7 +8,6 @@ import { Database } from "@server/models";
 import type { Document, User } from "@server/models";
 import { DocumentHelper } from "@server/models/helpers/DocumentHelper";
 import { can } from "@server/policies";
-import env from "../env";
 import type { DatabaseNodeCopy } from "../utils/databaseNodes";
 import { databaseIdsIn, rewriteDatabaseNodes } from "../utils/databaseNodes";
 import type { DatabaseDuplication } from "./databasesDuplicator";
@@ -48,7 +47,7 @@ export async function documentDatabasesDuplicator({
   withRecords = false,
   transaction,
 }: Props): Promise<number> {
-  if (!env.TEABLE_INTERNAL_URL || !env.GALADRIM_SECRET || !documents.length) {
+  if (!documents.length) {
     return 0;
   }
 

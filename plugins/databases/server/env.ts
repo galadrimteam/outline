@@ -1,4 +1,4 @@
-import { IsOptional, IsUrl } from "class-validator";
+import { IsIn, IsOptional, IsUrl } from "class-validator";
 import { Environment } from "@server/env";
 import { Public } from "@server/utils/decorators/Public";
 import environment from "@server/utils/environment";
@@ -11,10 +11,23 @@ const urlOptions = {
   protocols: ["http", "https"],
 };
 
+const teableConfigured =
+  !!environment.TEABLE_INTERNAL_URL && !!environment.GALADRIM_SECRET;
+
 class DatabasesPluginEnvironment extends Environment {
   /**
+   * The engine of new databases: "outline" keeps their data in Outline's own
+   * Postgres, "teable" in Teable. Defaults to "teable" when Teable is
+   * configured, else "outline". Existing databases stay on their engine.
+   */
+  @IsIn(teableConfigured ? ["outline", "teable"] : ["outline"])
+  public DATABASES_ENGINE =
+    environment.DATABASES_ENGINE || (teableConfigured ? "teable" : "outline");
+
+  /**
    * The Teable API as the Outline server reaches it, usually on a private
-   * network (for example http://teable:3000). Enables native databases.
+   * network (for example http://teable:3000). Optional: needed by databases
+   * on the Teable engine and by the tools that read Teable.
    */
   @IsOptional()
   @IsUrl(urlOptions)
@@ -47,6 +60,16 @@ class DatabasesPluginEnvironment extends Environment {
    */
   @IsOptional()
   public TEABLE_SPACE_ID = this.toOptionalString(environment.TEABLE_SPACE_ID);
+
+  /**
+   * Whether Outline can reach Teable: its address and the shared secret are
+   * both set.
+   *
+   * @returns true when Teable is configured.
+   */
+  public get isTeableConfigured(): boolean {
+    return !!this.TEABLE_INTERNAL_URL && !!this.GALADRIM_SECRET;
+  }
 }
 
 export default new DatabasesPluginEnvironment();

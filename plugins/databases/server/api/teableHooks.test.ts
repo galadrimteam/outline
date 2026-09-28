@@ -56,6 +56,21 @@ describe("#teableHooks.receive", () => {
     expect(databaseChanges()).toHaveLength(0);
   });
 
+  it("ignores tables moved to the Outline engine", async () => {
+    const moved = tableId();
+    await buildDatabase({ externalTableId: moved, engine: "outline" });
+
+    const res = await receive({
+      tableId: moved,
+      events: [{ kind: "record.update", recordIds: ["rec1"] }],
+      actor: null,
+      origin: null,
+    });
+
+    expect(res.status).toEqual(200);
+    expect(databaseChanges()).toHaveLength(0);
+  });
+
   it("sends one change per database of the table, with the actor of its team", async () => {
     const shared = tableId();
     const teamA = await buildTeam();

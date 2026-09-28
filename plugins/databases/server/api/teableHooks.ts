@@ -4,6 +4,7 @@ import { uniq } from "es-toolkit/compat";
 import { AuthenticationError } from "@server/errors";
 import { rateLimiter } from "@server/middlewares/rateLimiter";
 import validate from "@server/middlewares/validate";
+import { Database } from "@server/models";
 import type { APIContext } from "@server/types";
 import { safeEqual } from "@server/utils/crypto";
 import { TeableEngine } from "../engine/teable/TeableEngine";
@@ -22,6 +23,16 @@ router.post(
   async (ctx: APIContext<T.TeableHooksReceiveReq>) => {
     const { tableId, events, actor, origin } = ctx.input.body;
     const kinds = uniq(events.map((event) => event.kind));
+
+    // A table moved into the Outline engine lives on there: what is still
+    // written to it in Teable must not trigger automations or notifications.
+    const onTeable = await Database.count({
+      where: { externalTableId: tableId, engine: "teable" },
+    });
+    if (!onTeable) {
+      ctx.body = { success: true };
+      return;
+    }
 
     if (kinds.includes("field")) {
       await TeableEngine.forgetFields(tableId);
