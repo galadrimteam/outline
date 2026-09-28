@@ -1132,7 +1132,7 @@ class Collection extends ParanoidModel<
     order: string[],
     options: { transaction?: Transaction } = {}
   ): Promise<number> => {
-    const documents = await Document.unscoped().findAll({
+    const published = await Document.unscoped().findAll({
       attributes: [
         "id",
         "title",
@@ -1141,6 +1141,7 @@ class Collection extends ParanoidModel<
         "color",
         "parentDocumentId",
         "createdAt",
+        "databaseId",
       ],
       where: {
         collectionId: this.id,
@@ -1149,6 +1150,22 @@ class Collection extends ParanoidModel<
       },
       transaction: options.transaction,
     });
+    // Row pages of databases stay out of the tree, as addDocumentToStructure keeps them, and so do the pages under them.
+    const hidden = new Set(
+      published.filter((document) => document.databaseId).map(({ id }) => id)
+    );
+    for (let size = -1; size !== hidden.size;) {
+      size = hidden.size;
+      for (const document of published) {
+        if (
+          document.parentDocumentId &&
+          hidden.has(document.parentDocumentId)
+        ) {
+          hidden.add(document.id);
+        }
+      }
+    }
+    const documents = published.filter(({ id }) => !hidden.has(id));
     const ids = new Set(documents.map((document) => document.id));
     const position = new Map(order.map((id, i) => [id, i]));
     const byParent = new Map<string | null, Document[]>();
