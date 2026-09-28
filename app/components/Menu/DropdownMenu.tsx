@@ -25,6 +25,14 @@ import { toMenuItems, toMobileMenuItems } from "./transformer";
 import { observer } from "mobx-react";
 import { useComputed } from "~/hooks/useComputed";
 
+/**
+ * Makes the dropdown menus below it non-modal by default. A modal menu marks
+ * the rest of the page aria-hidden, paragraphs of the editor included:
+ * ProseMirror reads that as an edit and redraws the document, which
+ * unmounts a menu opened from inside a node view the moment it opens.
+ */
+export const NonModalMenusContext = React.createContext(false);
+
 type Props = {
   /** Root action with children representing the menu items */
   action: ActionWithChildren | ActionFactory;
@@ -36,8 +44,9 @@ type Props = {
   ariaLabel: string;
   /**
    * Whether the menu should lock page scroll and trap focus while open.
-   * Defaults to true. Set to false to avoid the scrollbar-removal layout
-   * shift when the menu lives inside a scrollable container.
+   * Defaults to true, or false under NonModalMenusContext. Set to false to
+   * avoid the scrollbar-removal layout shift when the menu lives inside a
+   * scrollable container.
    */
   modal?: boolean;
   /** Additional component to display at the bottom of the top-level menu */
@@ -57,7 +66,7 @@ export const DropdownMenu = observer(
         children,
         align = "start",
         ariaLabel,
-        modal = true,
+        modal: modalProp,
         append,
         onOpen,
         onClose,
@@ -66,6 +75,8 @@ export const DropdownMenu = observer(
       ref
     ) => {
       const [open, setOpen] = React.useState(false);
+      const inNodeView = React.useContext(NonModalMenusContext);
+      const modal = modalProp ?? !inNodeView;
       const isMobile = useMobile();
       const contentRef =
         React.useRef<React.ElementRef<typeof MenuContent>>(null);

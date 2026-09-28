@@ -21,7 +21,10 @@ import type { DatabaseAttrs } from "@shared/editor/nodes/Database";
 import { databaseAttrs } from "@shared/editor/nodes/Database";
 import type { ComponentProps } from "@shared/editor/types";
 import { s } from "@shared/styles";
-import { DropdownMenu } from "~/components/Menu/DropdownMenu";
+import {
+  DropdownMenu,
+  NonModalMenusContext,
+} from "~/components/Menu/DropdownMenu";
 import { useSplitView } from "~/components/SplitView/context";
 import Tooltip from "~/components/Tooltip";
 import { createAction } from "~/actions";
@@ -92,26 +95,26 @@ export const DatabaseBlock = observer(function DatabaseBlock(
   const attrs = databaseAttrs(props.node);
   const actions = useNodeActions(props);
 
-  if (!attrs.databaseId) {
-    return (
-      <EmptyBlock
-        attrs={attrs}
-        isEditable={props.isEditable}
-        updateAttrs={actions.updateAttrs}
-      />
-    );
-  }
-
   return (
-    <DatabaseFrame
-      databaseId={attrs.databaseId}
-      blockKey={attrs.id ?? attrs.databaseId}
-      viewIds={attrs.viewIds}
-      fullPage={attrs.fullPage}
-      isEditable={props.isEditable}
-      isSelected={props.isSelected}
-      actions={actions}
-    />
+    <NonModalMenusContext.Provider value>
+      {attrs.databaseId ? (
+        <DatabaseFrame
+          databaseId={attrs.databaseId}
+          blockKey={attrs.id ?? attrs.databaseId}
+          viewIds={attrs.viewIds}
+          fullPage={attrs.fullPage}
+          isEditable={props.isEditable}
+          isSelected={props.isSelected}
+          actions={actions}
+        />
+      ) : (
+        <EmptyBlock
+          attrs={attrs}
+          isEditable={props.isEditable}
+          updateAttrs={actions.updateAttrs}
+        />
+      )}
+    </NonModalMenusContext.Provider>
   );
 });
 
