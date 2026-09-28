@@ -7,7 +7,7 @@ import type { DatabaseField, DatabaseLinkValue } from "@shared/databases/types";
 import { s } from "@shared/styles";
 import NudeButton from "~/components/NudeButton";
 import useStores from "~/hooks/useStores";
-import type Database from "~/models/Database";
+import { databaseRowPath } from "~/utils/routeHelpers";
 import { EditorPopover } from "./components/EditorPopover";
 import {
   Chips,
@@ -45,18 +45,23 @@ export function linksOf(
 }
 
 /**
- * The app path that opens a linked row's page. Relations to another table need the Outline id of
- * that table's database, which the schema does not carry yet: they resolve through this database.
+ * The app path that opens a linked row's page, in the database of the linked table.
  *
- * @param database the database of the relation field.
+ * @param field the relation field.
  * @param recordId the linked row.
- * @returns the path.
+ * @returns the path, or null when the linked table has no Outline database: its rows have no page.
  */
-export function linkedRecordPath(database: Database, recordId: string): string {
-  return `/db/${database.id}/row/${recordId}`;
+export function linkedRecordPath(
+  field: DatabaseField,
+  recordId: string
+): string | null {
+  const { foreignDatabaseId } = field.options;
+  return foreignDatabaseId
+    ? databaseRowPath(foreignDatabaseId, recordId)
+    : null;
 }
 
-function LinkRenderer({ database, value, variant, wrap }: CellRendererProps) {
+function LinkRenderer({ field, value, variant, wrap }: CellRendererProps) {
   const { t } = useTranslation();
   const links = linksOf(value);
 
@@ -68,16 +73,22 @@ function LinkRenderer({ database, value, variant, wrap }: CellRendererProps) {
 
   return (
     <Chips $variant={variant} $wrap={wrap}>
-      {links.map((link) => (
-        <LinkChip
-          key={link.id}
-          to={linkedRecordPath(database, link.id)}
-          onClick={stopPropagation}
-        >
-          <DocumentIcon size={16} />
-          <ChipTitle>{link.title || t("Untitled")}</ChipTitle>
-        </LinkChip>
-      ))}
+      {links.map((link) => {
+        const path = linkedRecordPath(field, link.id);
+        const content = (
+          <>
+            <DocumentIcon size={16} />
+            <ChipTitle>{link.title || t("Untitled")}</ChipTitle>
+          </>
+        );
+        return path ? (
+          <LinkChip key={link.id} to={path} onClick={stopPropagation}>
+            {content}
+          </LinkChip>
+        ) : (
+          <PlainChip key={link.id}>{content}</PlainChip>
+        );
+      })}
     </Chips>
   );
 }
@@ -218,6 +229,21 @@ function isMultipleLink(field: DatabaseField): boolean {
   }
   return field.isMultipleCellValue;
 }
+
+const PlainChip = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  max-width: 100%;
+  flex-shrink: 0;
+  color: ${s("text")};
+
+  svg {
+    flex-shrink: 0;
+    fill: ${s("textSecondary")};
+  }
+`;
 
 const LinkChip = styled(Link)`
   display: inline-flex;
