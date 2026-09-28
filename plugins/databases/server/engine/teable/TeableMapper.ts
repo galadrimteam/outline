@@ -44,6 +44,13 @@ export class TeableMapper {
       type: field.type,
       description: field.description ?? null,
       options: field.options ?? {},
+      lookupOptions: field.lookupOptions
+        ? {
+            foreignTableId: field.lookupOptions.foreignTableId,
+            linkFieldId: field.lookupOptions.linkFieldId,
+            lookupFieldId: field.lookupOptions.lookupFieldId,
+          }
+        : null,
       isPrimary: !!field.isPrimary,
       isComputed: !!field.isComputed,
       isLookup: !!field.isLookup,

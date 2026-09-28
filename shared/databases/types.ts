@@ -109,12 +109,20 @@ export interface DatabaseFieldMeta {
   endFieldId?: string;
 }
 
+/** Where a lookup field or a rollup reads: through a link of its table, a field of the linked table. */
+export interface DatabaseLookupOptions {
+  foreignTableId: string;
+  linkFieldId: string;
+  lookupFieldId: string;
+}
+
 export interface DatabaseField {
   id: string;
   name: string;
   type: DatabaseFieldType;
   description?: string | null;
   options: DatabaseFieldOptions;
+  lookupOptions?: DatabaseLookupOptions | null;
   isPrimary: boolean;
   isComputed: boolean;
   isLookup: boolean;

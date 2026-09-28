@@ -25,6 +25,11 @@ export interface TeableField {
   description?: string | null;
   options?: DatabaseFieldOptions | null;
   isLookup?: boolean | null;
+  lookupOptions?: {
+    foreignTableId: string;
+    linkFieldId: string;
+    lookupFieldId: string;
+  } | null;
   isPrimary?: boolean | null;
   isComputed?: boolean | null;
   cellValueType: DatabaseCellValueType;
