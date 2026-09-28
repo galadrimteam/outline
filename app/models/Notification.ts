@@ -1,10 +1,12 @@
 import type { TFunction } from "i18next";
+import i18n from "i18next";
 import { action, computed, observable } from "mobx";
 import type { NotificationData } from "@shared/types";
 import { NotificationEventType } from "@shared/types";
 import {
   collectionPath,
   commentPath,
+  databaseRowPath,
   documentPath,
   settingsPath,
 } from "~/utils/routeHelpers";
@@ -41,6 +43,7 @@ class Notification extends Model {
         NotificationEventType.MentionedInComment,
         NotificationEventType.GroupMentionedInDocument,
         NotificationEventType.GroupMentionedInComment,
+        NotificationEventType.AddedToDatabaseRecord,
       ],
       comments: [
         NotificationEventType.CreateComment,
@@ -213,6 +216,8 @@ class Notification extends Model {
         return t("shared");
       case NotificationEventType.AddUserToCollection:
         return t("invited you to");
+      case NotificationEventType.AddedToDatabaseRecord:
+        return t("added you to");
       case NotificationEventType.RequestDocumentAccess:
         if (this.accessRequestStatus === "approved") {
           return t("was granted access to");
@@ -233,6 +238,9 @@ class Notification extends Model {
    * @returns The subject
    */
   get subject() {
+    if (this.event === NotificationEventType.AddedToDatabaseRecord) {
+      return this.data?.recordTitle || i18n.t("Untitled");
+    }
     if (this.documentId) {
       return this.document?.title ?? "a document";
     }
@@ -240,6 +248,18 @@ class Notification extends Model {
       return this.collection?.name ?? "a collection";
     }
     return "Unknown";
+  }
+
+  /**
+   * Returns what holds the subject, shown after it, eg the database of a row.
+   *
+   * @returns The name of the container, if the notification has one.
+   */
+  get subjectContainer(): string | undefined {
+    if (this.event === NotificationEventType.AddedToDatabaseRecord) {
+      return this.data?.databaseTitle || i18n.t("Untitled database");
+    }
+    return undefined;
   }
 
   /**
@@ -287,6 +307,12 @@ class Notification extends Model {
       }
       case NotificationEventType.ExportCompleted: {
         return settingsPath("export");
+      }
+      case NotificationEventType.AddedToDatabaseRecord: {
+        const { databaseId, recordId } = this.data ?? {};
+        return databaseId && recordId
+          ? databaseRowPath(databaseId, recordId)
+          : "";
       }
       default:
         this.event satisfies never;

@@ -1,3 +1,7 @@
+import { Node } from "prosemirror-model";
+import { yDocToProsemirrorJSON } from "y-prosemirror";
+import * as Y from "yjs";
+import { parser, schema } from "@server/editor";
 import Revision from "@server/models/Revision";
 import { buildCollection, buildDocument } from "@server/test/factories";
 import { ChangesetHelper } from "@shared/editor/lib/ChangesetHelper";
@@ -1163,6 +1167,60 @@ This is a [test paragraph](https://example.net)`,
       expect(result).not.toContain("# ");
       expect(result).not.toContain("Test Collection");
       expect(result).toContain("Collection description");
+    });
+  });
+
+  describe("applyProsemirrorToDocument", () => {
+    const contentOf = (state: Uint8Array) => {
+      const ydoc = new Y.Doc();
+      Y.applyUpdate(ydoc, state);
+      return Node.fromJSON(
+        schema,
+        yDocToProsemirrorJSON(ydoc, "default")
+      ).toJSON();
+    };
+
+    it("applies the document to the content, the text and the state", async () => {
+      const document = await buildDocument({ text: "Before" });
+      document.state = DocumentHelper.toState(document);
+      const doc = parser.parse("## Heading\n\nAfter");
+
+      DocumentHelper.applyProsemirrorToDocument(document, doc);
+
+      expect(document.content).toEqual(doc.toJSON());
+      expect(document.text).toEqual("## Heading\n\nAfter");
+      expect(document.changed("state")).toBeTruthy();
+      expect(contentOf(document.state)).toEqual(document.content);
+    });
+
+    it("continues the history of the existing state", async () => {
+      const document = await buildDocument({ text: "Before" });
+      const previous = DocumentHelper.toState(document);
+      document.state = previous;
+
+      DocumentHelper.applyProsemirrorToDocument(
+        document,
+        parser.parse("After")
+      );
+
+      const ydoc = new Y.Doc();
+      Y.applyUpdate(ydoc, previous);
+      Y.applyUpdate(ydoc, document.state);
+      expect(
+        Node.fromJSON(schema, yDocToProsemirrorJSON(ydoc, "default")).toJSON()
+      ).toEqual(document.content);
+    });
+
+    it("leaves a document without state without state", async () => {
+      const document = await buildDocument({ text: "Before" });
+
+      DocumentHelper.applyProsemirrorToDocument(
+        document,
+        parser.parse("After")
+      );
+
+      expect(document.state).toBeFalsy();
+      expect(document.text).toEqual("After");
     });
   });
 

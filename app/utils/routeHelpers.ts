@@ -150,6 +150,28 @@ export function documentPath(doc: Document): string {
 }
 
 /**
+ * Returns the path of a database, which leads to the page or collection it
+ * belongs to.
+ *
+ * @param databaseId the database id.
+ * @returns the path.
+ */
+export function databasePath(databaseId: string): string {
+  return `/db/${databaseId}`;
+}
+
+/**
+ * Returns the path of a database row, which opens the row's page.
+ *
+ * @param databaseId the database id.
+ * @param recordId the row id.
+ * @returns the path.
+ */
+export function databaseRowPath(databaseId: string, recordId: string): string {
+  return `/db/${databaseId}/row/${recordId}`;
+}
+
+/**
  * Returns the path to edit a document.
  *
  * @param doc the document to edit.
@@ -340,6 +362,9 @@ export const matchCollectionEdit = `/collection/${matchCollectionSlug}/overview/
 /** Route matcher for a document slug. */
 export const matchDocumentSlug =
   ":documentSlug([0-9a-zA-Z-_~]*-[a-zA-z0-9]{10,15})";
+
+/** Route matcher for a database id. */
+export const matchDatabaseId = ":databaseId([0-9a-fA-F-]{36})";
 
 /** Route matcher for the document edit screen. */
 export const matchDocumentEdit = `/doc/${matchDocumentSlug}/edit`;

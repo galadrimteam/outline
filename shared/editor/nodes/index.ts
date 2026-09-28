@@ -23,6 +23,7 @@ import CheckboxItem from "./CheckboxItem";
 import CheckboxList from "./CheckboxList";
 import CodeBlock from "./CodeBlock";
 import CodeFence from "./CodeFence";
+import Database from "./Database";
 import Doc from "./Doc";
 import Embed from "./Embed";
 import Emoji from "./Emoji";
@@ -115,6 +116,7 @@ export const richExtensions: Nodes = [
   CodeFence,
   Blockquote,
   Embed,
+  Database,
   Attachment,
   Video,
   Notice,

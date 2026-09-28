@@ -63,6 +63,7 @@ import { RedisPrefixHelper } from "@server/utils/RedisPrefixHelper";
 import { generateUrlId } from "@server/utils/url";
 import Collection from "./Collection";
 import Comment from "./Comment";
+import Database from "./Database";
 import FileOperation from "./FileOperation";
 import Group from "./Group";
 import GroupMembership from "./GroupMembership";
@@ -489,10 +490,11 @@ class Document extends ArchivableModel<
     model: Document,
     { transaction }: SaveOptions<InferAttributes<Document>>
   ) {
-    // templates, drafts, and archived documents don't appear in the structure
-    // and so never need to be updated when the title changes
+    // templates, drafts, archived documents and database row pages don't appear
+    // in the structure and so never need to be updated when the title changes
     if (
       model.archivedAt ||
+      model.databaseId ||
       !model.publishedAt ||
       !(
         model.changed("title") ||
@@ -661,6 +663,20 @@ class Document extends ArchivableModel<
   @AllowNull
   @Column(DataType.JSONB)
   sourceMetadata: SourceMetadata | null;
+
+  /** The database this document is a row page of. Row pages stay out of the sidebar tree. */
+  @BelongsTo(() => Database, "databaseId")
+  database: Database | null;
+
+  @ForeignKey(() => Database)
+  @AllowNull
+  @Column(DataType.UUID)
+  databaseId: string | null;
+
+  /** The engine record id of the row this document is the page of. */
+  @AllowNull
+  @Column(DataType.STRING)
+  databaseRecordId: string | null;
 
   @BelongsTo(() => Document, "parentDocumentId")
   parentDocument: Document | null;
@@ -1511,6 +1527,9 @@ class Document extends ArchivableModel<
             ? {
                 teamId: this.teamId,
                 parentDocumentId: this.id,
+                databaseId: {
+                  [Op.is]: null,
+                },
                 publishedAt: {
                   [Op.ne]: null,
                 },
@@ -1518,6 +1537,9 @@ class Document extends ArchivableModel<
             : {
                 teamId: this.teamId,
                 parentDocumentId: this.id,
+                databaseId: {
+                  [Op.is]: null,
+                },
                 publishedAt: {
                   [Op.ne]: null,
                 },

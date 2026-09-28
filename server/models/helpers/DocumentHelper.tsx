@@ -787,6 +787,20 @@ export class DocumentHelper {
       doc = parser.parse(text);
     }
 
+    return DocumentHelper.applyProsemirrorToDocument(document, doc);
+  }
+
+  /**
+   * Applies the given Prosemirror document to the document: its content, its
+   * Markdown text and, when it has one, its collaborative state, as a single
+   * change that continues the existing Y.js history. The document is not
+   * saved.
+   *
+   * @param document The document to apply the changes to.
+   * @param doc The new Prosemirror document.
+   * @returns The document.
+   */
+  static applyProsemirrorToDocument(document: Document, doc: Node) {
     document.content = doc.toJSON();
     document.text = serializer.serialize(doc);
 
@@ -799,15 +813,12 @@ export class DocumentHelper {
         throw new Error("type.doc not found");
       }
 
-      // apply new document to existing ydoc
       updateYFragment(type.doc, type, doc, {
         mapping: new Map(),
         isOMark: new Map(),
       });
 
-      const state = Y.encodeStateAsUpdate(ydoc);
-
-      document.state = Buffer.from(state);
+      document.state = Buffer.from(Y.encodeStateAsUpdate(ydoc));
       document.changed("state", true);
     }
 

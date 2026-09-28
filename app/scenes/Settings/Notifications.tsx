@@ -6,6 +6,7 @@ import {
   CheckboxIcon,
   CollectionIcon,
   CommentIcon,
+  DatabaseIcon,
   DocumentIcon,
   DoneIcon,
   EditIcon,
@@ -65,6 +66,14 @@ function Notifications() {
       title: t("Mentioned"),
       description: t(
         "Receive a notification when someone mentions you in a document or comment"
+      ),
+    },
+    {
+      event: NotificationEventType.AddedToDatabaseRecord,
+      icon: <DatabaseIcon />,
+      title: t("Added to a database row"),
+      description: t(
+        "Receive a notification when someone adds you to a person property of a database row"
       ),
     },
     {

@@ -28,6 +28,7 @@ import documentCreator, {
   authorizeDocumentPublish,
 } from "@server/commands/documentCreator";
 import documentDuplicator from "@server/commands/documentDuplicator";
+import { documentDatabasesDuplicator } from "plugins/databases/server/commands/documentDatabasesDuplicator";
 import documentLoader from "@server/commands/documentLoader";
 import documentMover from "@server/commands/documentMover";
 import documentPermanentDeleter from "@server/commands/documentPermanentDeleter";
@@ -295,6 +296,12 @@ router.post(
       filter !== undefined && hasFieldInFilter(filter, "archivedAt");
     if (!statusFilter && !filterIncludesArchivedAt) {
       where[Op.and].push({ archivedAt: { [Op.eq]: null } });
+    }
+
+    // The children of a page are its sub-pages: the row pages of a database it
+    // holds are listed by the database instead.
+    if (parentDocumentId) {
+      where[Op.and].push({ databaseId: { [Op.is]: null } });
     }
 
     // Sort=index needs the collection's documentStructure for ordering and
@@ -1566,6 +1573,11 @@ router.post(
       publish,
       recursive,
       parentDocumentId,
+    });
+    await documentDatabasesDuplicator({
+      user,
+      documents: response,
+      transaction,
     });
 
     ctx.body = {

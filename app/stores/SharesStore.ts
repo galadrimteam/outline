@@ -2,6 +2,7 @@ import invariant from "invariant";
 import { isUndefined, orderBy } from "es-toolkit/compat";
 import { action, computed, makeObservable, observable, override } from "mobx";
 import type { NavigationNode, PublicTeam } from "@shared/types";
+import type Collection from "~/models/Collection";
 import type Document from "~/models/Document";
 import Share from "~/models/Share";
 import type { PartialExcept } from "~/types";
@@ -142,12 +143,7 @@ export default class SharesStore extends Store<Share> {
       return;
     }
 
-    const parentIds = collection
-      .pathToDocument(document.id)
-      .slice(0, -1)
-      .map((p) => p.id);
-
-    for (const parentId of parentIds) {
+    for (const parentId of this.parentIdsOf(document, collection)) {
       const share = this.getByDocumentId(parentId);
 
       if (share?.includeChildDocuments && share.published) {
@@ -169,5 +165,29 @@ export default class SharesStore extends Store<Share> {
       ? (this.data.get(id) ??
           this.orderedData.find((share) => id.endsWith(share.urlId)))
       : undefined;
+  }
+
+  /**
+   * The ids of the documents above a document, from the collection root.
+   * Database row pages are not in the collection tree: their parents are
+   * followed up to the first one that is, which is where they would sit.
+   */
+  private parentIdsOf(document: Document, collection: Collection): string[] {
+    const path = collection.pathToDocument(document.id);
+    if (path.some((node) => node.id === document.id) && !document.databaseId) {
+      return path.slice(0, -1).map((node) => node.id);
+    }
+
+    const rowAncestorIds: string[] = [];
+    let parentId = document.parentDocumentId;
+    while (parentId && !rowAncestorIds.includes(parentId)) {
+      const treePath = collection.pathToDocument(parentId);
+      if (treePath.some((node) => node.id === parentId)) {
+        return [...treePath.map((node) => node.id), ...rowAncestorIds];
+      }
+      rowAncestorIds.unshift(parentId);
+      parentId = this.rootStore.documents.get(parentId)?.parentDocumentId;
+    }
+    return rowAncestorIds;
   }
 }

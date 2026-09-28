@@ -33,6 +33,7 @@ import FileStorage from "@server/storage/files";
 import {
   buildShare,
   buildCollection,
+  buildDatabase,
   buildUser,
   buildDocument,
   buildDraftDocument,
@@ -916,6 +917,66 @@ describe("#documents.list", () => {
     expect(res.status).toEqual(200);
     expect(body.data.length).toEqual(1);
     expect(body.data[0].id).toEqual(document.id);
+  });
+
+  it("should leave database row pages out of the children of a document", async () => {
+    const user = await buildUser();
+    const collection = await buildCollection({
+      userId: user.id,
+      teamId: user.teamId,
+    });
+    const parent = await buildDocument({
+      userId: user.id,
+      teamId: user.teamId,
+      collectionId: collection.id,
+    });
+    const child = await buildDocument({
+      userId: user.id,
+      teamId: user.teamId,
+      collectionId: collection.id,
+      parentDocumentId: parent.id,
+    });
+    const database = await buildDatabase({
+      teamId: user.teamId,
+      documentId: parent.id,
+    });
+    const row = await buildDocument({
+      userId: user.id,
+      teamId: user.teamId,
+      collectionId: collection.id,
+      parentDocumentId: parent.id,
+      databaseId: database.id,
+      databaseRecordId: "rec1",
+    });
+
+    const legacy = await server.post("/api/documents.list", user, {
+      body: { parentDocumentId: parent.id },
+    });
+    expect(legacy.status).toEqual(200);
+    expect((await legacy.json()).data.map((d: { id: string }) => d.id)).toEqual(
+      [child.id]
+    );
+
+    const filtered = await server.post("/api/documents.list", user, {
+      body: {
+        filters: [
+          { field: "parentDocumentId", operator: "eq", value: parent.id },
+        ],
+      },
+    });
+    expect(filtered.status).toEqual(200);
+    expect(
+      (await filtered.json()).data.map((d: { id: string }) => d.id)
+    ).toEqual([child.id]);
+
+    const inCollection = await server.post("/api/documents.list", user, {
+      body: { collectionId: collection.id },
+    });
+    const listed = (await inCollection.json()).data;
+    expect(listed.map((d: { id: string }) => d.id)).toContain(row.id);
+    expect(
+      listed.find((d: { id: string }) => d.id === row.id).databaseId
+    ).toEqual(database.id);
   });
 
   it("should not return draft documents", async () => {

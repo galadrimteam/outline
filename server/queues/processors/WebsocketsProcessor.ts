@@ -1,7 +1,9 @@
 import { compact, concat, uniq, uniqBy } from "es-toolkit/compat";
 import type { Server } from "socket.io";
+import type { DatabaseChangeEvent } from "@shared/databases/types";
 import {
   Comment,
+  Database,
   Document,
   Collection,
   FileOperation,
@@ -997,6 +999,40 @@ export default class WebsocketsProcessor {
             membersRoom,
             ...accessibleCollectionIds.map((id) => `collection-${id}`),
           ]);
+      }
+
+      case "databases.change": {
+        const database = await Database.findByPk(event.modelId);
+        if (!database) {
+          return;
+        }
+
+        let channels: string[];
+        if (database.documentId) {
+          const document = await Document.findByPk(database.documentId);
+          if (!document) {
+            return;
+          }
+          channels = await this.getDocumentEventChannels(event, document);
+        } else {
+          const collection = await Collection.findByPk(database.collectionId);
+          if (!collection) {
+            return;
+          }
+          channels = this.getCollectionEventChannels(event, collection);
+        }
+
+        // Ids only: readers fetch what they are allowed to see.
+        const payload: DatabaseChangeEvent = {
+          databaseId: database.id,
+          kinds: event.data.kinds,
+          recordIds: event.data.recordIds,
+          fieldIds: event.data.fieldIds,
+          viewIds: event.data.viewIds,
+          actorId: event.actorId || null,
+          origin: event.data.origin ?? null,
+        };
+        return socketio.to(channels).emit(event.name, payload);
       }
 
       case "users.signout":

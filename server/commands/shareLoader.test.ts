@@ -1,6 +1,7 @@
 import { faker } from "@faker-js/faker";
 import {
   buildCollection,
+  buildDatabase,
   buildDocument,
   buildShare,
   buildTeam,
@@ -385,6 +386,158 @@ describe("shareLoader", () => {
       });
 
       await expect(loadPublicShare({ id: share.id })).rejects.toThrow();
+    });
+  });
+
+  describe("database row pages", () => {
+    async function buildRowPageUnder(
+      parent: Awaited<ReturnType<typeof buildDocument>>,
+      recordId = "rec1"
+    ) {
+      const database = await buildDatabase({
+        teamId: parent.teamId,
+        documentId: parent.id,
+      });
+      return buildDocument({
+        teamId: parent.teamId,
+        collectionId: parent.collectionId,
+        parentDocumentId: parent.id,
+        databaseId: database.id,
+        databaseRecordId: recordId,
+      });
+    }
+
+    async function buildSharedTree(includeChildDocuments: boolean) {
+      const user = await buildUser();
+      const collection = await buildCollection({
+        userId: user.id,
+        teamId: user.teamId,
+      });
+      const shared = await buildDocument({
+        collectionId: collection.id,
+        userId: user.id,
+        teamId: user.teamId,
+      });
+      const child = await buildDocument({
+        parentDocumentId: shared.id,
+        collectionId: collection.id,
+        userId: user.id,
+        teamId: user.teamId,
+      });
+      const share = await buildShare({
+        includeChildDocuments,
+        userId: user.id,
+        teamId: user.teamId,
+        documentId: shared.id,
+      });
+      return { user, collection, shared, child, share };
+    }
+
+    it("should load a row page of a database under the shared document", async () => {
+      const { shared, child, share } = await buildSharedTree(true);
+      const directRow = await buildRowPageUnder(shared, "rec1");
+      const nestedRow = await buildRowPageUnder(child, "rec2");
+
+      const direct = await loadPublicShare({
+        id: share.id,
+        documentId: directRow.id,
+      });
+      expect(direct.document?.id).toEqual(directRow.id);
+      expect(direct.sharedTree?.children.map((node) => node.id)).toEqual([
+        child.id,
+      ]);
+
+      const nested = await loadPublicShare({
+        id: share.id,
+        documentId: nestedRow.id,
+      });
+      expect(nested.document?.id).toEqual(nestedRow.id);
+    });
+
+    it("should load the row page of a database held by a row page", async () => {
+      const { shared, share } = await buildSharedTree(true);
+      const row = await buildRowPageUnder(shared, "rec1");
+      const rowOfRow = await buildRowPageUnder(row, "rec2");
+
+      const result = await loadPublicShare({
+        id: share.id,
+        documentId: rowOfRow.id,
+      });
+      expect(result.document?.id).toEqual(rowOfRow.id);
+    });
+
+    it("should not load a row page when the share excludes child documents", async () => {
+      const { shared, share } = await buildSharedTree(false);
+      const row = await buildRowPageUnder(shared);
+
+      await expect(
+        loadPublicShare({ id: share.id, documentId: row.id })
+      ).rejects.toThrow();
+    });
+
+    it("should not load a row page of a database outside the share", async () => {
+      const { user, collection, share } = await buildSharedTree(true);
+      const outside = await buildDocument({
+        collectionId: collection.id,
+        userId: user.id,
+        teamId: user.teamId,
+      });
+      const row = await buildRowPageUnder(outside);
+
+      await expect(
+        loadPublicShare({ id: share.id, documentId: row.id })
+      ).rejects.toThrow();
+    });
+
+    it("should load a row page through a collection share", async () => {
+      const user = await buildUser();
+      const collection = await buildCollection({
+        userId: user.id,
+        teamId: user.teamId,
+      });
+      const database = await buildDatabase({
+        teamId: user.teamId,
+        collectionId: collection.id,
+      });
+      const row = await buildDocument({
+        collectionId: collection.id,
+        userId: user.id,
+        teamId: user.teamId,
+        databaseId: database.id,
+        databaseRecordId: "rec1",
+      });
+      const share = await buildShare({
+        userId: user.id,
+        teamId: user.teamId,
+        collectionId: collection.id,
+        includeChildDocuments: true,
+      });
+
+      const result = await loadPublicShare({
+        id: share.id,
+        documentId: row.id,
+      });
+      expect(result.document?.id).toEqual(row.id);
+    });
+
+    it("should return the share of the parent chain as parentShare", async () => {
+      const { user, shared, child, share } = await buildSharedTree(true);
+      const row = await buildRowPageUnder(child);
+      const rowShare = await buildShare({
+        includeChildDocuments: false,
+        userId: user.id,
+        teamId: user.teamId,
+        documentId: row.id,
+      });
+
+      const result = await loadShareWithParent({
+        documentId: row.id,
+        user,
+      });
+
+      expect(result.share.id).toEqual(rowShare.id);
+      expect(result.parentShare?.id).toEqual(share.id);
+      expect(shared.id).toEqual(share.documentId);
     });
   });
 });

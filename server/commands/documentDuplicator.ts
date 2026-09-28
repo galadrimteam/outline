@@ -169,6 +169,8 @@ async function duplicateRoots(
     // `duplicateItem`, so a large tree isn't held in memory at once.
     const childDocuments = await original.findChildDocuments(
       {
+        // Row pages belong to a database: its duplicate gets its own rows.
+        databaseId: { [Op.is]: null },
         archivedAt: original.archivedAt
           ? {
               [Op.ne]: null,
