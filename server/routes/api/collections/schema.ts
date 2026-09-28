@@ -294,3 +294,14 @@ export const CollectionsMoveSchema = BaseSchema.extend({
 });
 
 export type CollectionsMoveReq = z.infer<typeof CollectionsMoveSchema>;
+
+export const CollectionsRebuildStructureSchema = BaseSchema.extend({
+  body: BaseIdSchema.extend({
+    /** Document ids in the order the siblings should have, e.g. the tree in pre-order */
+    order: z.array(z.uuid()).max(500000).optional(),
+  }),
+});
+
+export type CollectionsRebuildStructureReq = z.infer<
+  typeof CollectionsRebuildStructureSchema
+>;

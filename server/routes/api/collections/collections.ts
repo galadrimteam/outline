@@ -978,4 +978,33 @@ router.post(
   }
 );
 
+router.post(
+  "collections.rebuildStructure",
+  auth({ role: UserRole.Admin }),
+  validate(T.CollectionsRebuildStructureSchema),
+  transaction(),
+  async (ctx: APIContext<T.CollectionsRebuildStructureReq>) => {
+    const { transaction } = ctx.state;
+    const { id, order } = ctx.input.body;
+    const { user } = ctx.state.auth;
+
+    const collection = await Collection.findByPk(id, {
+      userId: user.id,
+      includeDocumentStructure: true,
+      transaction,
+      lock: transaction.LOCK.NO_KEY_UPDATE,
+    });
+    authorize(user, "update", collection);
+
+    const documents = await collection.rebuildDocumentStructure(order ?? [], {
+      transaction,
+    });
+
+    ctx.body = {
+      success: true,
+      data: { documents },
+    };
+  }
+);
+
 export default router;
