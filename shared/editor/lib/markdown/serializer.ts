@@ -3,6 +3,8 @@
 // https://raw.githubusercontent.com/ProseMirror/prosemirror-markdown/master/src/to_markdown.js
 // forked for table support
 
+import { headerFormulaMarkdown } from "../tableFormulas";
+
 /** Options that control how a ProseMirror document is serialized to Markdown. */
 type Options = {
   /** Whether list items are rendered without blank lines between them. */
@@ -520,6 +522,11 @@ export class MarkdownSerializerState {
           .replace(/^\n+|\n+$/g, "")
           .replace(/\n/g, "<br>");
         this.append(content);
+        // Outline's own Markdown keeps a formula column's formula; standard
+        // Markdown has no place for it and keeps the computed values only.
+        if (i === 0 && cell.attrs.formula && !this.options.commonMark) {
+          this.append(headerFormulaMarkdown(cell.attrs.formula));
+        }
 
         // Pad to column width
         const padding = Math.max(0, columnWidths[j] - content.length);

@@ -12,6 +12,7 @@ import {
   SortAscendingIcon,
   SortDescendingIcon,
   TableColumnsDistributeIcon,
+  MathIcon,
 } from "outline-icons";
 import { CellSelection, selectedRect } from "prosemirror-tables";
 import { isNodeActive } from "@shared/editor/queries/isNodeActive";
@@ -31,6 +32,7 @@ import type {
 import { ArrowLeftIcon, ArrowRightIcon } from "~/components/Icons/ArrowIcon";
 import CircleIcon from "~/components/Icons/CircleIcon";
 import CellBackgroundColorPicker from "../components/CellBackgroundColorPicker";
+import ColumnFormulaInput from "../components/ColumnFormulaInput";
 import TableCell from "@shared/editor/nodes/TableCell";
 import { DottedCircleIcon } from "~/components/Icons/DottedCircleIcon";
 import type { EditorState } from "prosemirror-state";
@@ -95,6 +97,10 @@ export default function tableColMenuItems(ctx: SelectionContext): MenuItem[] {
     colColors.size === 1 && !TableCell.isPresetColor(activeColor)
       ? activeColor
       : undefined;
+  const header = state.doc.nodeAt(
+    tableMap.tableStart + tableMap.map.map[index]
+  );
+  const formula: string | null = header?.attrs.formula ?? null;
 
   return [
     {
@@ -152,6 +158,17 @@ export default function tableColMenuItems(ctx: SelectionContext): MenuItem[] {
           label: t("Sort descending"),
           attrs: { index, direction: "desc" },
           icon: <SortDescendingIcon />,
+        },
+      ],
+    },
+    {
+      label: formula ? t("Edit formula") : t("Formula"),
+      icon: <MathIcon />,
+      visible:
+        !isMultipleColumns && header?.type.spec.tableRole === "header_cell",
+      children: [
+        {
+          content: <ColumnFormulaInput index={index} formula={formula} />,
         },
       ],
     },

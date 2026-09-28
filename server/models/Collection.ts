@@ -1117,6 +1117,76 @@ class Collection extends ParanoidModel<
   };
 
   /**
+   * Build `documentStructure` from the documents themselves, in one save: every
+   * published, non archived document of the collection under its parent (at the
+   * root when its parent is not one of them), siblings in the order of `order`
+   * and, after the ones it does not name, oldest first. For bulk imports that
+   * created their documents with `deferStructure`: placing each one would
+   * rewrite the whole structure at every create.
+   *
+   * @param order document ids, typically the tree in pre-order.
+   * @param options the transaction to use.
+   * @returns the number of documents placed.
+   */
+  rebuildDocumentStructure = async (
+    order: string[],
+    options: { transaction?: Transaction } = {}
+  ): Promise<number> => {
+    const documents = await Document.unscoped().findAll({
+      attributes: [
+        "id",
+        "title",
+        "urlId",
+        "icon",
+        "color",
+        "parentDocumentId",
+        "createdAt",
+      ],
+      where: {
+        collectionId: this.id,
+        publishedAt: { [Op.ne]: null },
+        archivedAt: { [Op.is]: null },
+      },
+      transaction: options.transaction,
+    });
+    const ids = new Set(documents.map((document) => document.id));
+    const position = new Map(order.map((id, i) => [id, i]));
+    const byParent = new Map<string | null, Document[]>();
+    for (const document of documents) {
+      const parent =
+        document.parentDocumentId && ids.has(document.parentDocumentId)
+          ? document.parentDocumentId
+          : null;
+      byParent.set(parent, [...(byParent.get(parent) ?? []), document]);
+    }
+    const rank = (document: Document) =>
+      position.get(document.id) ?? Number.MAX_SAFE_INTEGER;
+    const build = (parent: string | null): NavigationNode[] =>
+      (byParent.get(parent) ?? [])
+        .sort(
+          (a, b) =>
+            rank(a) - rank(b) || a.createdAt.getTime() - b.createdAt.getTime()
+        )
+        .map((document) => ({
+          id: document.id,
+          title: document.title,
+          url: document.url,
+          icon: isNil(document.icon) ? undefined : document.icon,
+          color: isNil(document.color) ? undefined : document.color,
+          children: build(document.id),
+        }));
+
+    this.documentStructure = build(null);
+    this.changed("documentStructure", true);
+    await this.save({
+      fields: ["documentStructure"],
+      silent: true,
+      transaction: options.transaction,
+    });
+    return documents.length;
+  };
+
+  /**
    * Get all of the document ids that are in this collection by
    * recursively iterating through `documentStructure`.
    *

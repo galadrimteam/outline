@@ -1358,3 +1358,42 @@ export function toggleColumnBackground({
     return true;
   };
 }
+
+/**
+ * Turn a column into a formula column, or back into a plain one.
+ *
+ * @param index The index of the column
+ * @param formula The formula computing each cell of the column, or null
+ * @returns The command
+ */
+export function setColumnFormula({
+  index,
+  formula,
+}: {
+  index: number;
+  formula: string | null;
+}): Command {
+  return (state, dispatch) => {
+    if (!isInTable(state)) {
+      return false;
+    }
+
+    const rect = selectedRect(state);
+    const pos = rect.tableStart + rect.map.map[index];
+    const header = state.doc.nodeAt(pos);
+    if (!header || header.type.spec.tableRole !== "header_cell") {
+      return false;
+    }
+
+    if (dispatch) {
+      // The formula columns plugin fills the column in the same transaction.
+      dispatch(
+        state.tr.setNodeMarkup(pos, undefined, {
+          ...header.attrs,
+          formula: formula?.trim() || null,
+        })
+      );
+    }
+    return true;
+  };
+}

@@ -573,6 +573,14 @@ export const DocumentsCreateSchema = BaseSchema.extend({
     /** Boolean to denote if the doc should be published */
     publish: z.boolean().optional(),
 
+    /**
+     * Admins only: publish without placing the document in the collection's
+     * structure, which collections.rebuildStructure then builds once. Every
+     * create otherwise rewrites the whole structure: an import of thousands of
+     * documents into one collection slows down with each one.
+     */
+    deferStructure: z.boolean().optional(),
+
     /** Collection to create document within  */
     collectionId: z.uuid().nullish(),
 

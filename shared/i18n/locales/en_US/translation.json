@@ -2354,5 +2354,8 @@
   "Add title": "Add title",
   "Add content": "Add content",
   "Group admin": "Group admin",
-  "Member": "Member"
+  "Member": "Member",
+  "Formula": "Formula",
+  "Edit formula": "Edit formula",
+  "Press Enter to apply. Read other columns with prop(\"Name\"), as in Notion. Empty the field to turn the column back into plain text.": "Press Enter to apply. Read other columns with prop(\"Name\"), as in Notion. Empty the field to turn the column back into plain text."
 }

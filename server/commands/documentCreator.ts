@@ -36,6 +36,8 @@ type Props = Optional<
   publish?: boolean;
   template?: Template | null;
   index?: number;
+  /** Publish without placing the document in the collection's structure (bulk imports rebuild it once). */
+  deferStructure?: boolean;
 };
 
 type CreateLocation = {
@@ -173,6 +175,7 @@ export default async function documentCreator(
     sourceMetadata,
     createdById,
     lastModifiedById,
+    deferStructure,
   }: Props
 ): Promise<Document> {
   const { user } = ctx.state.auth;
@@ -262,6 +265,7 @@ export default async function documentCreator(
       index,
       event: !!document.title,
       data: eventData,
+      structure: !deferStructure,
     });
   }
 

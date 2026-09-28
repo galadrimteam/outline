@@ -2181,6 +2181,16 @@ table {
   tr:first-child td {
     border-top: 0;
   }
+
+  /* A formula column, as Notion marks its formula properties */
+  th[data-formula] > p:first-child::before {
+    content: "Σ";
+    margin-inline-end: 6px;
+    opacity: 0.7;
+  }
+  td.${EditorStyleHelper.tableFormulaCell} {
+    cursor: default;
+  }
   tr:first-child th[data-first-column],
   tr:first-child td[data-first-column] {
     border-top-left-radius: ${EditorStyleHelper.blockRadius};

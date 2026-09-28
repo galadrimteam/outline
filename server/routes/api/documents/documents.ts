@@ -36,6 +36,7 @@ import documentRestorer from "@server/commands/documentRestorer";
 import documentUpdater from "@server/commands/documentUpdater";
 import env from "@server/env";
 import {
+  AuthorizationError,
   InvalidRequestError,
   AuthenticationError,
   ValidationError,
@@ -1837,11 +1838,18 @@ router.post(
       preferences,
       templateId,
       createdAt,
+      deferStructure,
     } = ctx.input.body;
     const editorVersion = ctx.headers["x-editor-version"] as string | undefined;
 
     const { transaction } = ctx.state;
     const { user } = ctx.state.auth;
+
+    if (deferStructure && !user.isAdmin) {
+      throw AuthorizationError(
+        "Only admins can defer the collection structure"
+      );
+    }
 
     const { collection } = await authorizeDocumentCreate(ctx, {
       collectionId,
@@ -1882,6 +1890,7 @@ router.post(
       fullWidth,
       preferences,
       editorVersion,
+      deferStructure,
     });
 
     if (collection) {

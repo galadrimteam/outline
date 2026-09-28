@@ -1238,12 +1238,15 @@ class Document extends ArchivableModel<
       silent = false,
       event = true,
       data,
+      structure = true,
     }: {
       index?: number;
       collectionId: string | null | undefined;
       silent?: boolean;
       event?: boolean;
       data?: Record<string, unknown>;
+      /** false: leave the collection's structure alone, `Collection.rebuildDocumentStructure` places it later */
+      structure?: boolean;
     }
   ): Promise<this> => {
     const { user } = ctx.state.auth;
@@ -1266,7 +1269,7 @@ class Document extends ArchivableModel<
       this.collectionId = collectionId;
     }
 
-    if (this.collectionId) {
+    if (this.collectionId && structure) {
       const collection = await Collection.findByPk(this.collectionId, {
         includeDocumentStructure: true,
         transaction,

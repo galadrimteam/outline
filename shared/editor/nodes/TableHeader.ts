@@ -13,6 +13,7 @@ import {
   isValidCellMarks,
   setCellAttrs,
 } from "../lib/table";
+import { recomputeFormulas } from "../lib/tableFormulas";
 import {
   getCellsInColumn,
   getCellsInRow,
@@ -218,15 +219,31 @@ export default class TableHeader extends Node {
       tableRole: "header_cell",
       group: "cell",
       isolating: true,
-      parseDOM: [{ tag: "th", getAttrs: getCellAttrs }],
+      parseDOM: [
+        {
+          tag: "th",
+          getAttrs: (dom: HTMLElement | string) => ({
+            ...getCellAttrs(dom),
+            formula:
+              typeof dom === "string"
+                ? null
+                : dom.getAttribute("data-formula") || null,
+          }),
+        },
+      ],
       toDOM(node) {
-        return ["th", setCellAttrs(node), 0];
+        const attrs = node.attrs.formula
+          ? { ...setCellAttrs(node), "data-formula": node.attrs.formula }
+          : setCellAttrs(node);
+        return ["th", attrs, 0];
       },
       attrs: {
         colspan: { default: 1 },
         rowspan: { default: 1 },
         alignment: { default: null, validate: isValidCellAlignment },
         colwidth: { default: null },
+        // The formula computing every other cell of the column, see tableFormulas.
+        formula: { default: null },
         marks: {
           default: undefined,
           validate: (value: unknown) =>
@@ -245,6 +262,7 @@ export default class TableHeader extends Node {
       block: "th",
       getAttrs: (tok: Token) => ({
         alignment: isValidCellAlignment(tok.info) ? tok.info : null,
+        formula: tok.meta?.formula ?? null,
       }),
     };
   }
@@ -398,6 +416,48 @@ export default class TableHeader extends Node {
 
     return [
       columnDragPlugin,
+      new Plugin({
+        key: new PluginKey("table-formulas"),
+        appendTransaction: (transactions, _oldState, newState) => {
+          // A remote change was computed by the editor that made it.
+          const local = transactions.some(
+            (tr) => tr.docChanged && !tr.getMeta("y-sync$")?.isChangeOrigin
+          );
+          return local ? recomputeFormulas(newState) : null;
+        },
+        props: {
+          decorations: (state) => {
+            const decorations: Decoration[] = [];
+            state.doc.descendants((node, pos) => {
+              if (node.type.spec.tableRole !== "table") {
+                return true;
+              }
+              const map = TableMap.get(node);
+              for (let column = 0; column < map.width; column++) {
+                const header = node.nodeAt(map.map[column]);
+                if (!header?.attrs.formula) {
+                  continue;
+                }
+                for (let row = 1; row < map.height; row++) {
+                  const offset = map.map[row * map.width + column];
+                  const cell = node.nodeAt(offset);
+                  if (cell) {
+                    const from = pos + 1 + offset;
+                    decorations.push(
+                      Decoration.node(from, from + cell.nodeSize, {
+                        class: EditorStyleHelper.tableFormulaCell,
+                        contenteditable: "false",
+                      })
+                    );
+                  }
+                }
+              }
+              return false;
+            });
+            return DecorationSet.create(state.doc, decorations);
+          },
+        },
+      }),
       new Plugin({
         key: new PluginKey("table-header-first-column"),
         state: {

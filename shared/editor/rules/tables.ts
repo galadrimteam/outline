@@ -1,5 +1,6 @@
 import type MarkdownIt from "markdown-it";
 import { unescapeRawTableCell } from "../lib/markdown/tableCell";
+import { splitHeaderFormula } from "../lib/tableFormulas";
 
 const BR_TAG_REGEX = /<br\s*\/?>/gi;
 
@@ -108,6 +109,22 @@ function parseFencedCell(
 }
 
 export default function markdownTables(md: MarkdownIt): void {
+  // a header cell ending in {=…} heads a formula column: move the formula out
+  // of the text before it is parsed as inline Markdown
+  md.core.ruler.before("inline", "table-formulas", (state) => {
+    const tokens = state.tokens;
+    for (let i = 0; i < tokens.length - 1; i++) {
+      if (tokens[i].type === "th_open" && tokens[i + 1].type === "inline") {
+        const { text, formula } = splitHeaderFormula(tokens[i + 1].content);
+        if (formula) {
+          tokens[i].meta = { ...tokens[i].meta, formula };
+          tokens[i + 1].content = text;
+        }
+      }
+    }
+    return false;
+  });
+
   // insert a new rule after the "inline" rules are parsed
   md.core.ruler.after("inline", "tables-pm", (state) => {
     const tokens = state.tokens;
