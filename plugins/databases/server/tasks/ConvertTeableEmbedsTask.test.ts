@@ -16,6 +16,8 @@ import {
   buildDocument,
   buildUser,
 } from "@server/test/factories";
+import { setEngineFactory } from "../engine";
+import { FakeEngine } from "../engine/__mocks__/FakeEngine";
 import { ConvertTeableEmbedsTask } from "./ConvertTeableEmbedsTask";
 
 const past = new Date("2024-01-01T00:00:00.000Z");
@@ -97,10 +99,16 @@ describe("ConvertTeableEmbedsTask", () => {
     notifyUpdate = vi
       .spyOn(APIUpdateExtension, "notifyUpdate")
       .mockResolvedValue();
+    const engine = new FakeEngine();
+    vi.spyOn(engine, "describeTable").mockImplementation(async (_, ref) => ({
+      name: `Table ${ref.externalTableId}`,
+    }));
+    setEngineFactory(() => engine);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    setEngineFactory();
   });
 
   it("converts an embed through the collaborative state, silently", async () => {
@@ -306,6 +314,53 @@ describe("ConvertTeableEmbedsTask", () => {
 
     await database.reload();
     expect(database.documentId).toBe(home.id);
+  });
+
+  it("names databases shown inline after their table, not after the page holding their rows", async () => {
+    const context = await setup();
+    const page = await buildPage(
+      context,
+      doc(
+        paragraph("Logs"),
+        embed(framed("tblA")),
+        paragraph("Parcours"),
+        embed(framed("tblB"))
+      ),
+      "Journal de Test"
+    );
+    for (const tableId of ["tblA", "tblB"]) {
+      const earlier = await buildDatabase({
+        teamId: context.admin.teamId,
+        collectionId: context.collection.id,
+        externalBaseId: "bse1",
+        externalTableId: tableId,
+      });
+      await buildDocument({
+        teamId: context.admin.teamId,
+        userId: context.admin.id,
+        collectionId: context.collection.id,
+        parentDocumentId: page.id,
+        databaseId: earlier.id,
+        databaseRecordId: `rec-${tableId}`,
+      });
+      await earlier.destroy();
+    }
+
+    await new ConvertTeableEmbedsTask().perform({
+      teamId: context.admin.teamId,
+      documentId: page.id,
+    });
+
+    const databases = await Database.findAll({
+      where: { teamId: context.admin.teamId },
+      order: [["externalTableId", "ASC"]],
+    });
+    expect(
+      databases.map((database) => [database.title, database.documentId])
+    ).toEqual([
+      ["Table tblA", page.id],
+      ["Table tblB", page.id],
+    ]);
   });
 
   it("rolls back a failed document and goes on with the others", async () => {

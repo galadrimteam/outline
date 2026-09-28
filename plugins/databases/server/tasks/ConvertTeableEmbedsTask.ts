@@ -10,6 +10,8 @@ import { Collection, Database, Document, User } from "@server/models";
 import { DocumentHelper } from "@server/models/helpers/DocumentHelper";
 import { BaseTask, TaskPriority } from "@server/queues/tasks/base/BaseTask";
 import { sequelize } from "@server/storage/database";
+import { engineFor } from "../engine";
+import type { DatabaseRef } from "../engine/DatabaseEngine";
 import type { ResolvedDatabase, TeableEmbed } from "../utils/teableEmbeds";
 import { convertTeableEmbeds, findTeableEmbeds } from "../utils/teableEmbeds";
 
@@ -366,7 +368,15 @@ class DatabaseResolver {
       { ...target, collectionId: target.collectionId },
       transaction
     );
-    const title = (anchor.title ?? embed.heading ?? target.title).slice(0, 255);
+    const title = (
+      anchor.title ??
+      embed.heading ??
+      (await tableName({
+        externalBaseId: embed.baseId,
+        externalTableId: tableId,
+      })) ??
+      target.title
+    ).slice(0, 255);
 
     if (this.options.dryRun) {
       const planned = {
@@ -427,7 +437,12 @@ class DatabaseResolver {
   ): Promise<Anchor> {
     const rowPagesParent = await this.rowPagesParent(tableId, transaction);
     if (rowPagesParent) {
-      return rowPagesParent;
+      // A page holds the row pages of every database it shows inline: its
+      // title names a database only when the database fills it.
+      const filled =
+        rowPagesParent.documentId === target.documentId &&
+        embeds.some((embed) => embed.fullPage);
+      return { ...rowPagesParent, title: filled ? rowPagesParent.title : null };
     }
 
     if (target.documentId && embeds.some((embed) => embed.fullPage)) {
@@ -478,7 +493,10 @@ class DatabaseResolver {
     return {
       collectionId: target.collectionId,
       documentId: null,
-      title: null,
+      title:
+        !target.documentId && embeds.some((embed) => embed.fullPage)
+          ? target.title
+          : null,
     };
   }
 
@@ -558,6 +576,22 @@ class DatabaseResolver {
           title: parent.title,
         }
       : null;
+  }
+}
+
+/** The table's name in its engine, or null when the engine cannot tell. */
+async function tableName(ref: DatabaseRef): Promise<string | null> {
+  try {
+    return (
+      (await engineFor({ engine: "teable" }).describeTable("system", ref))
+        .name || null
+    );
+  } catch (error) {
+    Logger.warn("Could not read the name of a Teable table", {
+      tableId: ref.externalTableId,
+      error: toError(error).message,
+    });
+    return null;
   }
 }
 
