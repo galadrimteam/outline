@@ -242,6 +242,49 @@ describe("convertTeableEmbeds", () => {
     expect(output.content?.[3]).toBe(input.content?.[3]);
   });
 
+  it("converts a bare link to a Teable view inside a toggle, not a link inside text", () => {
+    const link = (href: string, text = href): ProsemirrorData => ({
+      type: "paragraph",
+      content: [
+        { type: "text", text, marks: [{ type: "link", attrs: { href } }] },
+      ],
+    });
+    const inText: ProsemirrorData = {
+      type: "paragraph",
+      content: [
+        { type: "text", text: "See " },
+        {
+          type: "text",
+          text: "the board",
+          marks: [{ type: "link", attrs: { href: framed } }],
+        },
+      ],
+    };
+    const toggle: ProsemirrorData = {
+      type: "container_toggle",
+      content: [paragraph("Gantt"), link(framedDev)],
+    };
+    const input = doc(toggle, inText, link(youtube));
+
+    const { doc: output, converted } = convertTeableEmbeds(
+      input,
+      (e) => ({ databaseId: `db-${e.tableId}` }),
+      ids()
+    );
+
+    expect(converted).toBe(1);
+    expect(output.content?.[0].content?.[1]).toMatchObject({
+      type: "database",
+      attrs: {
+        databaseId: "db-tblDev",
+        viewIds: ["viwDev"],
+        legacyHref: framedDev,
+      },
+    });
+    expect(output.content?.[1]).toBe(inText);
+    expect(output.content?.[2]).toBe(input.content?.[2]);
+  });
+
   it("returns the document itself when nothing resolves", () => {
     const input = doc(paragraph("Intro"), embed(framed));
 

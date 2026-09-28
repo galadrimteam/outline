@@ -161,8 +161,11 @@ function describeEmbed(
 ): TeableEmbed | null {
   const siblings = parent.content ?? [];
   const node = siblings[index];
-  const href = node.attrs?.href;
-  if (node.type !== "embed" || typeof href !== "string") {
+  const href =
+    node.type === "embed" && typeof node.attrs?.href === "string"
+      ? node.attrs.href
+      : soleLinkHref(node);
+  if (!href) {
     return null;
   }
 
@@ -196,6 +199,24 @@ function headingBefore(
     return textOf(sibling).trim() || null;
   }
   return null;
+}
+
+// The migrator writes a database nested in a Notion toggle as a bare link rather than an embed: a paragraph holding
+// nothing but a link to a Teable view is converted too.
+function soleLinkHref(node: ProsemirrorData): string | null {
+  if (node.type !== "paragraph") {
+    return null;
+  }
+  const parts = (node.content ?? []).filter(
+    (child) => !(child.type === "text" && !(child.text ?? "").trim())
+  );
+  const [part] = parts;
+  if (parts.length !== 1 || part.type !== "text") {
+    return null;
+  }
+  const link = part.marks?.find((mark) => mark.type === "link");
+  const href = link?.attrs?.href;
+  return typeof href === "string" && parseTeableHref(href) ? href : null;
 }
 
 function isBlank(node: ProsemirrorData): boolean {
