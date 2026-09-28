@@ -988,13 +988,18 @@ router.post(
     const { id, order } = ctx.input.body;
     const { user } = ctx.state.auth;
 
+    authorize(
+      user,
+      "update",
+      await Collection.findByPk(id, { userId: user.id, transaction })
+    );
+    // locked apart: Postgres refuses the lock on the memberships' outer join
     const collection = await Collection.findByPk(id, {
-      userId: user.id,
       includeDocumentStructure: true,
       transaction,
       lock: transaction.LOCK.NO_KEY_UPDATE,
+      rejectOnEmpty: true,
     });
-    authorize(user, "update", collection);
 
     const documents = await collection.rebuildDocumentStructure(order ?? [], {
       transaction,
