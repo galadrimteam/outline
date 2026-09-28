@@ -22,6 +22,16 @@ export { default as DatabaseAutomation } from "./DatabaseAutomation";
 
 export { default as DocumentInsight } from "./DocumentInsight";
 
+export { default as EngineTable } from "./EngineTable";
+
+export { default as EngineField } from "./EngineField";
+
+export { default as EngineView } from "./EngineView";
+
+export { default as EngineRecord } from "./EngineRecord";
+
+export { default as EngineRecordHistory } from "./EngineRecordHistory";
+
 export { default as Event } from "./Event";
 
 export { default as ExternalGroup } from "./ExternalGroup";

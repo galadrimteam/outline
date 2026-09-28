@@ -2,6 +2,8 @@ import { InternalError } from "@server/errors";
 import type { Database } from "@server/models";
 import env from "../env";
 import type { DatabaseTablesDuplicator } from "./DatabaseTablesDuplicator";
+import { OutlineTablesDuplicator } from "./outline/OutlineTablesDuplicator";
+import { processOutlineStore } from "./outline/processCaches";
 import { TeableClient } from "./teable/TeableClient";
 import { TeableIdentity } from "./teable/TeableIdentity";
 import { TeableTablesDuplicator } from "./teable/TeableTablesDuplicator";
@@ -14,7 +16,7 @@ import { TeableTablesDuplicator } from "./teable/TeableTablesDuplicator";
  * @throws InternalError when the engine is unknown or not configured.
  */
 export function tablesDuplicatorFor(
-  database: Pick<Database, "engine">
+  database: DatabaseTablesDuplicatorTarget
 ): DatabaseTablesDuplicator {
   return factory(database);
 }
@@ -30,11 +32,18 @@ export function setTablesDuplicatorFactory(
   factory = next ?? defaultFactory;
 }
 
+/** What a duplicator is chosen by: the database's engine, and its team. */
+export type DatabaseTablesDuplicatorTarget = Pick<Database, "engine"> &
+  Partial<Pick<Database, "teamId">>;
+
 export type DatabaseTablesDuplicatorFactory = (
-  database: Pick<Database, "engine">
+  database: DatabaseTablesDuplicatorTarget
 ) => DatabaseTablesDuplicator;
 
 const defaultFactory: DatabaseTablesDuplicatorFactory = (database) => {
+  if (database.engine === "outline") {
+    return new OutlineTablesDuplicator(processOutlineStore(), database.teamId);
+  }
   if (database.engine !== "teable") {
     throw InternalError(`Unknown database engine "${database.engine}"`);
   }
