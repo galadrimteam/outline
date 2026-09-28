@@ -34,6 +34,18 @@ describe("pageFields", () => {
       pageFields(fields, [board, table], "icon").map((field) => field.id)
     ).toEqual(["notes", "status"]);
   });
+
+  it("shows a date range as one property, its start", () => {
+    const start = makeField({
+      id: "start",
+      type: DatabaseFieldType.Date,
+      meta: { endFieldId: "end" },
+    });
+    const end = makeField({ id: "end", type: DatabaseFieldType.Date });
+    expect(
+      pageFields([title, start, end, notes], []).map((field) => field.id)
+    ).toEqual(["start", "notes"]);
+  });
 });
 
 describe("visibility", () => {

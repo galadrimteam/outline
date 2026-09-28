@@ -23,7 +23,7 @@ export interface PageProperties {
 /**
  * The properties listed on a row page, in the order of the database's first table (Notion lists
  * them in the order of the database), without the title and the icon, which the page header
- * shows.
+ * shows, nor the end field of a date range, which shows with its start as one property.
  *
  * @param fields the database fields.
  * @param views the database views.
@@ -39,7 +39,15 @@ export function pageFields(
   const reference =
     ordered.find((view) => view.layout === DatabaseLayout.Table) ?? ordered[0];
   const sorted = reference ? orderedFields(fields, reference) : fields;
-  return sorted.filter((field) => !field.isPrimary && field.id !== iconFieldId);
+  const rangeEnds = new Set(
+    fields.flatMap((field) =>
+      field.meta?.endFieldId ? [field.meta.endFieldId] : []
+    )
+  );
+  return sorted.filter(
+    (field) =>
+      !field.isPrimary && field.id !== iconFieldId && !rangeEnds.has(field.id)
+  );
 }
 
 /**
