@@ -4,7 +4,7 @@ import styled from "styled-components";
 import { CellText, EmptyValue, InlineInput } from "./components/styles";
 import { isWritable } from "./editable";
 import { cellValueToText, numberInputValue, parseNumberInput } from "./format";
-import { useCellLocale, useCommitOnUnmount } from "./hooks";
+import { moveCaretToEnd, useCellLocale, useCommitOnUnmount } from "./hooks";
 import type {
   CellDefinition,
   CellEditorProps,
@@ -16,6 +16,7 @@ export const numberCell: CellDefinition = {
   Renderer: NumberRenderer,
   Editor: NumberEditor,
   isEditable: isWritable,
+  opensOnTyping: true,
 };
 
 function NumberRenderer({ field, value, variant, wrap }: CellRendererProps) {
@@ -36,10 +37,16 @@ function NumberRenderer({ field, value, variant, wrap }: CellRendererProps) {
   );
 }
 
-function NumberEditor({ field, value, onChange, onClose }: CellEditorProps) {
+function NumberEditor({
+  field,
+  value,
+  onChange,
+  onClose,
+  initialInput,
+}: CellEditorProps) {
   const formatting = field.options.formatting;
   const initial = numberInputValue(value, formatting);
-  const [draft, setDraft] = React.useState(initial);
+  const [draft, setDraft] = React.useState(initialInput ?? initial);
 
   useCommitOnUnmount(draft, (text) => {
     if (text.trim() === initial) {
@@ -77,6 +84,7 @@ function NumberEditor({ field, value, onChange, onClose }: CellEditorProps) {
       onChange={handleChange}
       onKeyDown={handleKeyDown}
       onBlur={onClose}
+      onFocus={moveCaretToEnd}
     />
   );
 }

@@ -2,6 +2,7 @@ import * as React from "react";
 import { useTranslation } from "react-i18next";
 import type { DatabaseView } from "@shared/databases/types";
 import { Popover, PopoverTrigger } from "~/components/primitives/Popover";
+import Tooltip from "~/components/Tooltip";
 import useStores from "~/hooks/useStores";
 import type Database from "~/models/Database";
 import { MenuInput, MenuPanel } from "./components";
@@ -17,6 +18,8 @@ interface Props {
   onCreated?: (fieldId: string) => void;
   /** The element that opens the picker ("+" header, "Add a property"). */
   children: React.ReactElement;
+  /** A tooltip on the trigger, for a trigger without a visible label. */
+  tooltip?: string;
 }
 
 /**
@@ -25,7 +28,13 @@ interface Props {
  * @param props the database, the view and the trigger.
  * @returns the picker with its trigger.
  */
-export function AddFieldButton({ database, view, onCreated, children }: Props) {
+export function AddFieldButton({
+  database,
+  view,
+  onCreated,
+  children,
+  tooltip,
+}: Props) {
   const { t } = useTranslation();
   const stores = useStores();
   const [open, setOpen] = React.useState(false);
@@ -57,7 +66,9 @@ export function AddFieldButton({ database, view, onCreated, children }: Props) {
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger>{children}</PopoverTrigger>
+      <Tooltip content={tooltip} placement="top">
+        <PopoverTrigger>{children}</PopoverTrigger>
+      </Tooltip>
       <MenuPanel
         aria-label={t("Add a property")}
         side="bottom"

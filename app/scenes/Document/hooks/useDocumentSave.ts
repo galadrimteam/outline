@@ -1,4 +1,5 @@
 import { cloneDeep, debounce, isEqual } from "es-toolkit/compat";
+import { reaction, runInAction } from "mobx";
 import { Node } from "prosemirror-model";
 import type { Selection } from "prosemirror-state";
 import { AllSelection, TextSelection } from "prosemirror-state";
@@ -50,6 +51,39 @@ interface UseDocumentSaveResult {
   handleChangeIcon: (icon: string | null, color: string | null) => void;
   onFileUploadStart: () => void;
   onFileUploadStop: () => void;
+}
+
+/** What the title editor does with a title the document got from elsewhere. */
+export type IncomingTitleAction = "ignore" | "adopt" | "keep" | "keepAndSave";
+
+/**
+ * Decides what becomes of a document title that changed without being typed
+ * here: a rename by someone else or by a database row, or the server's answer
+ * to a save. Nothing typed may be lost, and a title nobody is typing follows
+ * the server; the server trims titles, so spaces at the ends do not count.
+ *
+ * @param incoming the document's new title.
+ * @param typed the title as typed in this editor.
+ * @param saved the last title this editor saved or took from the server.
+ * @returns "adopt" to show the incoming title, "keep" to put the typed one
+ * back, "keepAndSave" to put it back and save it, "ignore" when they agree.
+ */
+export function incomingTitleAction({
+  incoming,
+  typed,
+  saved,
+}: {
+  incoming: string;
+  typed: string;
+  saved: string;
+}): IncomingTitleAction {
+  if (incoming === typed) {
+    return "ignore";
+  }
+  if (incoming.trim() === typed.trim()) {
+    return "keep";
+  }
+  return typed.trim() === saved.trim() ? "adopt" : "keepAndSave";
 }
 
 export function shouldAutoDeleteDraftOnUnmount({
@@ -112,6 +146,7 @@ export function useDocumentSave({
   isEditorDirtyRef.current = isEditorDirty;
   const titleRef = useRef(title);
   titleRef.current = title;
+  const savedTitleRef = useRef(document.title);
 
   const updateIsDirty = useCallback(() => {
     const doc = editorRef.current?.view.state.doc;
@@ -158,16 +193,19 @@ export function useDocumentSave({
       if (
         options.autosave &&
         !isEditorDirtyRef.current &&
-        !document.isDirty()
+        !document.isDirty() &&
+        titleRef.current.trim() === savedTitleRef.current.trim()
       ) {
         return;
       }
 
       setIsSaving(true);
       setIsPublishing(!!options.publish);
+      const sentTitle = document.title;
 
       try {
         const savedDocument = await document.save(undefined, options);
+        savedTitleRef.current = sentTitle;
         isEditorDirtyRef.current = false;
         if (isMounted()) {
           setIsEditorDirty(false);
@@ -214,6 +252,40 @@ export function useDocumentSave({
         AUTOSAVE_DELAY
       ),
     []
+  );
+
+  // galadrim: the title can change under the editor (another person's rename,
+  // the title of a database row set from its table, a save's answer landing
+  // while typing). Show it unless something typed here is not saved yet.
+  useEffect(
+    () =>
+      reaction(
+        () => document.title,
+        (incoming) => {
+          const typed = titleRef.current;
+          const action = incomingTitleAction({
+            incoming,
+            typed,
+            saved: savedTitleRef.current,
+          });
+          if (action === "adopt") {
+            setTitle(incoming);
+            titleRef.current = incoming;
+            savedTitleRef.current = incoming;
+            updateIsDirtyRef.current();
+            return;
+          }
+          if (action === "keep" || action === "keepAndSave") {
+            runInAction(() => {
+              document.title = typed;
+            });
+          }
+          if (action === "keepAndSave") {
+            autosave();
+          }
+        }
+      ),
+    [document, autosave]
   );
 
   /**

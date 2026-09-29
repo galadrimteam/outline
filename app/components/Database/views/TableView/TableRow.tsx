@@ -11,6 +11,7 @@ import { SelectionCheckbox } from "~/components/SelectionCheckbox";
 import type Database from "~/models/Database";
 import { DragHandleIcon } from "../../toolbar/icons";
 import type { TableColumn } from "./layout";
+import { frozenEdge } from "./layout";
 import { Gutter, GutterControl, RowLine } from "./styles";
 import { TableCell } from "./TableCell";
 
@@ -32,6 +33,8 @@ interface Props {
   /** The active column of this row, when the active cell is in it. */
   activeFieldId?: string;
   isEditing: boolean;
+  /** What the reader typed on the active cell to start editing it. */
+  editInput?: string;
   dropSide?: DatabaseRecordPosition;
   measureElement: (element: Element | null) => void;
   onToggleSelected: (recordId: string, event: React.MouseEvent) => void;
@@ -71,6 +74,7 @@ export const TableRow = observer(function TableRow_({
   isSelected,
   activeFieldId,
   isEditing,
+  editInput,
   dropSide,
   measureElement,
   onToggleSelected,
@@ -86,6 +90,7 @@ export const TableRow = observer(function TableRow_({
     disabled: !draggable || readOnly,
   });
   const { setNodeRef: setDropRef } = useDroppable({ id: record.id });
+  const scrollMarginLeft = frozenEdge(columns);
 
   const setRef = React.useCallback(
     (element: HTMLDivElement | null) => {
@@ -142,6 +147,10 @@ export const TableRow = observer(function TableRow_({
           record={record}
           isActive={activeFieldId === column.field.id}
           isEditing={isEditing && activeFieldId === column.field.id}
+          initialInput={
+            activeFieldId === column.field.id ? editInput : undefined
+          }
+          scrollMarginLeft={scrollMarginLeft}
           wrap={wrap}
           readOnly={readOnly}
           onActivate={onActivate}

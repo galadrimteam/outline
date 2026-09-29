@@ -23,7 +23,8 @@ import { toast } from "sonner";
 import styled, { css } from "styled-components";
 import type { DatabaseView } from "@shared/databases/types";
 import { DatabaseLayout } from "@shared/databases/types";
-import { hideScrollbars, s } from "@shared/styles";
+import { s } from "@shared/styles";
+import ConfirmationDialog from "~/components/ConfirmationDialog";
 import { DropdownMenu } from "~/components/Menu/DropdownMenu";
 import {
   Popover,
@@ -34,9 +35,12 @@ import { createAction } from "~/actions";
 import { useMenuAction } from "~/hooks/useMenuAction";
 import useStores from "~/hooks/useStores";
 import type Database from "~/models/Database";
-import { isStackable } from "./boardModel";
 import { LayoutIcon } from "./LayoutIcon";
+import { newViewSettings } from "./newViewDefaults";
 import { PanelAction } from "./toolbar/components";
+import { useIsWrapped } from "./useIsWrapped";
+import { useTabStripMetrics } from "./useTabStripMetrics";
+import { splitTabs, stripMinimum } from "./viewTabsOverflow";
 
 interface Props {
   database: Database;
@@ -59,6 +63,7 @@ export const creatableLayouts = [
   DatabaseLayout.Gallery,
   DatabaseLayout.List,
   DatabaseLayout.Timeline,
+  DatabaseLayout.Form,
 ];
 
 /**
@@ -105,7 +110,7 @@ export const ViewTabs = observer(function ViewTabs({
   actions,
 }: Props) {
   const { t } = useTranslation();
-  const { databases } = useStores();
+  const { databases, dialogs } = useStores();
   const [menuViewId, setMenuViewId] = React.useState<string>();
   const [renamingViewId, setRenamingViewId] = React.useState<string>();
 
@@ -142,16 +147,21 @@ export const ViewTabs = observer(function ViewTabs({
 
   const handleCreate = React.useCallback(
     async (layout: DatabaseLayout) => {
-      const stackField = (database.fields ?? []).find(isStackable);
+      const { columnMeta, ...settings } = newViewSettings(
+        layout,
+        database.fields ?? []
+      );
       try {
-        const view = await databases.createView(database.id, {
+        const created = await databases.createView(database.id, {
           name: layoutName(layout, t),
           layout,
-          options:
-            layout === DatabaseLayout.Board && stackField
-              ? { stackFieldId: stackField.id }
-              : undefined,
+          ...settings,
         });
+        const view = columnMeta
+          ? await databases
+              .updateView(database.id, created.id, { columnMeta })
+              .catch(() => created)
+          : created;
         onViewCreated?.(view);
         onSelect(view.id);
       } catch (_err) {
@@ -189,13 +199,23 @@ export const ViewTabs = observer(function ViewTabs({
   const handleDuplicate = React.useCallback(
     async (view: DatabaseView) => {
       setMenuViewId(undefined);
+      let copy: DatabaseView;
       try {
-        const copy = await databases.duplicateView(database.id, view.id);
-        onViewCreated?.(copy);
-        onSelect(copy.id);
+        copy = await databases.duplicateView(database.id, view.id);
       } catch (_err) {
         toast.error(t("Couldn’t duplicate the view"));
+        return;
       }
+      // The engines add the copy last; Notion puts it next to its source.
+      const moved = databases.reorderView(
+        database.id,
+        copy.id,
+        view.id,
+        "after"
+      );
+      onViewCreated?.(copy);
+      onSelect(copy.id);
+      await moved.catch(() => toast.error(t("Couldn’t move the view")));
     },
     [databases, database.id, onSelect, onViewCreated, t]
   );
@@ -203,57 +223,140 @@ export const ViewTabs = observer(function ViewTabs({
   const handleDelete = React.useCallback(
     (view: DatabaseView) => {
       setMenuViewId(undefined);
-      databases
-        .deleteView(database.id, view.id)
-        .catch(() => toast.error(t("Couldn’t delete the view")));
+      dialogs.openModal({
+        title: t("Delete view?"),
+        content: (
+          <ConfirmationDialog
+            danger
+            submitText={t("Delete")}
+            onSubmit={async () => {
+              try {
+                await databases.deleteView(database.id, view.id);
+              } catch (_err) {
+                toast.error(t("Couldn’t delete the view"));
+              }
+            }}
+          >
+            {t(
+              "The view “{{ name }}” will be deleted for everyone. Its rows stay in the database.",
+              { name: view.name || t("Untitled") }
+            )}
+          </ConfirmationDialog>
+        ),
+      });
     },
-    [databases, database.id, t]
+    [databases, database.id, dialogs, t]
+  );
+
+  const { stripRef, measureRef, metrics } = useTabStripMetrics({
+    gap: TAB_GAP,
+    addWidth: readOnly ? 0 : ADD_WIDTH,
+  });
+  const activeIndex = views.findIndex((view) => view.id === activeViewId);
+  const split =
+    metrics && metrics.widths.length === views.length
+      ? splitTabs(metrics, activeIndex)
+      : undefined;
+  const shownViews = split ? split.visible.map((index) => views[index]) : views;
+  const hiddenViews = split ? split.hidden.map((index) => views[index]) : [];
+  const minStripWidth = metrics ? stripMinimum(metrics, activeIndex) : 0;
+  const barRef = React.useRef<HTMLDivElement>(null);
+  const actionsRef = React.useRef<HTMLDivElement>(null);
+  const isWrapped = useIsWrapped(barRef, stripRef, actionsRef);
+
+  const moreAction = useMenuAction(
+    hiddenViews.map((view) =>
+      createAction({
+        id: `view-${view.id}`,
+        name: view.name || t("Untitled"),
+        section: "Database",
+        icon: <LayoutIcon layout={view.layout} />,
+        perform: () => onSelect(view.id),
+      })
+    )
   );
 
   return (
-    <Bar>
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        modifiers={[restrictToHorizontalAxis]}
-        onDragEnd={handleDragEnd}
+    <Bar ref={barRef} $isWrapped={isWrapped}>
+      <Strip
+        ref={stripRef}
+        $isWrapped={isWrapped}
+        style={{ minWidth: `min(100%, ${minStripWidth}px)` }}
       >
-        <Tabs role="tablist" aria-label={t("Views")}>
-          <SortableContext
-            items={views.map((view) => view.id)}
-            strategy={horizontalListSortingStrategy}
-          >
-            {views.map((view) => (
-              <ViewTab
-                key={view.id}
-                view={view}
-                isActive={view.id === activeViewId}
-                readOnly={readOnly}
-                isMenuOpen={menuViewId === view.id}
-                isRenaming={renamingViewId === view.id}
-                canDelete={views.length > 1}
-                onSelect={onSelect}
-                onOpenMenu={setMenuViewId}
-                onStartRename={setRenamingViewId}
-                onRename={handleRename}
-                onDuplicate={handleDuplicate}
-                onDelete={handleDelete}
-              />
-            ))}
-          </SortableContext>
-          {!readOnly && (
-            <DropdownMenu action={addAction} ariaLabel={t("Add a view")}>
-              <AddButton aria-label={t("Add a view")}>
-                <PlusIcon size={18} />
-              </AddButton>
-            </DropdownMenu>
-          )}
-        </Tabs>
-      </DndContext>
-      {actions && <Actions>{actions}</Actions>}
+        <Measure ref={measureRef} aria-hidden>
+          {views.map((view) => (
+            <Tab key={view.id} as="span" $isActive={false}>
+              <TabFace view={view} />
+            </Tab>
+          ))}
+          <MoreButton as="span">
+            {t("{{ count }} more", { count: views.length })}
+          </MoreButton>
+        </Measure>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          modifiers={[restrictToHorizontalAxis]}
+          onDragEnd={handleDragEnd}
+        >
+          <Tabs role="tablist" aria-label={t("Views")}>
+            <SortableContext
+              items={shownViews.map((view) => view.id)}
+              strategy={horizontalListSortingStrategy}
+            >
+              {shownViews.map((view) => (
+                <ViewTab
+                  key={view.id}
+                  view={view}
+                  isActive={view.id === activeViewId}
+                  readOnly={readOnly}
+                  isMenuOpen={menuViewId === view.id}
+                  isRenaming={renamingViewId === view.id}
+                  canDelete={views.length > 1}
+                  onSelect={onSelect}
+                  onOpenMenu={setMenuViewId}
+                  onStartRename={setRenamingViewId}
+                  onRename={handleRename}
+                  onDuplicate={handleDuplicate}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </SortableContext>
+          </Tabs>
+        </DndContext>
+        {hiddenViews.length > 0 && (
+          <DropdownMenu action={moreAction} ariaLabel={t("More views")}>
+            <MoreButton type="button">
+              {t("{{ count }} more", { count: hiddenViews.length })}
+            </MoreButton>
+          </DropdownMenu>
+        )}
+        {!readOnly && (
+          <DropdownMenu action={addAction} ariaLabel={t("Add a view")}>
+            <AddButton aria-label={t("Add a view")}>
+              <PlusIcon size={18} />
+            </AddButton>
+          </DropdownMenu>
+        )}
+      </Strip>
+      {actions && (
+        <Actions ref={actionsRef} $isWrapped={isWrapped}>
+          {actions}
+        </Actions>
+      )}
     </Bar>
   );
 });
+
+function TabFace({ view }: { view: DatabaseView }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <LayoutIcon layout={view.layout} size={18} />
+      <TabLabel>{view.name || t("Untitled")}</TabLabel>
+    </>
+  );
+}
 
 interface ViewTabProps {
   view: DatabaseView;
@@ -353,8 +456,7 @@ const ViewTab = observer(function ViewTab({
               onContextMenu={handleContextMenu}
               onDoubleClick={handleDoubleClick}
             >
-              <LayoutIcon layout={view.layout} size={18} />
-              <TabLabel>{view.name || t("Untitled")}</TabLabel>
+              <TabFace view={view} />
             </Tab>
           )}
         </TabWrapper>
@@ -424,22 +526,57 @@ function RenameInput({
   );
 }
 
-const Bar = styled.div`
+const TAB_GAP = 2;
+const ADD_WIDTH = 28;
+
+// The toolbar wraps under the tabs when both do not fit, and the divider then
+// stays under the tabs, where the active tab draws its underline.
+const Bar = styled.div<{ $isWrapped: boolean }>`
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  column-gap: 8px;
   min-width: 0;
-  border-bottom: 1px solid ${s("divider")};
+  border-bottom: 1px solid
+    ${(props) => (props.$isWrapped ? "transparent" : props.theme.divider)};
 `;
 
+const Strip = styled.div<{ $isWrapped: boolean }>`
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: ${TAB_GAP}px;
+  flex: 1 1 0;
+  border-bottom: 1px solid
+    ${(props) => (props.$isWrapped ? props.theme.divider : "transparent")};
+  margin-bottom: -1px;
+`;
+
+const Measure = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  gap: ${TAB_GAP}px;
+  width: max-content;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+
+  > * {
+    flex-shrink: 0;
+  }
+`;
+
+// Clips rather than scrolls: the tabs that do not fit are listed under « N more ».
 const Tabs = styled.div`
   display: flex;
   align-items: center;
-  gap: 2px;
-  flex: 1 1 auto;
+  gap: ${TAB_GAP}px;
+  flex: 0 1 auto;
   min-width: 0;
-  overflow-x: auto;
-  ${hideScrollbars()}
+  overflow: hidden;
 `;
 
 const TabWrapper = styled.div<{ $isDragging: boolean }>`
@@ -526,12 +663,35 @@ const Rename = styled.input`
   outline: none;
 `;
 
+const MoreButton = styled.button`
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: ${s("textTertiary")};
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: var(--pointer);
+
+  &:hover,
+  &[data-state="open"] {
+    background: ${s("listItemHoverBackground")};
+    color: ${s("text")};
+  }
+`;
+
 const AddButton = styled.button`
   display: flex;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 28px;
+  width: ${ADD_WIDTH}px;
   height: 28px;
   padding: 0;
   border: 0;
@@ -547,12 +707,16 @@ const AddButton = styled.button`
   }
 `;
 
-const Actions = styled.div`
+const Actions = styled.div<{ $isWrapped: boolean }>`
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 2px;
   flex-shrink: 0;
-  padding: 4px 0;
+  max-width: 100%;
+  margin-left: auto;
+  padding: ${(props) => (props.$isWrapped ? "6px 0 2px" : "4px 0")};
 `;
 
 const MenuList = styled.div`

@@ -239,14 +239,29 @@ async function templateContent(
   );
 }
 
-function resolveContext(ctx: DatabaseCommandContext): DatabaseActorContext {
+/**
+ * Returns the acting user, transaction and IP of a command's context.
+ *
+ * @param ctx the request context, or the acting user with an optional transaction.
+ * @returns the user, the transaction and the IP.
+ */
+export function resolveContext(
+  ctx: DatabaseCommandContext
+): DatabaseActorContext {
   if ("auth" in ctx) {
     return { user: ctx.auth.user, transaction: ctx.transaction, ip: ctx.ip };
   }
   return ctx;
 }
 
-function inTransaction<T>(
+/**
+ * Runs in the given transaction, or in a new one.
+ *
+ * @param transaction the caller's transaction, if any.
+ * @param fn the work.
+ * @returns what the work returns.
+ */
+export function inTransaction<T>(
   transaction: Transaction | null | undefined,
   fn: (transaction: Transaction) => Promise<T>
 ): Promise<T> {

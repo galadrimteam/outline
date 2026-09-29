@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { DatabaseView } from "@shared/databases/types";
 import usePersistedState from "~/hooks/usePersistedState";
 import type Database from "~/models/Database";
@@ -47,7 +47,16 @@ export function useActiveView(
     return allowed.length ? allowed : all;
   }, [allViews, viewIds]);
 
-  const activeView = views.find((view) => view.id === storedId) ?? views[0];
+  // Without a stored choice (none yet, or its view was deleted) the first tab
+  // is shown; it stays shown when another tab is dragged before it.
+  const [shownId, setShownId] = useState<string>();
+  const activeView =
+    views.find((view) => view.id === storedId) ??
+    views.find((view) => view.id === shownId) ??
+    views[0];
+  if (activeView?.id !== shownId) {
+    setShownId(activeView?.id);
+  }
 
   const setActiveViewId = useCallback(
     (viewId: string) => setStoredId(viewId),

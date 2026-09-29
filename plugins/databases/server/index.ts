@@ -19,28 +19,33 @@ import { DatabaseAssignmentNotificationsProcessor } from "./processors/DatabaseA
 import { DatabaseChangeTitleProcessor } from "./processors/DatabaseChangeTitleProcessor";
 import { DatabaseRowTitleProcessor } from "./processors/DatabaseRowTitleProcessor";
 import { ConvertTeableEmbedsTask } from "./tasks/ConvertTeableEmbedsTask";
+import { MoveDatabaseEngineTask } from "./tasks/MoveDatabaseEngineTask";
 
-const enabled = !!env.TEABLE_INTERNAL_URL && !!env.GALADRIM_SECRET;
+PluginManager.add([
+  { ...config, type: Hook.API, value: databases },
+  { type: Hook.API, value: databaseRecords },
+  { type: Hook.API, value: databaseRecordPages },
+  { type: Hook.API, value: databaseFields },
+  { type: Hook.API, value: databaseViews },
+  { type: Hook.API, value: databaseAutomations },
+  { type: Hook.API, value: databaseForms },
+  { type: Hook.API, value: databaseDuplicate },
+  { type: Hook.Processor, value: DatabaseAutomationProcessor },
+  { type: Hook.Processor, value: DatabaseRowTitleProcessor },
+  { type: Hook.Processor, value: DatabaseChangeTitleProcessor },
+  { type: Hook.Processor, value: DatabaseAnchorMoveProcessor },
+  { type: Hook.Processor, value: DatabaseAnchorTitleProcessor },
+  { type: Hook.Processor, value: DatabaseAssignmentNotificationsProcessor },
+  { type: Hook.EmailTemplate, value: DatabaseRecordAssignedEmail },
+]);
 
-if (enabled) {
+// Teable's webhook, and the tools that read Teable: its embeds in imported
+// pages, and moving its bases into the Outline engine.
+if (env.isTeableConfigured) {
   PluginManager.add([
-    { ...config, type: Hook.API, value: databases },
-    { type: Hook.API, value: databaseRecords },
-    { type: Hook.API, value: databaseRecordPages },
-    { type: Hook.API, value: databaseFields },
-    { type: Hook.API, value: databaseViews },
     { type: Hook.API, value: teableHooks },
-    { type: Hook.API, value: databaseAutomations },
-    { type: Hook.API, value: databaseForms },
-    { type: Hook.API, value: databaseDuplicate },
-    { type: Hook.Processor, value: DatabaseAutomationProcessor },
-    { type: Hook.Processor, value: DatabaseRowTitleProcessor },
-    { type: Hook.Processor, value: DatabaseChangeTitleProcessor },
-    { type: Hook.Processor, value: DatabaseAnchorMoveProcessor },
-    { type: Hook.Processor, value: DatabaseAnchorTitleProcessor },
     { type: Hook.Processor, value: ConvertImportedEmbedsProcessor },
-    { type: Hook.Processor, value: DatabaseAssignmentNotificationsProcessor },
-    { type: Hook.EmailTemplate, value: DatabaseRecordAssignedEmail },
     { type: Hook.Task, value: ConvertTeableEmbedsTask },
+    { type: Hook.Task, value: MoveDatabaseEngineTask },
   ]);
 }

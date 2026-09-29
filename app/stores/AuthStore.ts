@@ -102,7 +102,8 @@ export default class AuthStore extends Store<Team> {
         : this.logout({ savePath: true, revokeToken: false, clearCache: false })
     );
 
-    void this.fetchAuth();
+    // A visitor without a session (a public share) gets a 401 here, which is expected.
+    this.fetchAuth().catch(() => undefined);
 
     // persists this entire store to localstorage whenever any keys are changed
     autorun(() => {

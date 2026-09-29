@@ -1,5 +1,7 @@
+import type { Job } from "bull";
 import { DatabaseLayout, DatabaseStatusGroup } from "@shared/databases/types";
 import { Database, Document } from "@server/models";
+import { BaseTask } from "@server/queues/tasks/base/BaseTask";
 import {
   buildAdmin,
   buildCollection,
@@ -10,8 +12,16 @@ import {
   buildViewer,
 } from "@server/test/factories";
 import { getTestServer } from "@server/test/support";
+import { DatabaseEngineMover } from "../commands/databaseEngineMover";
 import { setEngineFactory } from "../engine";
 import { FakeEngine } from "../engine/__mocks__/FakeEngine";
+import { FakeTeableBase } from "../engine/__mocks__/FakeTeableBase";
+import { InMemoryOutlineStore } from "../engine/outline/store/InMemoryOutlineStore";
+import { OutlineUserDirectory } from "../engine/outline/OutlineUserDirectory";
+import { TeableMapper } from "../engine/teable/TeableMapper";
+import env from "../env";
+import { setDatabaseEngineMoverFactory } from "../tasks/MoveDatabaseEngineTask";
+import { OutlineAttachmentFileStore } from "../utils/DatabaseFileStore";
 
 const server = getTestServer();
 
@@ -356,6 +366,43 @@ describe("#databases.create", () => {
     expect(res.status).toEqual(403);
     expect(engine.calls).toHaveLength(0);
   });
+
+  it("creates the database on the configured engine, in a base of that engine", async () => {
+    const user = await buildUser();
+    const collection = await buildCollection({
+      teamId: user.teamId,
+      userId: user.id,
+      name: "Delisle",
+    });
+    await buildDatabase({
+      teamId: user.teamId,
+      collectionId: collection.id,
+      externalBaseId: "bseTeable",
+    });
+    const engineNames: string[] = [];
+    setEngineFactory((database) => {
+      engineNames.push(database.engine);
+      return engine;
+    });
+    const previous = env.DATABASES_ENGINE;
+    env.DATABASES_ENGINE = "outline";
+
+    try {
+      const res = await server.post("/api/databases.create", user, {
+        body: { collectionId: collection.id },
+      });
+      const body = await res.json();
+
+      expect(res.status).toEqual(200);
+      expect(engineNames).toEqual(["outline"]);
+      expect(engine.callsTo("createBase")[0].args).toEqual(["Delisle"]);
+      const database = await Database.findByPk(body.data.database.id);
+      expect(database?.engine).toEqual("outline");
+      expect(database?.externalBaseId).toEqual("bseCreated");
+    } finally {
+      env.DATABASES_ENGINE = previous;
+    }
+  });
 });
 
 describe("#databases.update", () => {
@@ -556,5 +603,115 @@ describe("#databases.convertEmbeds", () => {
 
     expect(res.status).toEqual(200);
     expect(body.data).toMatchObject({ convertedEmbeds: 0, failed: 0 });
+  });
+});
+
+describe("#databases.moveToOutlineEngine", () => {
+  let store: InMemoryOutlineStore;
+
+  beforeEach(() => {
+    store = new InMemoryOutlineStore();
+    setDatabaseEngineMoverFactory(
+      (user) =>
+        new DatabaseEngineMover({
+          source: new FakeTeableBase(),
+          store,
+          files: new OutlineAttachmentFileStore(user),
+          users: new OutlineUserDirectory(),
+          mapper: new TeableMapper(),
+        })
+    );
+  });
+
+  afterEach(() => {
+    setDatabaseEngineMoverFactory();
+  });
+
+  it("requires an admin", async () => {
+    const user = await buildUser();
+    const database = await buildDatabase({ teamId: user.teamId });
+    const res = await server.post("/api/databases.moveToOutlineEngine", user, {
+      body: { id: database.id, dryRun: true },
+    });
+    expect(res.status).toEqual(403);
+  });
+
+  it("returns 404 for a database of another team", async () => {
+    const admin = await buildAdmin();
+    const database = await buildDatabase();
+    const res = await server.post("/api/databases.moveToOutlineEngine", admin, {
+      body: { id: database.id, dryRun: true },
+    });
+    expect(res.status).toEqual(404);
+  });
+
+  it("counts what would move on a dry run", async () => {
+    const admin = await buildAdmin();
+    const database = await buildDatabase({
+      teamId: admin.teamId,
+      externalBaseId: "bseRoute",
+      externalTableId: "tblOne",
+    });
+
+    const res = await server.post("/api/databases.moveToOutlineEngine", admin, {
+      body: { id: database.id, dryRun: true },
+    });
+    const body = await res.json();
+
+    expect(res.status).toEqual(200);
+    expect(body.data).toMatchObject({
+      baseId: "bseRoute",
+      dryRun: true,
+      tables: [{ id: "tblOne", records: 2, databaseIds: [database.id] }],
+      databaseIds: [database.id],
+      notMoved: ["record history"],
+    });
+    expect(await store.base("bseRoute")).toEqual([]);
+  });
+
+  it("moves the base in a task", async () => {
+    const admin = await buildAdmin();
+    const database = await buildDatabase({
+      teamId: admin.teamId,
+      externalBaseId: "bseRoute",
+      externalTableId: "tblOne",
+    });
+    const schedule = vi.mocked(BaseTask.prototype.schedule);
+
+    const res = await server.post("/api/databases.moveToOutlineEngine", admin, {
+      body: { id: database.id },
+    });
+
+    expect(res.status).toEqual(200);
+    const index = schedule.mock.calls.findIndex(
+      ([props]) => "databaseId" in props && props.databaseId === database.id
+    );
+    expect(schedule.mock.calls[index][0]).toEqual({
+      databaseId: database.id,
+      actorId: admin.id,
+      dryRun: false,
+    });
+    const job: Job = await schedule.mock.results[index].value;
+    await job.finished();
+
+    const [table] = await store.base("bseRoute");
+    expect(table.records.map((record) => record.orders)).toEqual([
+      { viwGrid: 2 },
+      { viwGrid: 1 },
+    ]);
+    await database.reload();
+    expect(database.engine).toEqual("outline");
+  });
+
+  it("refuses a database that is not on Teable", async () => {
+    const admin = await buildAdmin();
+    const database = await buildDatabase({
+      teamId: admin.teamId,
+      engine: "outline",
+    });
+    const res = await server.post("/api/databases.moveToOutlineEngine", admin, {
+      body: { id: database.id, dryRun: true },
+    });
+    expect(res.status).toEqual(400);
   });
 });

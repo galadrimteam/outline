@@ -15,7 +15,12 @@ import {
 } from "./components/styles";
 import { isWritable } from "./editable";
 import { cellValueToText, hrefForText } from "./format";
-import { stopPropagation, useCellLocale, useCommitOnUnmount } from "./hooks";
+import {
+  moveCaretToEnd,
+  stopPropagation,
+  useCellLocale,
+  useCommitOnUnmount,
+} from "./hooks";
 import type {
   CellDefinition,
   CellEditorProps,
@@ -27,6 +32,7 @@ export const textCell: CellDefinition = {
   Renderer: TextRenderer,
   Editor: TextEditor,
   isEditable: isWritable,
+  opensOnTyping: true,
 };
 
 /** Multi-line text. */
@@ -34,6 +40,7 @@ export const longTextCell: CellDefinition = {
   Renderer: TextRenderer,
   Editor: LongTextEditor,
   isEditable: isWritable,
+  opensOnTyping: true,
 };
 
 function TextRenderer({ field, value, variant, wrap }: CellRendererProps) {
@@ -71,9 +78,14 @@ function TextRenderer({ field, value, variant, wrap }: CellRendererProps) {
   );
 }
 
-function TextEditor({ value, onChange, onClose }: CellEditorProps) {
+function TextEditor({
+  value,
+  onChange,
+  onClose,
+  initialInput,
+}: CellEditorProps) {
   const initial = typeof value === "string" ? value : "";
-  const [draft, setDraft] = React.useState(initial);
+  const [draft, setDraft] = React.useState(initialInput ?? initial);
 
   useCommitOnUnmount(draft, (text) => {
     if (text !== initial) {
@@ -114,12 +126,12 @@ function TextEditor({ value, onChange, onClose }: CellEditorProps) {
 }
 
 function LongTextEditor(props: CellEditorProps) {
-  const { value, onChange, onClose } = props;
+  const { value, onChange, onClose, initialInput } = props;
   const { t } = useTranslation();
   const anchorRef = React.useRef<HTMLDivElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const initial = typeof value === "string" ? value : "";
-  const [draft, setDraft] = React.useState(initial);
+  const [draft, setDraft] = React.useState(initialInput ?? initial);
   const [anchorSize, setAnchorSize] = React.useState({ width: 0, height: 0 });
 
   useCommitOnUnmount(draft, (text) => {
@@ -209,13 +221,6 @@ function LongTextEditor(props: CellEditorProps) {
       </OverlayContent>
     </Popover>
   );
-}
-
-function moveCaretToEnd(
-  event: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
-) {
-  const length = event.target.value.length;
-  event.target.setSelectionRange(length, length);
 }
 
 const OverlayContent = styled(PopoverContent)`

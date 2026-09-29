@@ -219,6 +219,22 @@ describe("#databaseRecords.move", () => {
 });
 
 describe("#databaseRecords.delete", () => {
+  async function rowPage(recordId: string, collectionId = collection.id) {
+    const page = await buildDocument({
+      teamId: user.teamId,
+      userId: user.id,
+      collectionId,
+    });
+    await Document.update(
+      { databaseId: database.id, databaseRecordId: recordId },
+      { where: { id: page.id } }
+    );
+    return page;
+  }
+
+  const deletedAt = async (id: string) =>
+    (await Document.findByPk(id, { paranoid: false }))?.deletedAt ?? null;
+
   it("deletes records", async () => {
     engine.addRecord("rec1", {});
 
@@ -228,6 +244,62 @@ describe("#databaseRecords.delete", () => {
 
     expect(res.status).toEqual(200);
     expect(engine.records.has("rec1")).toBe(false);
+  });
+
+  it("sends the pages of the deleted rows to the trash, and only those", async () => {
+    engine.addRecord("rec1", {});
+    engine.addRecord("rec2", {});
+    engine.addRecord("rec3", {});
+    const first = await rowPage("rec1");
+    const second = await rowPage("rec2");
+    const kept = await rowPage("rec3");
+
+    const res = await server.post("/api/databaseRecords.delete", user, {
+      body: { databaseId: database.id, recordIds: ["rec1", "rec2"] },
+    });
+
+    expect(res.status).toEqual(200);
+    expect(engine.records.has("rec1")).toBe(false);
+    expect(engine.records.has("rec2")).toBe(false);
+    expect(await deletedAt(first.id)).not.toBeNull();
+    expect(await deletedAt(second.id)).not.toBeNull();
+    expect(await deletedAt(kept.id)).toBeNull();
+    expect(
+      (await Document.findByPk(first.id, { paranoid: false }))?.deletedById
+    ).toEqual(user.id);
+  });
+
+  it("deletes nothing when a page of the rows is not the user's to delete", async () => {
+    engine.addRecord("rec1", {});
+    engine.addRecord("rec2", {});
+    const page = await rowPage("rec1");
+    const hidden = await buildCollection({
+      teamId: user.teamId,
+      permission: null,
+    });
+    const secret = await rowPage("rec2", hidden.id);
+
+    const res = await server.post("/api/databaseRecords.delete", user, {
+      body: { databaseId: database.id, recordIds: ["rec1", "rec2"] },
+    });
+
+    expect(res.status).toEqual(403);
+    expect(engine.records.has("rec1")).toBe(true);
+    expect(await deletedAt(page.id)).toBeNull();
+    expect(await deletedAt(secret.id)).toBeNull();
+  });
+
+  it("keeps the pages when the engine refuses the deletion", async () => {
+    engine.addRecord("rec1", {});
+    const page = await rowPage("rec1");
+    vi.spyOn(engine, "deleteRecords").mockRejectedValue(new Error("refused"));
+
+    const res = await server.post("/api/databaseRecords.delete", user, {
+      body: { databaseId: database.id, recordIds: ["rec1"] },
+    });
+
+    expect(res.status).toEqual(500);
+    expect(await deletedAt(page.id)).toBeNull();
   });
 });
 

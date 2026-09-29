@@ -25,6 +25,11 @@ export interface TeableField {
   description?: string | null;
   options?: DatabaseFieldOptions | null;
   isLookup?: boolean | null;
+  lookupOptions?: {
+    foreignTableId: string;
+    linkFieldId: string;
+    lookupFieldId: string;
+  } | null;
   isPrimary?: boolean | null;
   isComputed?: boolean | null;
   cellValueType: DatabaseCellValueType;
@@ -50,6 +55,7 @@ export interface TeableView {
 export interface TeableRecord {
   id: string;
   fields: Record<string, TeableCellValue>;
+  autoNumber?: number;
   createdTime?: string;
   lastModifiedTime?: string;
   createdBy?: string;
@@ -151,6 +157,26 @@ export interface TeableSpaceVo {
 export interface TeableBaseVo {
   id: string;
   name: string;
+}
+
+/** An item of `GET /api/base/{baseId}/table`. */
+export interface TeableTableMetaVo {
+  id: string;
+  name: string;
+  order?: number;
+  /** Bumped by Teable on every record, field or view change of the table. */
+  lastModifiedTime?: string | null;
+}
+
+/** Response of `GET /api/base/{baseId}/collaborators` (space members included). */
+export interface TeableCollaboratorsVo {
+  collaborators: {
+    type: string;
+    userId?: string;
+    userName?: string;
+    email?: string;
+  }[];
+  total: number;
 }
 
 /** Response of the fork's `POST /api/galadrim/token`. */

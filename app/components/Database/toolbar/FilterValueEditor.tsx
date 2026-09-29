@@ -14,14 +14,12 @@ import {
   isDateFilterValue,
 } from "@shared/databases/filters";
 import type {
-  DatabaseCellValue,
   DatabaseDateFilterValue,
   DatabaseField,
   DatabaseFilterItem,
   DatabaseFilterValue,
   DatabaseRecord,
 } from "@shared/databases/types";
-import { DatabaseFieldType } from "@shared/databases/types";
 import { borderRadius, s } from "@shared/styles";
 import {
   Popover,
@@ -29,16 +27,13 @@ import {
   PopoverTrigger,
 } from "~/components/primitives/Popover";
 import type Database from "~/models/Database";
-import {
-  calendarDayToISO,
-  isLinkItem,
-  isUserItem,
-  isoToCalendarDay,
-  toArray,
-} from "../cells/format";
+import { calendarDayToISO, isoToCalendarDay } from "../cells/format";
 import { useListNavigation } from "../cells/hooks";
 import { getCell } from "../cells/registry";
 import { CompactSelect, SmallInput } from "./components";
+import type { PickerOption } from "./filterCandidates";
+import { candidateKind } from "./filterCandidates";
+import { useFilterOptions } from "./useFilterOptions";
 
 interface Props {
   /** The database of the rule. */
@@ -47,7 +42,9 @@ interface Props {
   field: DatabaseField;
   /** The rule whose value is edited. */
   item: DatabaseFilterItem;
-  /** Loaded rows, where people and linked rows to choose from are found. */
+  /** The view filtered, none for an automation's condition. */
+  viewId?: string;
+  /** Loaded rows, whose people and linked rows are offered at once. */
   records: DatabaseRecord[];
   /** Called with the new value. */
   onChange: (value: DatabaseFilterValue) => void;
@@ -65,6 +62,7 @@ export const FilterValueEditor = observer(function FilterValueEditor({
   database,
   field,
   item,
+  viewId,
   records,
   onChange,
 }: Props) {
@@ -101,22 +99,21 @@ export const FilterValueEditor = observer(function FilterValueEditor({
 
   const isTextMatch =
     item.operator === "contains" || item.operator === "doesNotContain";
-  const options = isTextMatch
-    ? undefined
-    : pickerOptions(field, records, t("Me"));
-  if (options) {
+  if (!isTextMatch && candidateKind(field)) {
     const multiple = kind === "list";
-    const selected = Array.isArray(item.value)
-      ? item.value
-      : typeof item.value === "string"
-        ? [item.value]
-        : [];
     return (
-      <OptionsValue
+      <PickedValue
         database={database}
         field={field}
-        options={options}
-        selected={selected}
+        viewId={viewId}
+        records={records}
+        selected={
+          Array.isArray(item.value)
+            ? item.value
+            : typeof item.value === "string"
+              ? [item.value]
+              : []
+        }
         multiple={multiple}
         onChange={(values) => onChange(multiple ? values : (values[0] ?? null))}
       />
@@ -145,71 +142,47 @@ export const FilterValueEditor = observer(function FilterValueEditor({
   );
 });
 
-interface PickerOption {
-  /** What the filter stores: a choice name, an engine user id, a row id or "Me". */
-  value: string;
-  /** Text searched and shown when no cell renders it. */
-  label: string;
-  /** A cell value drawn with the field's renderer. */
-  cell?: DatabaseCellValue;
+interface PickedValueProps {
+  database: Database;
+  field: DatabaseField;
+  viewId?: string;
+  records: DatabaseRecord[];
+  selected: string[];
+  multiple: boolean;
+  onChange: (values: string[]) => void;
 }
 
-function pickerOptions(
-  field: DatabaseField,
-  records: DatabaseRecord[],
-  meLabel: string
-): PickerOption[] | undefined {
-  switch (field.type) {
-    case DatabaseFieldType.SingleSelect:
-    case DatabaseFieldType.MultipleSelect:
-      return (field.options.choices ?? []).map((choice) => ({
-        value: choice.name,
-        label: choice.name,
-        cell: choice.name,
-      }));
-    case DatabaseFieldType.User:
-    case DatabaseFieldType.CreatedBy:
-    case DatabaseFieldType.LastModifiedBy: {
-      const people = new Map<string, PickerOption>();
-      for (const record of records) {
-        for (const person of toArray(record.fields[field.id])) {
-          if (isUserItem(person) && !people.has(person.id)) {
-            people.set(person.id, {
-              value: person.id,
-              label: person.title,
-              cell: person,
-            });
-          }
-        }
-      }
-      return [
-        { value: FILTER_ME, label: meLabel },
-        ...Array.from(people.values()).sort((a, b) =>
-          a.label.localeCompare(b.label)
-        ),
-      ];
-    }
-    case DatabaseFieldType.Link: {
-      const links = new Map<string, PickerOption>();
-      for (const record of records) {
-        for (const link of toArray(record.fields[field.id])) {
-          if (isLinkItem(link) && !links.has(link.id)) {
-            links.set(link.id, {
-              value: link.id,
-              label: link.title ?? link.id,
-              cell: [link],
-            });
-          }
-        }
-      }
-      return Array.from(links.values()).sort((a, b) =>
-        a.label.localeCompare(b.label)
-      );
-    }
-    default:
-      return undefined;
-  }
-}
+const PickedValue = observer(function PickedValue({
+  database,
+  field,
+  viewId,
+  records,
+  selected,
+  multiple,
+  onChange,
+}: PickedValueProps) {
+  const [search, setSearch] = React.useState("");
+  const options = useFilterOptions({
+    database,
+    field,
+    viewId,
+    records,
+    search,
+  });
+
+  return (
+    <OptionsValue
+      database={database}
+      field={field}
+      options={options ?? []}
+      selected={selected}
+      multiple={multiple}
+      search={search}
+      onSearchChange={setSearch}
+      onChange={onChange}
+    />
+  );
+});
 
 interface OptionsValueProps {
   database: Database;
@@ -217,6 +190,8 @@ interface OptionsValueProps {
   options: PickerOption[];
   selected: string[];
   multiple: boolean;
+  search: string;
+  onSearchChange: (search: string) => void;
   onChange: (values: string[]) => void;
 }
 
@@ -226,21 +201,41 @@ const OptionsValue = observer(function OptionsValue({
   options,
   selected,
   multiple,
+  search,
+  onSearchChange,
   onChange,
 }: OptionsValueProps) {
   const { t } = useTranslation();
   const [open, setOpen] = React.useState(false);
-  const [search, setSearch] = React.useState("");
   const { Renderer } = getCell(field.type);
 
-  const matches = React.useMemo(() => {
-    const term = search.trim().toLocaleLowerCase();
-    return term
-      ? options.filter((option) =>
-          option.label.toLocaleLowerCase().includes(term)
-        )
-      : options;
-  }, [options, search]);
+  // Options come and go with the search; the chosen ones stay drawn.
+  const seen = React.useRef(new Map<string, PickerOption>());
+  for (const option of options) {
+    seen.current.set(option.value, option);
+  }
+  const chosen = selected.flatMap((value) => {
+    const option = seen.current.get(value);
+    return option ? [option] : [];
+  });
+
+  const term = search.trim().toLocaleLowerCase();
+  const listed = new Set(options.map((option) => option.value));
+  const matches = term
+    ? options.filter((option) =>
+        option.label.toLocaleLowerCase().includes(term)
+      )
+    : [...options, ...chosen.filter((option) => !listed.has(option.value))];
+
+  const handleOpenChange = React.useCallback(
+    (next: boolean) => {
+      setOpen(next);
+      if (!next) {
+        onSearchChange("");
+      }
+    },
+    [onSearchChange]
+  );
 
   const handleToggle = React.useCallback(
     (value: string) => {
@@ -285,10 +280,8 @@ const OptionsValue = observer(function OptionsValue({
       option.label
     );
 
-  const chosen = options.filter((option) => selected.includes(option.value));
-
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger>
         <ValueButton type="button" aria-label={t("Value")}>
           {chosen.length ? (
@@ -318,7 +311,7 @@ const OptionsValue = observer(function OptionsValue({
             autoFocus
             value={search}
             placeholder={t("Search")}
-            onChange={(ev) => setSearch(ev.target.value)}
+            onChange={(ev) => onSearchChange(ev.target.value)}
             onKeyDown={handleKeyDown}
           />
           <OptionList role="listbox" aria-multiselectable={multiple}>

@@ -36,17 +36,30 @@ export function useCommitOnUnmount<T>(draft: T, commit: (draft: T) => void) {
 
 /**
  * Keyboard highlight of a popover list driven from its search box: arrows move, Enter picks.
+ * Given the search text, the list starts with nothing highlighted and a first Enter picks
+ * nothing, like Notion's pickers: typing highlights the first match, arrows move from there.
+ * Without it, the first item is highlighted from the start. A held Enter never repeats a pick.
  *
  * @param count the number of items.
  * @param onPick called with the index of the picked item.
- * @returns the highlighted index, its setter and the search box key handler.
+ * @param search the search text, and what Enter does when nothing is highlighted.
+ * @returns the highlighted index (-1 for none), its setter and the search box key handler.
  */
 export function useListNavigation(
   count: number,
-  onPick: (index: number) => void
+  onPick: (index: number) => void,
+  search?: { query: string; onEnterWithoutPick?: () => void }
 ) {
-  const [highlighted, setActive] = React.useState(0);
-  const active = Math.min(highlighted, Math.max(count - 1, 0));
+  const query = search?.query;
+  const [highlighted, setActive] = React.useState(search && !query ? -1 : 0);
+  const [queried, setQueried] = React.useState(query);
+  if (query !== queried) {
+    setQueried(query);
+    setActive(query ? 0 : -1);
+  }
+  const active =
+    highlighted < 0 ? -1 : Math.min(highlighted, Math.max(count - 1, 0));
+  const onEnterWithoutPick = search?.onEnterWithoutPick;
 
   const handleKeyDown = React.useCallback(
     (event: React.KeyboardEvent) => {
@@ -57,17 +70,22 @@ export function useListNavigation(
       }
       if (event.key === "ArrowUp") {
         event.preventDefault();
-        setActive(count ? (active - 1 + count) % count : 0);
+        setActive(count ? (Math.max(active, 0) - 1 + count) % count : 0);
         return;
       }
       if (event.key === "Enter" && !event.nativeEvent.isComposing) {
         event.preventDefault();
-        if (count) {
-          onPick(active);
+        if (event.repeat) {
+          return;
         }
+        if (count && active >= 0) {
+          onPick(active);
+          return;
+        }
+        onEnterWithoutPick?.();
       }
     },
-    [active, count, onPick]
+    [active, count, onEnterWithoutPick, onPick]
   );
 
   return { active, setActive, handleKeyDown };
@@ -90,6 +108,19 @@ export function useDebouncedValue<T>(value: T, delay = 250): T {
   }, [value, delay]);
 
   return settled;
+}
+
+/**
+ * Puts the caret after the text of a field that gets the focus, for editors opened with what
+ * the reader already typed.
+ *
+ * @param event the focus event.
+ */
+export function moveCaretToEnd(
+  event: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
+) {
+  const length = event.target.value.length;
+  event.target.setSelectionRange(length, length);
 }
 
 /**

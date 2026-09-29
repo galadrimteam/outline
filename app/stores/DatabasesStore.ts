@@ -1,5 +1,6 @@
 import invariant from "invariant";
 import { action, makeObservable, override, runInAction } from "mobx";
+import { v4 as uuidv4 } from "uuid";
 import type {
   DatabaseColumnMeta,
   DatabaseField,
@@ -93,9 +94,15 @@ export interface DatabaseViewUpdateParams {
 }
 
 /**
- * Sends a database RPC. The shared database types are interfaces, which are
- * serialisable but not assignable to `JSONObject`'s index signature, hence
- * the single conversion here.
+ * Tags the database writes of this tab. The change events echo it, so a tab
+ * tells its own writes from those of the same person in another tab.
+ */
+export const tabOrigin = `tab-${uuidv4()}`;
+
+/**
+ * Sends a database RPC; a write is tagged with this tab's origin. The shared
+ * database types are interfaces, which are serialisable but not assignable to
+ * `JSONObject`'s index signature, hence the single conversion here.
  *
  * @param path the API method, eg "/databases.info".
  * @param body the request body.
@@ -105,9 +112,18 @@ export function databaseRpc<T>(
   path: string,
   body: object | FormData
 ): Promise<{ data: T; policies?: Policy[]; pagination?: JSONObject }> {
+  const isWrite = writeMethod.test(path);
+  if (body instanceof FormData) {
+    if (isWrite && !body.has("origin")) {
+      body.append("origin", tabOrigin);
+    }
+    return client.post(path, body);
+  }
   return client.post(
     path,
-    body instanceof FormData ? body : (body as JSONObject)
+    isWrite
+      ? { origin: tabOrigin, ...(body as JSONObject) }
+      : (body as JSONObject)
   );
 }
 
@@ -583,3 +599,7 @@ export default class DatabasesStore extends Store<Database> {
 }
 
 export { DatabasesStore };
+
+/** The database routes that write: their change events echo the origin. */
+const writeMethod =
+  /\.(create|createFromTemplate|update|convert|move|reorder|duplicate|delete|upload)$/;

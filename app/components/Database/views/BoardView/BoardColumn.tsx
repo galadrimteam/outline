@@ -572,6 +572,8 @@ const HeaderCell = styled.div<{
 `;
 
 const Cell = styled.div<{ $width: number; $tint: string }>`
+  display: flex;
+  flex-direction: column;
   flex: 0 0 ${(props) => props.$width}px;
   width: ${(props) => props.$width}px;
   padding: 8px;
@@ -588,7 +590,10 @@ const Header = styled.div<{ $tint: string }>`
   align-items: center;
   gap: 8px;
   min-height: 42px;
-  padding: 8px 2px 6px;
+  /* Part of the gap above the cards is margin, not the opaque header, so
+     that the header does not paint over the first card's border. */
+  padding: 8px 2px 4px;
+  margin-bottom: 2px;
   cursor: grab;
   outline: none;
   border-radius: 10px 10px 0 0;
@@ -669,6 +674,7 @@ const IconButton = styled.button`
 const Cards = styled.div`
   display: flex;
   flex-direction: column;
+  flex-grow: 1;
   gap: 8px;
   min-height: 48px;
 `;

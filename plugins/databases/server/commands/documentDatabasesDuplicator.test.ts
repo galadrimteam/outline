@@ -1,6 +1,6 @@
 import type { ProsemirrorData } from "@shared/types";
 import documentDuplicator from "@server/commands/documentDuplicator";
-import { Database, Document } from "@server/models";
+import { Collection, Database, Document } from "@server/models";
 import {
   buildCollection,
   buildDatabase,
@@ -198,6 +198,163 @@ describe("documentDatabasesDuplicator", () => {
       epics.id,
       shared.id,
     ]);
+  });
+
+  it("copies the rows with their pages, each page on the copied row", async () => {
+    const { user, collection, project, suivi, epics } = await setup();
+    const rowPage = await buildDocument({
+      teamId: user.teamId,
+      userId: user.id,
+      collectionId: collection.id,
+      parentDocumentId: project.id,
+      databaseId: suivi.id,
+      databaseRecordId: "recA",
+      title: "Carte A",
+      content: docWith(databaseNode(epics.id, { viewIds: ["viwGrid"] })),
+    });
+
+    const { copies, count } = await withAPIContext(user, async (ctx) => {
+      const duplicated = await documentDuplicator(ctx, {
+        document: project,
+        collection,
+        recursive: true,
+      });
+      return {
+        copies: duplicated,
+        count: await documentDatabasesDuplicator({
+          user,
+          documents: duplicated,
+          withRecords: true,
+          transaction: ctx.state.transaction,
+        }),
+      };
+    });
+
+    expect(count).toEqual(2);
+    expect(duplicator.calls[0].input.withRecords).toBe(true);
+    const projectCopyId =
+      copies.find(
+        (document) => document.sourceMetadata?.originalDocumentId === project.id
+      )?.id ?? "";
+    const suiviCopy = await Database.findOne({
+      where: { documentId: projectCopyId, title: "Suivi" },
+      rejectOnEmpty: true,
+    });
+    const epicsCopy = await Database.findOne({
+      where: { title: "Epics", documentId: copies.map((copy) => copy.id) },
+      rejectOnEmpty: true,
+    });
+
+    const [pageCopy] = await Document.unscoped().findAll({
+      where: { databaseId: suiviCopy.id },
+    });
+    expect(pageCopy).toMatchObject({
+      databaseRecordId: "recA",
+      parentDocumentId: projectCopyId,
+      collectionId: collection.id,
+      title: "Carte A",
+    });
+    expect(pageCopy.publishedAt).not.toBeNull();
+    expect(pageCopy.content && databaseIdsIn(pageCopy.content)).toEqual([
+      epicsCopy.id,
+    ]);
+    expect(copies.map((document) => document.id)).not.toContain(pageCopy.id);
+
+    const source = await Document.unscoped().findByPk(rowPage.id, {
+      rejectOnEmpty: true,
+    });
+    expect(source).toMatchObject({
+      databaseId: suivi.id,
+      databaseRecordId: "recA",
+    });
+    expect(source.content && databaseIdsIn(source.content)).toEqual([epics.id]);
+    const structure = JSON.stringify(
+      (
+        await Collection.findByPk(collection.id, {
+          includeDocumentStructure: true,
+          rejectOnEmpty: true,
+        })
+      ).documentStructure
+    );
+    expect(structure).toContain(projectCopyId);
+    expect(structure).not.toContain(pageCopy.id);
+  });
+
+  it("puts each copied page on the row copied from its row, and leaves out pages of rows not copied", async () => {
+    const { user, collection, project, suivi } = await setup();
+    setTablesDuplicatorFactory(() => ({
+      duplicateTables: async (actor, input) =>
+        (await duplicator.duplicateTables(actor, input)).map((table) => ({
+          ...table,
+          recordIds: { recA: "recCopyA" },
+        })),
+    }));
+    for (const recordId of ["recA", "recGone"]) {
+      await buildDocument({
+        teamId: user.teamId,
+        userId: user.id,
+        collectionId: collection.id,
+        parentDocumentId: project.id,
+        databaseId: suivi.id,
+        databaseRecordId: recordId,
+      });
+    }
+
+    const copies = await withAPIContext(user, async (ctx) => {
+      const duplicated = await documentDuplicator(ctx, {
+        document: project,
+        collection,
+      });
+      await documentDatabasesDuplicator({
+        user,
+        documents: duplicated,
+        withRecords: true,
+        transaction: ctx.state.transaction,
+      });
+      return duplicated;
+    });
+
+    const suiviCopy = await Database.findOne({
+      where: { documentId: copies[0].id },
+      rejectOnEmpty: true,
+    });
+    const pages = await Document.unscoped().findAll({
+      where: { databaseId: suiviCopy.id },
+    });
+    expect(pages.map((page) => page.databaseRecordId)).toEqual(["recCopyA"]);
+  });
+
+  it("copies no row page without the rows", async () => {
+    const { user, collection, project, suivi } = await setup();
+    await buildDocument({
+      teamId: user.teamId,
+      userId: user.id,
+      collectionId: collection.id,
+      parentDocumentId: project.id,
+      databaseId: suivi.id,
+      databaseRecordId: "recA",
+    });
+
+    const copies = await withAPIContext(user, async (ctx) => {
+      const duplicated = await documentDuplicator(ctx, {
+        document: project,
+        collection,
+      });
+      await documentDatabasesDuplicator({
+        user,
+        documents: duplicated,
+        transaction: ctx.state.transaction,
+      });
+      return duplicated;
+    });
+
+    const suiviCopy = await Database.findOne({
+      where: { documentId: copies[0].id },
+      rejectOnEmpty: true,
+    });
+    expect(
+      await Document.unscoped().count({ where: { databaseId: suiviCopy.id } })
+    ).toEqual(0);
   });
 
   it("keeps a linked view when only the page showing it is duplicated", async () => {

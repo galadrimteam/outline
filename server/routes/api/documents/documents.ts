@@ -1577,6 +1577,7 @@ router.post(
     await documentDatabasesDuplicator({
       user,
       documents: response,
+      withRecords: true,
       transaction,
     });
 

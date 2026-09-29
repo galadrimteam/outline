@@ -20,7 +20,7 @@ import Tooltip from "~/components/Tooltip";
 import type Database from "~/models/Database";
 import type { RecordQuery } from "~/stores/DatabaseRecordsStore";
 import { ToolbarButton } from "./components";
-import { FilterBuilder } from "./FilterBuilder";
+import { FilterBuilder, filterPopoverWidth } from "./FilterBuilder";
 import { GroupMenu, layoutSupportsGrouping } from "./GroupMenu";
 import { FilterIcon, GroupByIcon, PropertiesIcon } from "./icons";
 import { PropertiesMenu } from "./PropertiesMenu";
@@ -139,12 +139,13 @@ export const DatabaseToolbar = observer(function DatabaseToolbar({
         openRequest={block?.filterRequest?.at}
         count={filterCount}
         icon={<FilterIcon size={20} />}
-        width={filter?.filterSet.length ? 680 : 300}
+        width={filterPopoverWidth(filter)}
       >
         <FilterBuilder
           database={database}
           filter={filter}
           onChange={handleFilterChange}
+          viewId={view.id}
           records={query.records}
           lockedFilter={canSave ? undefined : view.filter}
         />
@@ -278,6 +279,7 @@ function ToolbarPopover({
 
 const Bar = styled.div`
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 2px;

@@ -106,8 +106,8 @@ export function formDefinition(
     viewId: view.id,
     title: view.name || database.title,
     description: view.description ?? null,
-    coverUrl: absoluteUrl(view.options.coverUrl),
-    logoUrl: absoluteUrl(view.options.logoUrl),
+    coverUrl: absoluteUrl(database, view.options.coverUrl),
+    logoUrl: absoluteUrl(database, view.options.logoUrl),
     submitLabel: view.options.submitLabel ?? null,
     successMessage: settings.successMessage ?? null,
     requireLogin: !!settings.requireLogin,
@@ -140,11 +140,17 @@ function publicField(field: DatabaseField): DatabaseField {
   };
 }
 
-function absoluteUrl(url: string | undefined): string | null {
+/** Teable gives its own files as paths; other engines give paths of Outline. */
+function absoluteUrl(
+  database: Pick<Database, "engine">,
+  url: string | undefined
+): string | null {
   if (!url) {
     return null;
   }
-  return url.startsWith("/") && env.TEABLE_PUBLIC_URL
+  return database.engine === "teable" &&
+    url.startsWith("/") &&
+    env.TEABLE_PUBLIC_URL
     ? `${env.TEABLE_PUBLIC_URL}${url}`
     : url;
 }

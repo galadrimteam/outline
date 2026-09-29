@@ -1,6 +1,7 @@
 import type { DatabaseRecord } from "@shared/databases/types";
 import stores from "~/stores";
 import { client } from "~/utils/ApiClient";
+import { tabOrigin } from "./DatabasesStore";
 import {
   evaluateFilter,
   insertIds,
@@ -230,7 +231,6 @@ describe("DatabaseRecordsStore", () => {
     mockList([record("r1", "A")]);
     const board = stores.databaseRecords.query(databaseId, viewId, column("A"));
     await board.fetch();
-    stores.auth.currentUserId = "me";
 
     vi.mocked(client.post).mockResolvedValue({ data: [record("r1", "A")] });
     await stores.databaseRecords.move(databaseId, viewId, {
@@ -243,8 +243,51 @@ describe("DatabaseRecordsStore", () => {
       kinds: ["view"],
       viewIds: [viewId],
       actorId: "me",
+      origin: tabOrigin,
     });
 
     expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  it("tags its writes with the origin of the tab, not its reads", async () => {
+    vi.mocked(client.post).mockResolvedValue({ data: record("r1", "B") });
+    await stores.databaseRecords.update(databaseId, "r1", { [status]: "B" });
+
+    expect(vi.mocked(client.post)).toHaveBeenCalledWith(
+      "/databaseRecords.update",
+      expect.objectContaining({ origin: tabOrigin })
+    );
+
+    mockList([record("r1", "B")]);
+    await stores.databaseRecords.query(databaseId, viewId).fetch();
+    const [, listBody] =
+      vi
+        .mocked(client.post)
+        .mock.calls.find(([path]) => path === "/databaseRecords.list") ?? [];
+    expect(listBody).not.toHaveProperty("origin");
+  });
+
+  it("applies a change the same person made in another tab to a row it just wrote", async () => {
+    mockList([record("r1", "A")]);
+    const board = stores.databaseRecords.query(databaseId, viewId, column("A"));
+    await board.fetch();
+    stores.auth.currentUserId = "me";
+    vi.mocked(client.post).mockResolvedValue({ data: record("r1", "A") });
+    await stores.databaseRecords.update(databaseId, "r1", { [status]: "A" });
+    vi.mocked(client.post).mockResolvedValue({ data: record("r1", "B") });
+
+    stores.databaseRecords.handleChange({
+      databaseId,
+      kinds: ["record.update"],
+      recordIds: ["r1"],
+      fieldIds: [status],
+      actorId: "me",
+      origin: "tab-other",
+    });
+    await vi.waitFor(() =>
+      expect(
+        stores.databaseRecords.recordById(databaseId, "r1")?.fields[status]
+      ).toBe("B")
+    );
   });
 });

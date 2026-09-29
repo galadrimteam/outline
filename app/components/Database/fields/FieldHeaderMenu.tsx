@@ -42,6 +42,7 @@ import {
   createFieldOfKind,
   deleteField,
   duplicateField,
+  fieldHasValues,
   updateField,
 } from "./fieldActions";
 import type { FieldKindId } from "./fieldTypes";
@@ -124,14 +125,17 @@ export const FieldHeaderMenu = observer(function FieldHeaderMenu_({
   }, [database, description, field, stores]);
 
   const handlePickKind = React.useCallback(
-    (next: FieldKindId) => {
+    async (next: FieldKindId) => {
       close();
       if (next === kind) {
         return;
       }
       const convert = () =>
         convertFieldToKind(stores, database, field, next, t);
-      if (!isLossyConversion(field, next)) {
+      if (
+        !isLossyConversion(field, next) ||
+        !(await fieldHasValues(database, field))
+      ) {
         void convert();
         return;
       }
@@ -268,7 +272,10 @@ export const FieldHeaderMenu = observer(function FieldHeaderMenu_({
         )}
 
         {panel === "type" && (
-          <FieldKindList current={kind} onPick={handlePickKind} />
+          <FieldKindList
+            current={kind}
+            onPick={(next) => void handlePickKind(next)}
+          />
         )}
 
         {panel === "options" && (

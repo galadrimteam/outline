@@ -3,9 +3,13 @@ import { toast } from "sonner";
 import type {
   DatabaseField,
   DatabaseFieldMeta,
+  DatabaseFilterItem,
+  DatabaseRecord,
   DatabaseView,
 } from "@shared/databases/types";
+import { DatabaseFieldType } from "@shared/databases/types";
 import type Database from "~/models/Database";
+import { databaseRpc } from "~/stores/DatabasesStore";
 import type RootStore from "~/stores/RootStore";
 import { visibilityPatch } from "../toolbar/columns";
 import { insertionOrder } from "../views/TableView/layout";
@@ -114,6 +118,40 @@ export async function convertFieldToKind(
   } catch (err) {
     reportError(err);
     return undefined;
+  }
+}
+
+/**
+ * Whether any row of the database has a value in a property, whatever the views show, so that
+ * converting an empty property needs no confirmation.
+ *
+ * @param database the database.
+ * @param field the property.
+ * @returns true when a row has a value, or when it could not be checked.
+ */
+export async function fieldHasValues(
+  database: Database,
+  field: DatabaseField
+): Promise<boolean> {
+  const viewId = database.orderedViews[0]?.id;
+  if (!viewId) {
+    return true;
+  }
+  const rule: DatabaseFilterItem =
+    field.type === DatabaseFieldType.Checkbox
+      ? { fieldId: field.id, operator: "is", value: true }
+      : { fieldId: field.id, operator: "isNotEmpty", value: null };
+  try {
+    const res = await databaseRpc<DatabaseRecord[]>("/databaseRecords.list", {
+      databaseId: database.id,
+      viewId,
+      filter: { conjunction: "and", filterSet: [rule] },
+      replaceFilter: true,
+      limit: 1,
+    });
+    return res.data.length > 0;
+  } catch {
+    return true;
   }
 }
 

@@ -18,7 +18,12 @@ import {
 } from "./components/styles";
 import { isWritable } from "./editable";
 import { isLinkItem, toArray } from "./format";
-import { stopPropagation, useDebouncedValue, useListNavigation } from "./hooks";
+import {
+  moveCaretToEnd,
+  stopPropagation,
+  useDebouncedValue,
+  useListNavigation,
+} from "./hooks";
 import type {
   CellDefinition,
   CellEditorProps,
@@ -30,6 +35,7 @@ export const linkCell: CellDefinition = {
   Renderer: LinkRenderer,
   Editor: LinkEditor,
   isEditable: isWritable,
+  opensOnTyping: true,
 };
 
 /**
@@ -94,12 +100,13 @@ function LinkRenderer({ field, value, variant, wrap }: CellRendererProps) {
 }
 
 function LinkEditor(props: CellEditorProps) {
-  const { database, field, value, record, onChange, onClose } = props;
+  const { database, field, value, record, onChange, onClose, initialInput } =
+    props;
   const { t } = useTranslation();
   const { databaseRecords } = useStores();
   const multiple = isMultipleLink(field);
   const [selected, setSelected] = React.useState(() => linksOf(value));
-  const [query, setQuery] = React.useState("");
+  const [query, setQuery] = React.useState(initialInput ?? "");
   const search = useDebouncedValue(query);
   const [candidates, setCandidates] = React.useState<DatabaseLinkValue[]>([]);
 
@@ -168,7 +175,8 @@ function LinkEditor(props: CellEditorProps) {
 
   const { active, setActive, handleKeyDown } = useListNavigation(
     candidates.length,
-    handlePick
+    handlePick,
+    { query, onEnterWithoutPick: onClose }
   );
 
   return (
@@ -200,6 +208,7 @@ function LinkEditor(props: CellEditorProps) {
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         onKeyDown={handleKeyDown}
+        onFocus={moveCaretToEnd}
       />
       <PopoverList role="listbox" aria-multiselectable={multiple}>
         {candidates.map((link, index) => (

@@ -24,7 +24,7 @@ import {
 } from "./components/styles";
 import { isWritable } from "./editable";
 import { isUserItem, toArray } from "./format";
-import { useDebouncedValue, useListNavigation } from "./hooks";
+import { moveCaretToEnd, useDebouncedValue, useListNavigation } from "./hooks";
 import type {
   CellDefinition,
   CellEditorProps,
@@ -37,6 +37,7 @@ export const userCell: CellDefinition = {
   Editor: observer(UserEditor),
   isEditable: (field) =>
     field.type === DatabaseFieldType.User && isWritable(field),
+  opensOnTyping: true,
 };
 
 /**
@@ -100,10 +101,10 @@ const Person = observer(function Person_({
 });
 
 function UserEditor(props: CellEditorProps) {
-  const { field, value, onChange, onClose } = props;
+  const { field, value, onChange, onClose, initialInput } = props;
   const { t } = useTranslation();
   const { users } = useStores();
-  const [query, setQuery] = React.useState("");
+  const [query, setQuery] = React.useState(initialInput ?? "");
   const settledQuery = useDebouncedValue(query);
   const multiple = isMultiplePerson(field);
   const [selectedIds, setSelectedIds] = React.useState<string[]>(() =>
@@ -170,7 +171,8 @@ function UserEditor(props: CellEditorProps) {
 
   const { active, setActive, handleKeyDown } = useListNavigation(
     candidates.length,
-    handlePick
+    handlePick,
+    { query, onEnterWithoutPick: onClose }
   );
 
   const handleSearchKeyDown = React.useCallback(
@@ -216,6 +218,7 @@ function UserEditor(props: CellEditorProps) {
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         onKeyDown={handleSearchKeyDown}
+        onFocus={moveCaretToEnd}
       />
       <PopoverList role="listbox" aria-multiselectable={multiple}>
         {candidates.map((user, index) => (

@@ -31,7 +31,6 @@ import type {
   DatabaseRef,
   DatabaseUserActor,
 } from "plugins/databases/server/engine/DatabaseEngine";
-import databasesEnv from "plugins/databases/server/env";
 import { presentDatabaseRecords } from "plugins/databases/server/presenters/databaseRecords";
 import { actorFor } from "plugins/databases/server/utils/actor";
 import { cellText } from "plugins/databases/server/utils/cellText";
@@ -66,17 +65,12 @@ import {
 /**
  * Registers the tools that read and write databases (tables and boards of
  * rows, each row having its own page), filtered by the OAuth scopes granted
- * to the current token. Nothing is registered when databases are not
- * configured on this server.
+ * to the current token.
  *
  * @param server - the MCP server instance to register tools on.
  * @param scopes - the OAuth scopes granted to the access token.
  */
 export function databaseTools(server: McpServer, scopes: string[]) {
-  if (!databasesEnv.TEABLE_INTERNAL_URL || !databasesEnv.GALADRIM_SECRET) {
-    return;
-  }
-
   if (AuthenticationHelper.canAccess("databases.list", scopes)) {
     server.registerTool(
       "list_databases",

@@ -1,11 +1,12 @@
 import { groupBy } from "es-toolkit";
 import type { Transaction } from "sequelize";
 import { Database } from "@server/models";
-import type { User } from "@server/models";
+import type { Document, User } from "@server/models";
 import type { DatabaseDuplicatedTable } from "../engine/DatabaseTablesDuplicator";
 import { tablesDuplicatorFor } from "../engine/tablesDuplicator";
 import { actorFor } from "../utils/actor";
 import { remapEngineIds } from "../utils/remapEngineIds";
+import { databaseRowPagesDuplicator } from "./databaseRowPagesDuplicator";
 
 /** A database to copy, and where its copy is anchored. */
 export interface DatabaseDuplication {
@@ -25,6 +26,8 @@ export interface DuplicatedDatabase {
   fieldIds: Record<string, string>;
   /** Engine id of each view of the copy, keyed by the id of its source view. */
   viewIds: Record<string, string>;
+  /** The pages of the copied rows, copied from those of their source rows. */
+  rowPages: Document[];
 }
 
 interface Props {
@@ -32,7 +35,7 @@ interface Props {
   user: User;
   /** The databases to copy together; a database listed twice is copied once. */
   duplications: DatabaseDuplication[];
-  /** Whether the rows are copied too. */
+  /** Whether the rows are copied too, with their pages. */
   withRecords: boolean;
   /** The transaction the Outline databases are created in. */
   transaction?: Transaction | null;
@@ -42,8 +45,9 @@ interface Props {
  * Copies databases: their engine tables, each into the base of its source,
  * and their Outline settings with the view and field ids of the copies. The
  * databases copied together keep their relations between the copies, which
- * is what makes a project template out of a page and its databases. The
- * caller authorizes the user on the sources and on the new anchors.
+ * is what makes a project template out of a page and its databases. Copied
+ * rows get a copy of the page of their source row. The caller authorizes the
+ * user on the sources and on the new anchors.
  *
  * @param props the user, the databases and whether rows are copied.
  * @returns each copy, in the order of the duplications.
@@ -110,6 +114,15 @@ export async function databasesDuplicator({
       database,
       fieldIds: table.fieldIds,
       viewIds: table.viewIds,
+      rowPages: withRecords
+        ? await databaseRowPagesDuplicator({
+            user,
+            source,
+            database,
+            recordIds: table.recordIds,
+            transaction,
+          })
+        : [],
     });
   }
 

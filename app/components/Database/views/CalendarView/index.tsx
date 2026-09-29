@@ -50,6 +50,7 @@ import {
   hasTime,
 } from "../../cells/format";
 import { getCell } from "../../cells/registry";
+import { defaultDateField } from "../../newViewDefaults";
 import type { DatabaseViewProps } from "../../types";
 import {
   CardProperties,
@@ -688,10 +689,7 @@ function calendarStartField(
   const chosen = view.options.startDateFieldId
     ? database.fieldById(view.options.startDateFieldId)
     : undefined;
-  return (
-    chosen ??
-    (database.fields ?? []).find((f) => f.cellValueType === "dateTime")
-  );
+  return chosen ?? defaultDateField(database.fields ?? []);
 }
 
 /**

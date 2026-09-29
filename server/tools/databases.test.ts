@@ -762,13 +762,12 @@ describe("permissions", () => {
     expect(names).not.toContain("comment_database_record");
   });
 
-  it("offers no database tool when databases are not configured", async () => {
+  it("offers the database tools without Teable, the Outline engine needing nothing", async () => {
     databasesEnv.TEABLE_INTERNAL_URL = undefined;
 
     const names = await listTools(accessToken);
 
-    expect(names).toContain("list_documents");
-    expect(names).not.toContain("list_databases");
+    expect(names).toContain("list_databases");
   });
 });
 

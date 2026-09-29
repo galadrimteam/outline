@@ -13,6 +13,7 @@ import {
   createFilterItem,
   emptyFilter,
   filterConjunctionLabel,
+  filterDepth,
   filterOperatorLabel,
   getValidFilterOperators,
   isFilterGroup,
@@ -51,7 +52,9 @@ interface Props {
   filter: DatabaseFilter | null;
   /** Called with the edited filter; null once the last rule is removed. */
   onChange: (filter: DatabaseFilter | null) => void;
-  /** Loaded rows, to offer the people and linked rows they hold as values. */
+  /** The view filtered, whose rows hold the people and linked rows offered as values; none in automations. */
+  viewId?: string;
+  /** Loaded rows, to offer the people and linked rows they hold at once. */
   records: DatabaseRecord[];
   /** The view's saved filter, shown locked above the rules of someone who may not save it. */
   lockedFilter?: DatabaseFilter | null;
@@ -70,6 +73,7 @@ export const FilterBuilder = observer(function FilterBuilder({
   database,
   filter,
   onChange,
+  viewId,
   records,
   lockedFilter,
 }: Props) {
@@ -123,6 +127,7 @@ export const FilterBuilder = observer(function FilterBuilder({
             group={root}
             path={[]}
             root={root}
+            viewId={viewId}
             records={records}
             timeZone={timeZone}
             onChange={handleChange}
@@ -145,15 +150,36 @@ export const FilterBuilder = observer(function FilterBuilder({
   );
 });
 
+/**
+ * Returns the width of the filter popover: room for three columns per rule
+ * at every nesting level, so that deep rules keep a readable condition and
+ * value.
+ *
+ * @param filter the filter shown.
+ * @returns the width in pixels.
+ */
+export function filterPopoverWidth(filter: DatabaseFilter | null): number {
+  if (!filter?.filterSet.length) {
+    return 300;
+  }
+  return 680 + NESTED_GROUP_WIDTH * (filterDepth(filter) - 1);
+}
+
+/** What a nested group takes from its rules: its « Where » column, padding and border. */
+const NESTED_GROUP_WIDTH = 96;
+
 interface GroupEditorProps {
   database: Database;
   fields: DatabaseField[];
   group: DatabaseFilter;
   path: FilterPath;
   root: DatabaseFilter;
+  viewId?: string;
   records: DatabaseRecord[];
   timeZone: string;
   onChange: (filter: DatabaseFilter) => void;
+  /** Removes a nested group; the root group has « Delete filter » instead. */
+  onRemove?: () => void;
 }
 
 const GroupEditor = observer(function GroupEditor({
@@ -162,9 +188,11 @@ const GroupEditor = observer(function GroupEditor({
   group,
   path,
   root,
+  viewId,
   records,
   timeZone,
   onChange,
+  onRemove,
 }: GroupEditorProps) {
   const { t } = useTranslation();
 
@@ -226,13 +254,11 @@ const GroupEditor = observer(function GroupEditor({
                   group={node}
                   path={nodePath}
                   root={root}
+                  viewId={viewId}
                   records={records}
                   timeZone={timeZone}
                   onChange={onChange}
-                />
-                <RemoveButton
-                  label={t("Remove group")}
-                  onClick={() => onChange(removeFilterNode(root, nodePath))}
+                  onRemove={() => onChange(removeFilterNode(root, nodePath))}
                 />
               </Nested>
             ) : (
@@ -240,6 +266,7 @@ const GroupEditor = observer(function GroupEditor({
                 database={database}
                 fields={fields}
                 item={node}
+                viewId={viewId}
                 records={records}
                 timeZone={timeZone}
                 onChange={(item) =>
@@ -262,6 +289,11 @@ const GroupEditor = observer(function GroupEditor({
             {t("Add filter group")}
           </PanelAction>
         )}
+        {onRemove && (
+          <GroupRemove>
+            <RemoveButton label={t("Remove group")} onClick={onRemove} />
+          </GroupRemove>
+        )}
       </Actions>
     </Rows>
   );
@@ -271,6 +303,7 @@ interface RuleEditorProps {
   database: Database;
   fields: DatabaseField[];
   item: DatabaseFilterItem;
+  viewId?: string;
   records: DatabaseRecord[];
   timeZone: string;
   onChange: (item: DatabaseFilterItem) => void;
@@ -281,6 +314,7 @@ const RuleEditor = observer(function RuleEditor({
   database,
   fields,
   item,
+  viewId,
   records,
   timeZone,
   onChange,
@@ -332,6 +366,7 @@ const RuleEditor = observer(function RuleEditor({
             database={database}
             field={field}
             item={item}
+            viewId={viewId}
             records={records}
             onChange={(value) => onChange({ ...item, value })}
           />
@@ -498,11 +533,17 @@ const Nested = styled.div`
 const Actions = styled.div`
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 2px;
 
   ${PanelAction} {
     width: auto;
   }
+`;
+
+// Kept apart from the rules' own delete buttons, which sit at the top right.
+const GroupRemove = styled.div`
+  margin-inline-start: auto;
 `;
 
 const Footer = styled.div`

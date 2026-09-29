@@ -7,7 +7,6 @@ import type {
   DragStartEvent,
   DropAnimation,
   Over,
-  UniqueIdentifier,
 } from "@dnd-kit/core";
 import {
   DndContext,
@@ -17,9 +16,7 @@ import {
   MouseSensor,
   TouchSensor,
   closestCenter,
-  closestCorners,
   defaultDropAnimationSideEffects,
-  pointerWithin,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -65,6 +62,14 @@ import { CardOverlay } from "./BoardCard";
 import { BoardColumn, columnDndId, columnWidths } from "./BoardColumn";
 import { BoardLanes } from "./BoardLanes";
 import { BoardSetup } from "./BoardSetup";
+import type { Items } from "./dragModel";
+import {
+  CardCollision,
+  containerOfId,
+  entersAfter,
+  findContainer,
+  moveToContainer,
+} from "./dragModel";
 import { HiddenGroups } from "./HiddenGroups";
 import { NewGroup } from "./NewGroup";
 
@@ -86,8 +91,6 @@ export const BoardView = observer(function BoardView(props: DatabaseViewProps) {
   }
   return <Board {...props} field={field} />;
 });
-
-type Items = Record<string, string[]>;
 
 interface DragState {
   type: "card" | "column";
@@ -120,6 +123,7 @@ const Board = observer(function Board({
       : undefined;
   const [drag, setDrag] = React.useState<DragState | null>(null);
   const justDraggedRef = React.useRef(false);
+  const cardCollision = React.useMemo(() => new CardCollision(), []);
 
   const queries = React.useMemo(() => {
     const { filter, replaceFilter, sort, search } = query.params;
@@ -195,44 +199,20 @@ const Board = observer(function Board({
     })
   );
 
-  const collisionDetection = React.useCallback<CollisionDetection>((args) => {
-    if (dragType(args.active) === "column") {
-      return closestCenter({
-        ...args,
-        droppableContainers: args.droppableContainers.filter(
-          (container) => container.data.current?.type === "column"
-        ),
-      });
-    }
-
-    const candidates = args.droppableContainers.filter((container) => {
-      const type = container.data.current?.type;
-      return type === "card" || type === "column-body";
-    });
-    const within = pointerWithin({ ...args, droppableContainers: candidates });
-    const typeOf = (id: UniqueIdentifier) =>
-      candidates.find((container) => container.id === id)?.data.current?.type;
-
-    const card = within.find((collision) => typeOf(collision.id) === "card");
-    if (card) {
-      return [card];
-    }
-
-    const body = within[0];
-    if (body) {
-      const key = containerOfId(body.id);
-      const cards = candidates.filter(
-        (container) =>
-          container.data.current?.type === "card" &&
-          container.data.current?.container === key
-      );
-      return cards.length
-        ? closestCenter({ ...args, droppableContainers: cards })
-        : [body];
-    }
-
-    return closestCorners({ ...args, droppableContainers: candidates });
-  }, []);
+  const collisionDetection = React.useCallback<CollisionDetection>(
+    (args) => {
+      if (dragType(args.active) === "column") {
+        return closestCenter({
+          ...args,
+          droppableContainers: args.droppableContainers.filter(
+            (container) => container.data.current?.type === "column"
+          ),
+        });
+      }
+      return cardCollision.detect(args);
+    },
+    [cardCollision]
+  );
 
   const handleDragStart = ({ active }: DragStartEvent) => {
     const activeId = String(active.id);
@@ -246,6 +226,7 @@ const Board = observer(function Board({
     if (container === undefined) {
       return;
     }
+    cardCollision.reset();
     setDrag({
       type: "card",
       activeId,
@@ -255,15 +236,21 @@ const Board = observer(function Board({
   };
 
   const handleDragOver = React.useCallback(
-    ({ active, over }: DragOverEvent) => {
+    ({ active, over, collisions }: DragOverEvent) => {
       if (!over || dragType(active) !== "card") {
         return;
       }
+      const after = entersAfter(collisions, over.id);
       setDrag((current) => {
         if (!current?.items) {
           return current;
         }
-        const items = moveAcrossContainers(current.items, active, over);
+        const items = moveToContainer(
+          current.items,
+          String(active.id),
+          String(over.id),
+          after
+        );
         return items === current.items ? current : { ...current, items };
       });
     },
@@ -587,17 +574,6 @@ function dragType(active: Active): string | undefined {
   return typeof type === "string" ? type : undefined;
 }
 
-/** The column or container of a column or container dnd id. */
-function containerOfId(id: UniqueIdentifier): string | undefined {
-  const value = String(id);
-  for (const prefix of ["column:", "body:"]) {
-    if (value.startsWith(prefix)) {
-      return value.slice(prefix.length);
-    }
-  }
-  return undefined;
-}
-
 /** The column a droppable belongs to. */
 function columnKeyOf(over: Over): string | undefined {
   const { columnKey, container } = over.data.current ?? {};
@@ -609,46 +585,6 @@ function columnKeyOf(over: Over): string | undefined {
   }
   const key = containerOfId(over.id);
   return key === undefined ? undefined : parseContainerKey(key).column;
-}
-
-function findContainer(id: string, items: Items): string | undefined {
-  const key = containerOfId(id);
-  if (key !== undefined) {
-    return key;
-  }
-  return Object.keys(items).find((container) => items[container].includes(id));
-}
-
-/**
- * Moves the dragged card into the container under the pointer, above or
- * below the card it is over. Moves within a container are left to the
- * sortable strategy until the drop.
- */
-function moveAcrossContainers(items: Items, active: Active, over: Over): Items {
-  const activeId = String(active.id);
-  const from = findContainer(activeId, items);
-  const to = findContainer(String(over.id), items);
-  if (from === undefined || to === undefined || from === to || !(to in items)) {
-    return items;
-  }
-
-  const target = items[to];
-  const overIndex = target.indexOf(String(over.id));
-  let index = target.length;
-  if (overIndex !== -1) {
-    const translated = active.rect.current.translated;
-    const isBelow =
-      !!translated &&
-      translated.top + translated.height / 2 >
-        over.rect.top + over.rect.height / 2;
-    index = overIndex + (isBelow ? 1 : 0);
-  }
-
-  return {
-    ...items,
-    [from]: items[from].filter((id) => id !== activeId),
-    [to]: [...target.slice(0, index), activeId, ...target.slice(index)],
-  };
 }
 
 const Scroller = styled.div`
