@@ -255,6 +255,11 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
       $containsIcon={!!icon}
       autoFocus={!title}
       maxLength={DocumentValidation.maxTitleLength}
+      // galadrim: the title given here keeps up with what is typed (see
+      // useDocumentSave), so a change under focus is a rename made elsewhere,
+      // such as a database row's title: shown at once, and never overwritten
+      // by the stale text on blur.
+      syncWhileFocused
       readOnly={readOnly}
       aria-label={t("Document title")}
       dir="auto"

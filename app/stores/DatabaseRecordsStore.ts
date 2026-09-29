@@ -27,7 +27,7 @@ import type {
 import type Document from "~/models/Document";
 import type { PartialExcept } from "~/types";
 import Logger from "~/utils/Logger";
-import { databaseRpc } from "./DatabasesStore";
+import { databaseRpc, tabOrigin } from "./DatabasesStore";
 import type RootStore from "./RootStore";
 
 /** What narrows the rows of a view for one reader, on top of the view's own settings. */
@@ -879,8 +879,7 @@ export default class DatabaseRecordsStore {
 
     const kinds = new Set(event.kinds);
     const recordIds = event.recordIds ?? [];
-    const isOwn =
-      !!event.actorId && event.actorId === this.rootStore.auth.currentUserId;
+    const isOwn = event.origin === tabOrigin;
     const isEcho = (ids: string[]) =>
       isOwn && ids.length > 0 && ids.every((id) => this.isRecentLocalWrite(id));
 

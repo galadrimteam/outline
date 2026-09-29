@@ -13,6 +13,7 @@ import { client } from "~/utils/ApiClient";
 import { makeField, makeView } from "../views/TableView/testFixtures";
 import { rowTemplates } from "./rowTemplates";
 import { NewRecordMenu } from "./NewRecordMenu";
+import { tabOrigin } from "~/stores/DatabasesStore";
 
 const me = "00000000-0000-4000-8000-000000000011";
 const databaseId = "30000000-0000-4000-8000-000000000011";
@@ -139,6 +140,7 @@ describe("NewRecordMenu", () => {
       (call) => call.path === "/databaseRecords.createFromTemplate"
     );
     expect(create?.body).toEqual({
+      origin: tabOrigin,
       databaseId,
       templateId,
       fields: { status: "À faire" },

@@ -12,6 +12,7 @@ import { Document } from "@server/models";
 import { authorize, can } from "@server/policies";
 import { presentDocument, presentPolicies } from "@server/presenters";
 import type { APIContext } from "@server/types";
+import { databaseRecordsDeleter } from "../commands/databaseRecordsDeleter";
 import type { DatabaseActor, DatabaseEngine } from "../engine/DatabaseEngine";
 import { engineFor, refFor } from "../engine";
 import {
@@ -207,11 +208,11 @@ router.post(
     const { databaseId, recordIds, origin } = ctx.input.body;
     const database = await loadDatabase(user, databaseId, "update");
 
-    await engineFor(database, { origin }).deleteRecords(
-      actorFor(user),
-      refFor(database),
-      recordIds
-    );
+    await databaseRecordsDeleter(ctx.context, {
+      database,
+      engine: engineFor(database, { origin }),
+      recordIds,
+    });
 
     ctx.body = { success: true };
   }

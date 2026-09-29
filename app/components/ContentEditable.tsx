@@ -16,6 +16,12 @@ type Props = Omit<React.HTMLAttributes<HTMLSpanElement>, "ref" | "onChange"> & {
   placeholder?: string;
   maxLength?: number;
   autoFocus?: boolean;
+  /**
+   * Shows a new value even while the element has focus, for a caller whose
+   * value never lags behind what is typed. By default the typed text stays
+   * and is sent again on blur.
+   */
+  syncWhileFocused?: boolean;
   children?: React.ReactNode;
   value: string;
 };
@@ -44,6 +50,7 @@ const ContentEditable = React.forwardRef(function ContentEditable_(
     className,
     maxLength,
     autoFocus,
+    syncWhileFocused,
     placeholder,
     readOnly,
     dir,
@@ -55,6 +62,7 @@ const ContentEditable = React.forwardRef(function ContentEditable_(
   const contentRef = React.useRef<HTMLSpanElement>(null);
   const [innerValue, setInnerValue] = React.useState<string>(value);
   const lastValue = React.useRef(value);
+  const caretToEnd = React.useRef(false);
 
   React.useImperativeHandle(ref, () => ({
     focus: () => {
@@ -128,17 +136,33 @@ const ContentEditable = React.forwardRef(function ContentEditable_(
   }, [autoFocus, disabled, isVisible, readOnly, contentRef]);
 
   React.useEffect(() => {
-    if (contentRef.current && value !== contentRef.current.textContent) {
-      if (document.activeElement === contentRef.current) {
-        // Don't reset content while the user is actively editing. Update
-        // lastValue so that the next input or blur event will push the
-        // current DOM text back to the model via onChange.
-        lastValue.current = value;
-      } else {
-        setInnerValue(value);
-      }
+    const element = contentRef.current;
+    if (!element || value === element.textContent) {
+      return;
     }
-  }, [value, contentRef]);
+    if (document.activeElement !== element) {
+      setInnerValue(value);
+    } else if (syncWhileFocused) {
+      lastValue.current = value;
+      element.textContent = value;
+      placeCaret(element, false);
+      // Rendering the new value rewrites the text node, which moves the caret.
+      caretToEnd.current = innerValue !== value;
+      setInnerValue(value);
+    } else {
+      // Don't reset content while the user is actively editing. Update
+      // lastValue so that the next input or blur event will push the
+      // current DOM text back to the model via onChange.
+      lastValue.current = value;
+    }
+  }, [value, contentRef, syncWhileFocused, innerValue]);
+
+  React.useLayoutEffect(() => {
+    if (caretToEnd.current && contentRef.current) {
+      caretToEnd.current = false;
+      placeCaret(contentRef.current, false);
+    }
+  }, [innerValue]);
 
   // Ensure only plain text can be pasted into input when pasting from another
   // rich text source. Note: If `onPaste` prop is passed then it takes
