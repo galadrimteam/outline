@@ -182,7 +182,7 @@ export const CardProperties = observer(function CardProperties({
               value={record.fields[field.id]}
               database={database}
               record={record}
-              variant="card"
+              variant={inline ? "table" : "card"}
             />
           </Property>
         );

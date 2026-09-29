@@ -23,6 +23,7 @@ import { groupRecords } from "../../toolbar/grouping";
 import { useViewUpdate } from "../../toolbar/useViewUpdate";
 import type { DatabaseViewProps } from "../../types";
 import type { DaySpan } from "../CalendarView/calendarModel";
+import { defaultDateField } from "../../newViewDefaults";
 import { recordSpan } from "../CalendarView/calendarModel";
 import { useDateLocale } from "../CalendarView/useDateLocale";
 import {
@@ -873,10 +874,7 @@ function timelineStartField(
   const id =
     view.overrides.timeline?.startFieldId || view.options.startDateFieldId;
   const chosen = id ? database.fieldById(id) : undefined;
-  return (
-    chosen ??
-    (database.fields ?? []).find((f) => f.cellValueType === "dateTime")
-  );
+  return chosen ?? defaultDateField(database.fields ?? []);
 }
 
 /**
@@ -990,18 +988,27 @@ const HeaderRow = styled.div`
   border-bottom: 1px solid ${s("divider")};
 `;
 
+// The side table's widths are the track's offset: padding and borders must
+// stay inside them, and a cell never spills over the timeline.
+const tablePart = css`
+  box-sizing: border-box;
+`;
+
 const TableHead = styled.div`
+  ${tablePart}
   position: sticky;
   left: 0;
   z-index: 5;
   display: flex;
   align-items: flex-end;
   flex-shrink: 0;
+  overflow: hidden;
   background: ${s("background")};
   border-inline-end: 1px solid ${s("divider")};
 `;
 
 const HeadCell = styled.div`
+  ${tablePart}
   flex-shrink: 0;
   padding: 0 8px 6px;
   color: ${s("textTertiary")};
@@ -1085,17 +1092,20 @@ const Row = styled.div`
 `;
 
 const TableSide = styled.div`
+  ${tablePart}
   position: sticky;
   left: 0;
   z-index: 3;
   display: flex;
   flex-shrink: 0;
+  overflow: hidden;
   background: ${s("background")};
   border-inline-end: 1px solid ${s("divider")};
   border-bottom: 1px solid ${s("divider")};
 `;
 
 const TitleCell = styled.div`
+  ${tablePart}
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -1117,6 +1127,7 @@ const TitleCell = styled.div`
 `;
 
 const Cell = styled.div`
+  ${tablePart}
   flex-shrink: 0;
   display: flex;
   align-items: center;

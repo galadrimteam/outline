@@ -48,6 +48,7 @@ export const SWITCHABLE_LAYOUTS: DatabaseLayout[] = [
   DatabaseLayout.Calendar,
   DatabaseLayout.List,
   DatabaseLayout.Gallery,
+  DatabaseLayout.Form,
 ];
 
 /**
@@ -269,7 +270,12 @@ const LayoutOptions = observer(function LayoutOptions({
           <Setting label={t("End date")}>
             <CompactSelect
               ariaLabel={t("End date")}
-              value={view.options.endDateFieldId || NONE}
+              value={
+                view.options.endDateFieldId &&
+                view.options.endDateFieldId !== view.options.startDateFieldId
+                  ? view.options.endDateFieldId
+                  : NONE
+              }
               disabled={disabled}
               options={[
                 { value: NONE, label: t("No end date") },
@@ -373,7 +379,7 @@ const LayoutPage = observer(function LayoutPage({
         return;
       }
       const inPlace = inPlaceLayoutOverride(view, layout);
-      if (inPlace) {
+      if (inPlace !== undefined) {
         onUpdate({ overrides: { layout: inPlace } });
         return;
       }
@@ -382,10 +388,14 @@ const LayoutPage = observer(function LayoutPage({
           name: view.name,
           layout,
         });
-        const copied = await databases.updateView(database.id, created.id, {
-          filter: view.filter,
-          sort: view.sort,
-        });
+        // A form adds rows, it shows none: there is nothing to filter or sort.
+        const copied =
+          layout === DatabaseLayout.Form
+            ? created
+            : await databases.updateView(database.id, created.id, {
+                filter: view.filter,
+                sort: view.sort,
+              });
         block?.onViewCreated(copied ?? created);
         toast.success(
           t("A {{ layout }} view named “{{ name }}” was added to the tabs", {
@@ -415,7 +425,8 @@ const LayoutPage = observer(function LayoutPage({
       <Tiles role="radiogroup" aria-label={t("Layout")}>
         {SWITCHABLE_LAYOUTS.map((layout) => {
           const isCurrent = layout === view.layout;
-          const addsView = !isCurrent && !inPlaceLayoutOverride(view, layout);
+          const addsView =
+            !isCurrent && inPlaceLayoutOverride(view, layout) === undefined;
           return (
             <Tile
               key={layout}
@@ -424,7 +435,7 @@ const LayoutPage = observer(function LayoutPage({
               aria-checked={isCurrent}
               $active={isCurrent}
               title={
-                addsView
+                addsView && layout !== DatabaseLayout.Form
                   ? t("Adds a new view with the same filters and sorts")
                   : undefined
               }
@@ -450,26 +461,29 @@ const LayoutPage = observer(function LayoutPage({
 
 /**
  * Returns the `overrides.layout` that shows a grid view with another layout in
- * place, or undefined when the engine view type has to change (a new view).
+ * place: list, timeline, or null to draw it as the table it is again. Other
+ * layouts need another engine view type, hence a new view.
  *
  * @param view the view.
  * @param layout the wanted layout.
- * @returns the override to save, or undefined.
+ * @returns the override to save, null to clear it, or undefined for a new view.
  */
 export function inPlaceLayoutOverride(
   view: Pick<DatabaseView, "type">,
   layout: DatabaseLayout
-): DatabaseLayout.List | DatabaseLayout.Timeline | undefined {
+): DatabaseLayout.List | DatabaseLayout.Timeline | null | undefined {
   if (view.type !== "grid") {
     return undefined;
   }
-  if (layout === DatabaseLayout.List) {
-    return DatabaseLayout.List;
+  switch (layout) {
+    case DatabaseLayout.List:
+    case DatabaseLayout.Timeline:
+      return layout;
+    case DatabaseLayout.Table:
+      return null;
+    default:
+      return undefined;
   }
-  if (layout === DatabaseLayout.Timeline) {
-    return DatabaseLayout.Timeline;
-  }
-  return undefined;
 }
 
 /**
