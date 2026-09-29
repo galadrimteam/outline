@@ -153,7 +153,8 @@ function DocumentBreadcrumb(
   const depth = maxDepth === undefined ? undefined : Math.max(0, maxDepth);
 
   React.useEffect(() => {
-    void document.loadRelations({ withoutPolicies: true });
+    // A reader of a page may not read its collection (a linked view, a guest): the breadcrumb then shows less.
+    document.loadRelations({ withoutPolicies: true }).catch(() => undefined);
   }, [document]);
 
   const path = documentBreadcrumbNodes(document, showCurrent);
