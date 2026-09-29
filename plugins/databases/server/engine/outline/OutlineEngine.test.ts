@@ -904,6 +904,7 @@ describe.each(stores)("OutlineEngine on %s", (_name, makeStore) => {
         await engine.listRecords(ada, copiedTasks, { skip: 0, take: 10 })
       ).records;
       expect(project.id).not.toBe(p1.id);
+      expect(projectsCopy.recordIds).toEqual({ [p1.id]: project.id });
       expect(project.fields[projectsCopy.fieldIds[t.total]]).toBe(100);
       expect(linkedIds(task.fields[tasksCopy.fieldIds[t.project.id]])).toEqual([
         project.id,

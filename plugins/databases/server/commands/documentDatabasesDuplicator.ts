@@ -22,7 +22,7 @@ interface Props {
    * (`templateId`), duplicated together. They are updated in place.
    */
   documents: Document[];
-  /** Whether the rows of the databases are copied too. */
+  /** Whether the rows of the databases are copied too, with their pages. */
   withRecords?: boolean;
   /** The transaction the documents were created in. */
   transaction?: Transaction | null;
@@ -34,9 +34,10 @@ interface Props {
  * anchored on the source of a new document is copied and anchored on that new
  * document, and every `database` node of the new documents that showed one of
  * those databases (its own block, or a linked view elsewhere in the copied
- * pages) now shows the copy. Databases copied together keep their relations
- * between the copies. A database the user cannot read stays a linked view of
- * the original; when the engine fails, every node is left as it was.
+ * pages, row pages included) now shows the copy. Databases copied together
+ * keep their relations between the copies. A database the user cannot read
+ * stays a linked view of the original; when the engine fails, every node is
+ * left as it was.
  *
  * @param props the user, the new documents, and whether rows are copied.
  * @returns the number of databases copied.
@@ -80,6 +81,10 @@ export async function documentDatabasesDuplicator({
       }
     );
     return 0;
+  }
+
+  for (const document of duplicated.flatMap((copy) => copy.rowPages)) {
+    pages.push({ document, content: await DocumentHelper.toJSON(document) });
   }
 
   const nodeCopies = new Map<string, DatabaseNodeCopy>(

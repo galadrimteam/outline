@@ -180,8 +180,11 @@ export const Cell = styled.div<{
   $active?: boolean;
   $wrap?: boolean;
   $editable?: boolean;
+  /** Room kept on the left when the cell is scrolled into view, under the frozen columns. */
+  $scrollMarginLeft?: number;
 }>`
   position: relative;
+  scroll-margin-left: ${(props) => props.$scrollMarginLeft ?? 0}px;
   display: flex;
   align-items: ${(props) => (props.$wrap ? "flex-start" : "center")};
   min-width: 0;

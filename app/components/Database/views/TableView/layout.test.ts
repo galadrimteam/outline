@@ -3,6 +3,7 @@ import {
   GUTTER_WIDTH,
   clampColumnWidth,
   defaultColumnWidth,
+  frozenEdge,
   insertionOrder,
   moveId,
   rowLayout,
@@ -129,5 +130,17 @@ describe("insertionOrder", () => {
   it("places a column past the edges", () => {
     expect(insertionOrder(fields, view, "title", "left")).toBe(-1);
     expect(insertionOrder(fields.slice(0, 3), view, "done", "right")).toBe(3);
+  });
+});
+
+describe("frozenEdge", () => {
+  it("ends after the last frozen column", () => {
+    const view = makeView({ options: { frozenFieldId: "status" } });
+    const columns = tableColumns(fields, view);
+    expect(frozenEdge(columns)).toBe(GUTTER_WIDTH + 280 + 200);
+  });
+
+  it("is the gutter alone without columns", () => {
+    expect(frozenEdge([])).toBe(GUTTER_WIDTH);
   });
 });

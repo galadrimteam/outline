@@ -15,7 +15,8 @@ import type { TeableIdentity } from "./TeableIdentity";
 
 /**
  * Duplicates Teable tables with Teable's own table duplication, which copies
- * fields, views, formulas and records but turns every link to another table
+ * fields, views, formulas and records (each copied record keeps the id of its
+ * source, so no record ids are returned) but turns every link to another table
  * into a one-way link to the original table. The links between the tables
  * duplicated together are then pointed at the copies: a two-way pair becomes
  * a two-way pair between the copies again (the copy of the reverse side is

@@ -51,6 +51,7 @@ import { TableFooter } from "./TableFooter";
 import { TableHeader } from "./TableHeader";
 import { TableRow } from "./TableRow";
 import { useRowVirtualizer } from "./useRowVirtualizer";
+import { useTableClipboard } from "./useTableClipboard";
 
 /** Props of the table view: the block's view props, and the hook that opens the view's filter. */
 export interface TableViewProps extends DatabaseViewProps {
@@ -104,6 +105,7 @@ export const TableView = observer(function TableView_({
   const [selected, setSelected] = React.useState<string[]>([]);
   const [active, setActive] = React.useState<ActiveCell | null>(null);
   const [editing, setEditing] = React.useState(false);
+  const [editInput, setEditInput] = React.useState<string>();
   const [menuFieldId, setMenuFieldId] = React.useState<string | null>(null);
   const [drop, setDrop] = React.useState<DropTarget | null>(null);
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
@@ -155,6 +157,14 @@ export const TableView = observer(function TableView_({
         (row): row is RecordDisplayRow => row.type === "record"
       ),
     [displayRows]
+  );
+  const rowIds = React.useMemo(
+    () => recordRows.map((row) => row.record.id),
+    [recordRows]
+  );
+  const columnFields = React.useMemo(
+    () => columns.map((column) => column.field),
+    [columns]
   );
   const selectedIds = React.useMemo(() => {
     const shown = new Set(records.map((record) => record.id));
@@ -313,6 +323,7 @@ export const TableView = observer(function TableView_({
   const handleActivate = React.useCallback(
     (recordId: string, fieldId: string, edit: boolean) => {
       setActive({ recordId, fieldId });
+      setEditInput(undefined);
       setEditing(edit);
     },
     []
@@ -329,6 +340,7 @@ export const TableView = observer(function TableView_({
 
   const handleCloseEditor = React.useCallback(() => {
     setEditing(false);
+    setEditInput(undefined);
     focusGrid();
   }, [focusGrid]);
 
@@ -354,6 +366,7 @@ export const TableView = observer(function TableView_({
       const primary = database.primaryField;
       if (created && primary && getCell(primary.type).isEditable(primary)) {
         setActive({ recordId: created, fieldId: primary.id });
+        setEditInput(undefined);
         setEditing(true);
       }
     },
@@ -566,22 +579,41 @@ export const TableView = observer(function TableView_({
 
   const moveActive = React.useCallback(
     (key: NonNullable<ReturnType<typeof navigationKey>>) => {
-      const rowIds = recordRows.map((row) => row.record.id);
-      const colIds = columns.map((column) => column.field.id);
-      if (!rowIds.length || !colIds.length) {
+      if (!rowIds.length || !columnFields.length) {
         return;
       }
       const row = active ? rowIds.indexOf(active.recordId) : -1;
-      const col = active ? colIds.indexOf(active.fieldId) : -1;
+      const col = active
+        ? columnFields.findIndex((field) => field.id === active.fieldId)
+        : -1;
       if (row === -1 || col === -1) {
-        setActive({ recordId: rowIds[0], fieldId: colIds[0] });
+        setActive({ recordId: rowIds[0], fieldId: columnFields[0].id });
         return;
       }
-      const next = moveCell({ row, col }, key, rowIds.length, colIds.length);
-      setActive({ recordId: rowIds[next.row], fieldId: colIds[next.col] });
+      const next = moveCell(
+        { row, col },
+        key,
+        rowIds.length,
+        columnFields.length
+      );
+      setActive({
+        recordId: rowIds[next.row],
+        fieldId: columnFields[next.col].id,
+      });
     },
-    [active, columns, recordRows]
+    [active, columnFields, rowIds]
   );
+
+  const { bridge: clipboardBridge, handleKeyDown: handleClipboardKey } =
+    useTableClipboard({
+      database,
+      gridRef,
+      active,
+      rowIds,
+      fields: columnFields,
+      readOnly,
+      onError: showError,
+    });
 
   const handleKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -592,12 +624,16 @@ export const TableView = observer(function TableView_({
         if (event.key === "Tab") {
           event.preventDefault();
           setEditing(false);
+          setEditInput(undefined);
           moveActive(event.shiftKey ? "ShiftTab" : "Tab");
           focusGrid();
         }
         return;
       }
       if (event.target !== gridRef.current) {
+        return;
+      }
+      if (handleClipboardKey(event)) {
         return;
       }
 
@@ -620,6 +656,7 @@ export const TableView = observer(function TableView_({
         case "Enter":
           event.preventDefault();
           if (editable) {
+            setEditInput(undefined);
             setEditing(true);
           } else if (field?.isPrimary) {
             onOpenRecord(active.recordId);
@@ -640,6 +677,11 @@ export const TableView = observer(function TableView_({
           }
           return;
         default:
+          if (editable && cell?.opensOnTyping && isTypedCharacter(event)) {
+            event.preventDefault();
+            setEditInput(event.key);
+            setEditing(true);
+          }
           return;
       }
     },
@@ -649,6 +691,7 @@ export const TableView = observer(function TableView_({
       editing,
       focusGrid,
       handleChange,
+      handleClipboardKey,
       menuFieldId,
       moveActive,
       onOpenRecord,
@@ -685,6 +728,7 @@ export const TableView = observer(function TableView_({
 
   return (
     <Wrapper>
+      {clipboardBridge}
       {selectedIds.length > 0 && !readOnly && (
         <SelectionBar
           count={selectedIds.length}
@@ -790,6 +834,11 @@ export const TableView = observer(function TableView_({
                         : undefined
                     }
                     isEditing={editing && active?.recordId === row.record.id}
+                    editInput={
+                      editing && active?.recordId === row.record.id
+                        ? editInput
+                        : undefined
+                    }
                     dropSide={
                       drop?.recordId === row.record.id ? drop.side : undefined
                     }
@@ -875,6 +924,13 @@ function LoadingRows({
         </SpanningLine>
       ))}
     </>
+  );
+}
+
+function isTypedCharacter(event: React.KeyboardEvent): boolean {
+  // AltGr reports Ctrl+Alt on Windows and types characters such as « @ ».
+  return (
+    event.key.length === 1 && !event.metaKey && (!event.ctrlKey || event.altKey)
   );
 }
 

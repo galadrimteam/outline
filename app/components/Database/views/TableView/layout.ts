@@ -107,6 +107,21 @@ export function tableColumns(
 }
 
 /**
+ * Where the frozen part of the table ends: the gutter and the frozen columns stay over the
+ * left of the scrolled columns, so a cell scrolled into view must clear them.
+ *
+ * @param columns the columns of the table.
+ * @returns the distance from the table's left edge, in pixels.
+ */
+export function frozenEdge(columns: TableColumn[]): number {
+  return columns.reduce(
+    (edge, column) =>
+      column.frozen ? Math.max(edge, column.left + column.width) : edge,
+    GUTTER_WIDTH
+  );
+}
+
+/**
  * Row height and wrapping for a view's `rowHeight` option. Notion's "Wrap all columns" is
  * `autoFit`; taller presets wrap within their height.
  *

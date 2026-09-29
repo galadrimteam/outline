@@ -279,6 +279,7 @@ function ToolbarPopover({
 
 const Bar = styled.div`
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 2px;

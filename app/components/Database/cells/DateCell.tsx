@@ -36,6 +36,7 @@ export const dateCell: CellDefinition = {
   Renderer: DateRenderer,
   Editor: DateEditor,
   isEditable: isWritable,
+  opensOnTyping: true,
 };
 
 function DateRenderer({

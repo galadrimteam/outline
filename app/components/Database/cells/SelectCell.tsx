@@ -34,7 +34,7 @@ import {
 } from "./components/styles";
 import { isWritable } from "./editable";
 import { toArray } from "./format";
-import { useListNavigation } from "./hooks";
+import { moveCaretToEnd, useListNavigation } from "./hooks";
 import { saveChoices } from "./saveChoices";
 import type {
   CellDefinition,
@@ -47,6 +47,7 @@ export const selectCell: CellDefinition = {
   Renderer: SelectRenderer,
   Editor: observer(SelectEditor),
   isEditable: isWritable,
+  opensOnTyping: true,
 };
 
 /**
@@ -106,7 +107,7 @@ function SelectRenderer({ field, value, variant, wrap }: CellRendererProps) {
 }
 
 function SelectEditor(props: CellEditorProps) {
-  const { database, field, value, onChange, onClose } = props;
+  const { database, field, value, onChange, onClose, initialInput } = props;
   const { t } = useTranslation();
   const stores = useStores();
   const multiple = field.type === DatabaseFieldType.MultipleSelect;
@@ -116,7 +117,7 @@ function SelectEditor(props: CellEditorProps) {
     [field.options.choices]
   );
   const [selected, setSelected] = React.useState(() => selectedNames(value));
-  const [query, setQuery] = React.useState("");
+  const [query, setQuery] = React.useState(initialInput ?? "");
   const [creating, setCreating] = React.useState(false);
 
   const sections = status
@@ -213,7 +214,8 @@ function SelectEditor(props: CellEditorProps) {
 
   const { active, setActive, handleKeyDown } = useListNavigation(
     itemCount,
-    handlePick
+    handlePick,
+    { query, onEnterWithoutPick: onClose }
   );
 
   const handleSearchKeyDown = React.useCallback(
@@ -252,6 +254,7 @@ function SelectEditor(props: CellEditorProps) {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={handleSearchKeyDown}
+          onFocus={moveCaretToEnd}
         />
       </SearchArea>
       <PopoverHeading>{t("Select an option or create one")}</PopoverHeading>

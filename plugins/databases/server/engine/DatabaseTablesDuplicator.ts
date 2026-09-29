@@ -43,4 +43,10 @@ export interface DatabaseDuplicatedTable {
   fieldIds: Record<string, string>;
   /** Engine id of each view of the copy, keyed by the id of its source view. */
   viewIds: Record<string, string>;
+  /**
+   * Engine id of each copied record, keyed by the id of its source record,
+   * for an engine that gives the copies new ids; absent when each copy keeps
+   * the id of its source.
+   */
+  recordIds?: Record<string, string>;
 }

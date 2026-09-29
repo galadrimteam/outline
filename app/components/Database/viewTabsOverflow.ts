@@ -71,3 +71,23 @@ export function splitTabs(
     hidden: all.filter((index) => !visible.includes(index)),
   };
 }
+
+/**
+ * The narrowest the strip may get: the active tab (the first one when none
+ * is active), « N more » when some tab can be listed there, and « + ». The
+ * toolbar goes to its own line rather than squeeze the strip below this.
+ *
+ * @param metrics the widths of the tabs and buttons.
+ * @param activeIndex the index of the active tab, -1 when none.
+ * @returns the width in pixels, 0 without tabs.
+ */
+export function stripMinimum(
+  metrics: TabStripMetrics,
+  activeIndex: number
+): number {
+  const { widths, gap, moreWidth, addWidth } = metrics;
+  const tab = widths[activeIndex] ?? widths[0] ?? 0;
+  const more = widths.length > 1 ? gap + moreWidth : 0;
+  const add = addWidth > 0 ? gap + addWidth : 0;
+  return Math.ceil(tab + more + add);
+}

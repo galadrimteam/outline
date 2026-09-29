@@ -38,8 +38,9 @@ import type Database from "~/models/Database";
 import { LayoutIcon } from "./LayoutIcon";
 import { newViewSettings } from "./newViewDefaults";
 import { PanelAction } from "./toolbar/components";
+import { useIsWrapped } from "./useIsWrapped";
 import { useTabStripMetrics } from "./useTabStripMetrics";
-import { splitTabs } from "./viewTabsOverflow";
+import { splitTabs, stripMinimum } from "./viewTabsOverflow";
 
 interface Props {
   database: Database;
@@ -258,6 +259,10 @@ export const ViewTabs = observer(function ViewTabs({
       : undefined;
   const shownViews = split ? split.visible.map((index) => views[index]) : views;
   const hiddenViews = split ? split.hidden.map((index) => views[index]) : [];
+  const minStripWidth = metrics ? stripMinimum(metrics, activeIndex) : 0;
+  const barRef = React.useRef<HTMLDivElement>(null);
+  const actionsRef = React.useRef<HTMLDivElement>(null);
+  const isWrapped = useIsWrapped(barRef, stripRef, actionsRef);
 
   const moreAction = useMenuAction(
     hiddenViews.map((view) =>
@@ -272,8 +277,12 @@ export const ViewTabs = observer(function ViewTabs({
   );
 
   return (
-    <Bar>
-      <Strip ref={stripRef}>
+    <Bar ref={barRef} $isWrapped={isWrapped}>
+      <Strip
+        ref={stripRef}
+        $isWrapped={isWrapped}
+        style={{ minWidth: `min(100%, ${minStripWidth}px)` }}
+      >
         <Measure ref={measureRef} aria-hidden>
           {views.map((view) => (
             <Tab key={view.id} as="span" $isActive={false}>
@@ -330,7 +339,11 @@ export const ViewTabs = observer(function ViewTabs({
           </DropdownMenu>
         )}
       </Strip>
-      {actions && <Actions>{actions}</Actions>}
+      {actions && (
+        <Actions ref={actionsRef} $isWrapped={isWrapped}>
+          {actions}
+        </Actions>
+      )}
     </Bar>
   );
 });
@@ -516,21 +529,27 @@ function RenameInput({
 const TAB_GAP = 2;
 const ADD_WIDTH = 28;
 
-const Bar = styled.div`
+// The toolbar wraps under the tabs when both do not fit, and the divider then
+// stays under the tabs, where the active tab draws its underline.
+const Bar = styled.div<{ $isWrapped: boolean }>`
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  column-gap: 8px;
   min-width: 0;
-  border-bottom: 1px solid ${s("divider")};
+  border-bottom: 1px solid
+    ${(props) => (props.$isWrapped ? "transparent" : props.theme.divider)};
 `;
 
-const Strip = styled.div`
+const Strip = styled.div<{ $isWrapped: boolean }>`
   position: relative;
   display: flex;
   align-items: center;
   gap: ${TAB_GAP}px;
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 1 1 0;
+  border-bottom: 1px solid
+    ${(props) => (props.$isWrapped ? props.theme.divider : "transparent")};
+  margin-bottom: -1px;
 `;
 
 const Measure = styled.div`
@@ -688,12 +707,16 @@ const AddButton = styled.button`
   }
 `;
 
-const Actions = styled.div`
+const Actions = styled.div<{ $isWrapped: boolean }>`
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 2px;
   flex-shrink: 0;
-  padding: 4px 0;
+  max-width: 100%;
+  margin-left: auto;
+  padding: ${(props) => (props.$isWrapped ? "6px 0 2px" : "4px 0")};
 `;
 
 const MenuList = styled.div`

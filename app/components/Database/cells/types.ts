@@ -37,6 +37,11 @@ export interface CellEditorProps extends CellRendererProps {
    * that omit it only get single-field edits.
    */
   onChangeFields?: (fields: Record<string, DatabaseCellInput>) => void;
+  /**
+   * What the reader typed on the selected cell to open the editor: it replaces the value of a
+   * text editor and starts the search of a picker.
+   */
+  initialInput?: string;
 }
 
 /** How a field type is drawn and edited. */
@@ -47,4 +52,6 @@ export interface CellDefinition {
   Editor?: React.ComponentType<CellEditorProps>;
   /** Whether cells of this field can be edited by someone with write access. */
   isEditable: (field: DatabaseField) => boolean;
+  /** Whether typing on a selected cell opens its editor with what was typed. */
+  opensOnTyping?: boolean;
 }

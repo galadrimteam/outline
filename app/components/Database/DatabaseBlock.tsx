@@ -57,6 +57,7 @@ import {
 } from "./toolbar/viewDrafts";
 import type { TableViewProps } from "./views/TableView";
 import { useActiveView } from "./useActiveView";
+import { useDatabaseTitleSync } from "./useDatabaseTitleSync";
 import { ViewTabs } from "./ViewTabs";
 
 const BoardView = lazyWithRetry(() =>
@@ -103,6 +104,7 @@ export const DatabaseBlock = observer(function DatabaseBlock(
           blockKey={attrs.id ?? attrs.databaseId}
           viewIds={attrs.viewIds}
           fullPage={attrs.fullPage}
+          title={attrs.title}
           isEditable={props.isEditable}
           isSelected={props.isSelected}
           actions={actions}
@@ -209,6 +211,7 @@ const EmptyBlock = observer(function EmptyBlock({
               .create({
                 collectionId: document.collectionId,
                 documentId: document.id,
+                title: (attrs.fullPage && document.title.trim()) || undefined,
                 layout,
               })
               .then((database) => database.id);
@@ -300,6 +303,8 @@ interface FrameProps {
   blockKey: string;
   viewIds: string[] | null;
   fullPage: boolean;
+  /** The `title` attribute of the node. */
+  title: string | null;
   isEditable: boolean;
   isSelected: boolean;
   actions: NodeActions;
@@ -330,6 +335,7 @@ const DatabaseFrame = observer(function DatabaseFrame({
   blockKey,
   viewIds,
   fullPage,
+  title,
   isEditable,
   isSelected,
   actions,
@@ -341,6 +347,20 @@ const DatabaseFrame = observer(function DatabaseFrame({
   const [loadError, setLoadError] = React.useState<Error>();
   const database = databases.get(databaseId);
   const isLoaded = !!database?.isSchemaLoaded;
+  const readOnly =
+    share.readOnly || !isEditable || !policies.abilities(databaseId).update;
+
+  const setNodeTitle = React.useCallback(
+    (next: string | null) => updateAttrs({ title: next }),
+    [updateAttrs]
+  );
+  useDatabaseTitleSync({
+    database: isLoaded ? database : undefined,
+    fullPage,
+    nodeTitle: title,
+    canRename: !readOnly,
+    setNodeTitle,
+  });
 
   const load = React.useCallback(() => {
     setLoadError(undefined);
@@ -400,9 +420,6 @@ const DatabaseFrame = observer(function DatabaseFrame({
       </Frame>
     );
   }
-
-  const readOnly =
-    share.readOnly || !isEditable || !policies.abilities(database.id).update;
 
   return (
     <Frame $fullPage={fullPage} $selected={isSelected}>
@@ -655,6 +672,10 @@ const BlockOptions = observer(function BlockOptions({
   const makeHostFullWidth = useFullWidthHost();
   const share = useDatabaseShare();
   const { dialogs, databases, policies } = useStores();
+  const canAutomate =
+    !share.isShare &&
+    !!policies.abilities(databaseId).update &&
+    !!databases.get(databaseId)?.isSchemaLoaded;
 
   const menu = useMenuAction([
     createAction({
@@ -683,10 +704,7 @@ const BlockOptions = observer(function BlockOptions({
       name: t("Automations"),
       section: "Database",
       icon: <LightningIcon />,
-      visible:
-        !share.isShare &&
-        !!policies.abilities(databaseId).update &&
-        !!databases.get(databaseId)?.isSchemaLoaded,
+      visible: canAutomate,
       perform: () => {
         const database = databases.get(databaseId);
         if (database) {
@@ -703,6 +721,10 @@ const BlockOptions = observer(function BlockOptions({
       perform: () => actions.remove(),
     }),
   ]);
+
+  if (!share.canLinkToDatabase && !isEditable && !canAutomate) {
+    return null;
+  }
 
   return (
     <OptionsAnchor $floating={!!floating}>

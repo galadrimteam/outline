@@ -1,4 +1,4 @@
-import { splitTabs } from "./viewTabsOverflow";
+import { splitTabs, stripMinimum } from "./viewTabsOverflow";
 
 const metrics = {
   widths: [100, 100, 100, 100, 100],
@@ -60,5 +60,19 @@ describe("splitTabs", () => {
       visible: [],
       hidden: [],
     });
+  });
+});
+
+describe("stripMinimum", () => {
+  it("keeps room for the active tab, « N more » and « + »", () => {
+    const widths = [100, 150.4, 100];
+    expect(stripMinimum({ ...metrics, widths, available: 0 }, 1)).toBe(243);
+  });
+
+  it("falls back to the first tab and drops what is not shown", () => {
+    expect(
+      stripMinimum({ ...metrics, widths: [80], addWidth: 0, available: 0 }, -1)
+    ).toBe(80);
+    expect(stripMinimum({ ...metrics, widths: [], available: 0 }, -1)).toBe(30);
   });
 });

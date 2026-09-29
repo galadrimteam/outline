@@ -73,6 +73,7 @@ describe("TableView", () => {
     })) as unknown as typeof window.matchMedia;
     window.scrollTo = vi.fn();
     Element.prototype.scrollIntoView = vi.fn();
+    globalThis.CSS ??= { escape: (value: string) => value } as typeof CSS;
     calls = [];
     vi.mocked(client.post).mockReset();
     vi.mocked(client.post).mockImplementation(async (path, body) => {
@@ -213,6 +214,131 @@ describe("TableView", () => {
         .querySelector("[data-cell='rec2:status']")
         ?.getAttribute("aria-selected")
     ).toBe("true");
+  });
+
+  const grid = () => container.querySelector<HTMLElement>("[role='grid']");
+
+  const pressOnGrid = (key: string, init: KeyboardEventInit = {}) =>
+    act(async () => {
+      grid()?.dispatchEvent(
+        new KeyboardEvent("keydown", { key, bubbles: true, ...init })
+      );
+    });
+
+  const pressIn = (element: Element | null | undefined, key: string) =>
+    act(async () => {
+      element?.dispatchEvent(
+        new KeyboardEvent("keydown", { key, bubbles: true })
+      );
+    });
+
+  const updates = () =>
+    calls.filter((call) => call.path === "/databaseRecords.update");
+
+  it("opens the options of a select cell on Enter without picking one", async () => {
+    await render(makeView({ id: "viwTable5" }));
+    await pressOnGrid("ArrowDown");
+    await pressOnGrid("ArrowRight");
+    await pressOnGrid("Enter");
+
+    const search = document.querySelector<HTMLInputElement>(
+      "[aria-label='Edit options'] input"
+    );
+    expect(search).not.toBeNull();
+    expect(updates()).toHaveLength(0);
+
+    await pressIn(search, "Enter");
+    expect(updates()).toHaveLength(0);
+    expect(
+      document.querySelector("[aria-label='Edit options'] input")
+    ).toBeNull();
+  });
+
+  it("picks the option the arrows highlight", async () => {
+    await render(makeView({ id: "viwTable6" }));
+    await pressOnGrid("ArrowDown");
+    await pressOnGrid("ArrowRight");
+    await pressOnGrid("Enter");
+    const search = document.querySelector<HTMLInputElement>(
+      "[aria-label='Edit options'] input"
+    );
+    await pressIn(search, "ArrowDown");
+    await pressIn(search, "Enter");
+    expect(updates()[0]?.body).toMatchObject({
+      recordId: "rec1",
+      fields: { status: "À faire" },
+    });
+  });
+
+  it("starts editing a text cell with the character typed on it", async () => {
+    await render(makeView({ id: "viwTable7" }));
+    await pressOnGrid("ArrowDown");
+    await pressOnGrid("x");
+    const input = container.querySelector<HTMLInputElement>(
+      "[data-cell='rec1:name'] input"
+    );
+    expect(input?.value).toBe("x");
+  });
+
+  it("opens a picker with the character typed as its search", async () => {
+    await render(makeView({ id: "viwTable8" }));
+    await pressOnGrid("ArrowDown");
+    await pressOnGrid("ArrowRight");
+    await pressOnGrid("t");
+    expect(
+      document.querySelector<HTMLInputElement>(
+        "[aria-label='Edit options'] input"
+      )?.value
+    ).toBe("t");
+  });
+
+  function clipboardEvent(
+    type: "copy" | "paste",
+    data: Record<string, string>
+  ) {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "clipboardData", {
+      value: {
+        getData: (format: string) => data[format] ?? "",
+        setData: (format: string, value: string) => {
+          data[format] = value;
+        },
+      },
+    });
+    return event;
+  }
+
+  it("copies the selected cell as text", async () => {
+    await render(makeView({ id: "viwTable9" }));
+    await pressOnGrid("ArrowDown");
+    await pressOnGrid("ArrowRight");
+    await pressOnGrid("c", { ctrlKey: true, metaKey: true });
+    const bridge = container.querySelector("textarea");
+    expect(document.activeElement).toBe(bridge);
+
+    const data: Record<string, string> = {};
+    await act(async () => {
+      bridge?.dispatchEvent(clipboardEvent("copy", data));
+    });
+    expect(data["text/plain"]).toBe("Terminé");
+  });
+
+  it("pastes lines of text down the column, one update per row", async () => {
+    await render(makeView({ id: "viwTable10" }));
+    await pressOnGrid("ArrowDown");
+    await pressOnGrid("ArrowRight");
+    await pressOnGrid("ArrowRight");
+    await pressOnGrid("v", { ctrlKey: true, metaKey: true });
+    const bridge = container.querySelector("textarea");
+    await act(async () => {
+      bridge?.dispatchEvent(
+        clipboardEvent("paste", { "text/plain": "4\n5,5\n" })
+      );
+    });
+    expect(updates().map((call) => call.body)).toEqual([
+      expect.objectContaining({ recordId: "rec1", fields: { estimate: 4 } }),
+      expect.objectContaining({ recordId: "rec2", fields: { estimate: 5.5 } }),
+    ]);
   });
 
   it("draws groups with their counts and the calculations", async () => {

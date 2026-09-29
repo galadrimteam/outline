@@ -112,7 +112,13 @@ export const DatabaseHeader = observer(function DatabaseHeader({
         </IconSlot>
       )}
       {readOnly ? (
-        <Title as="h2" $fullPage={fullPage} $empty={!database.title}>
+        <Title
+          as="div"
+          role="heading"
+          aria-level={2}
+          $fullPage={fullPage}
+          $empty={!database.title}
+        >
           {database.title || t("Untitled")}
         </Title>
       ) : (

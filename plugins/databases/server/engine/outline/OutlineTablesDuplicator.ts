@@ -121,6 +121,7 @@ export class OutlineTablesDuplicator implements DatabaseTablesDuplicator {
         externalTableId: copy.tableId,
         fieldIds: copy.fieldIds,
         viewIds: copy.viewIds,
+        recordIds: copy.recordIds,
       });
     }
     return results;

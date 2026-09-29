@@ -20,7 +20,6 @@ import styled from "styled-components";
 import type { DatabaseSortOrder, DatabaseView } from "@shared/databases/types";
 import NudeButton from "~/components/NudeButton";
 import { SelectionCheckbox } from "~/components/SelectionCheckbox";
-import Tooltip from "~/components/Tooltip";
 import type Database from "~/models/Database";
 import { AddFieldButton } from "../../fields/AddFieldButton";
 import { FieldHeaderMenu } from "../../fields/FieldHeaderMenu";
@@ -157,12 +156,14 @@ export const TableHeader = observer(function TableHeader_({
       </DndContext>
       {!readOnly && (
         <AddCell>
-          <AddFieldButton database={database} view={view}>
-            <Tooltip content={t("Add a property")} placement="top">
-              <NudeButton aria-label={t("Add a property")} size={28}>
-                <PlusIcon size={20} />
-              </NudeButton>
-            </Tooltip>
+          <AddFieldButton
+            database={database}
+            view={view}
+            tooltip={t("Add a property")}
+          >
+            <NudeButton aria-label={t("Add a property")} size={28}>
+              <PlusIcon size={20} />
+            </NudeButton>
           </AddFieldButton>
         </AddCell>
       )}

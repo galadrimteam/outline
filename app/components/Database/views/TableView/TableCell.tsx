@@ -17,6 +17,10 @@ interface Props {
   record: DatabaseRecord;
   isActive: boolean;
   isEditing: boolean;
+  /** What the reader typed on the cell to start editing it. */
+  initialInput?: string;
+  /** Room to keep on the left when the cell is scrolled into view. */
+  scrollMarginLeft: number;
   wrap: boolean;
   readOnly: boolean;
   /** Makes the cell active, and starts editing it when `edit` is set. */
@@ -47,6 +51,8 @@ export const TableCell = observer(function TableCell_({
   record,
   isActive,
   isEditing,
+  initialInput,
+  scrollMarginLeft,
   wrap,
   readOnly,
   onActivate,
@@ -100,6 +106,7 @@ export const TableCell = observer(function TableCell_({
         onChange={handleChange}
         onChangeFields={handleChangeFields}
         onClose={onCloseEditor}
+        initialInput={initialInput}
       />
     ) : (
       <cell.Renderer
@@ -119,6 +126,7 @@ export const TableCell = observer(function TableCell_({
       data-cell={`${record.id}:${field.id}`}
       $frozen={column.frozen}
       $left={column.left}
+      $scrollMarginLeft={column.frozen ? 0 : scrollMarginLeft}
       $active={isActive}
       $wrap={wrap}
       $editable={editable}
