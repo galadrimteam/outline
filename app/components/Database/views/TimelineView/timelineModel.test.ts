@@ -8,6 +8,7 @@ import {
   dependencyPath,
   dragSpan,
   PX_PER_DAY,
+  showsTimelineTable,
   spanFields,
   timelineRange,
   timelineScale,
@@ -44,6 +45,19 @@ describe("timelineRange", () => {
     expect(range.start.getDay()).toBe(1);
     expect(dayKey(range.start) <= "2026-08-18").toBe(true);
     expect(dayKey(last)).toBe("2026-10-09");
+  });
+
+  it("reaches the days the reader moved to", () => {
+    const range = timelineRange([], day(25), "month", [day(25, 11)]);
+    const last = new Date(range.start);
+    last.setDate(last.getDate() + range.days - 1);
+    expect(dayKey(last) >= "2026-12-25").toBe(true);
+  });
+
+  it("folds the table unless the view shows it", () => {
+    expect(showsTimelineTable(undefined)).toBe(false);
+    expect(showsTimelineTable({ showTable: false })).toBe(false);
+    expect(showsTimelineTable({ showTable: true })).toBe(true);
   });
 
   it("starts years on January 1st", () => {
@@ -122,7 +136,7 @@ describe("timelineScale", () => {
     const scale = timelineScale(day(28), 7, "month", fr);
     expect(scale.top.map((u) => u.label)).toEqual([
       "septembre 2026",
-      "octobre 2026",
+      "octobre",
     ]);
     expect(scale.top[0]).toMatchObject({
       left: 0,
@@ -136,6 +150,15 @@ describe("timelineScale", () => {
       "2",
       "3",
       "4",
+    ]);
+  });
+
+  it("names months in full in the quarter zoom, the year on January", () => {
+    const scale = timelineScale(day(1, 10), 70, "quarter", fr);
+    expect(scale.top.map((u) => u.label)).toEqual([
+      "novembre 2026",
+      "décembre",
+      "janvier 2027",
     ]);
   });
 

@@ -291,10 +291,14 @@ describe("database views", () => {
         },
       })
     );
-    expect(container.textContent).toContain("Sans date");
+    expect(container.textContent).not.toContain("Sans date");
+    expect(container.textContent).toContain("No date (1)");
     expect(container.querySelectorAll("svg path[marker-end]")).toHaveLength(1);
     expect(
       container.querySelectorAll("[aria-label^='Maquettes,']")
     ).toHaveLength(1);
+    expect(container.querySelector("[aria-label='Show table']")).not.toBeNull();
+    expect(container.querySelector("[aria-label='Previous']")).not.toBeNull();
+    expect(container.querySelector("[aria-label='Next']")).not.toBeNull();
   });
 });

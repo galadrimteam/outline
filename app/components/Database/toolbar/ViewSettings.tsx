@@ -29,6 +29,7 @@ import {
 import { useDatabaseBlock } from "../DatabaseBlockContext";
 import { LayoutIcon } from "../LayoutIcon";
 import { FieldKindIcon } from "../fields/FieldKindIcon";
+import { showsTimelineTable } from "../views/TimelineView/timelineModel";
 import type { DatabaseViewPatch } from "./useViewUpdate";
 
 interface Props {
@@ -349,7 +350,7 @@ const LayoutOptions = observer(function LayoutOptions({
           </Setting>
           <Setting label={t("Show table")} as="label">
             <Switch
-              checked={timeline.showTable !== false}
+              checked={showsTimelineTable(timeline)}
               disabled={disabled}
               onChange={(showTable) => setTimeline({ showTable })}
             />
