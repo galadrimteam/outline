@@ -9,7 +9,12 @@ import auth from "@server/middlewares/authentication";
 import { rateLimiter } from "@server/middlewares/rateLimiter";
 import { transaction } from "@server/middlewares/transaction";
 import validate from "@server/middlewares/validate";
-import { Collection, Database, Document } from "@server/models";
+import {
+  Collection,
+  Database,
+  DatabaseAutomation,
+  Document,
+} from "@server/models";
 import { authorize, can } from "@server/policies";
 import { presentDatabase, presentPolicies } from "@server/presenters";
 import { QueryHelper } from "@server/storage/QueryHelper";
@@ -51,11 +56,19 @@ router.post(
       refFor(database)
     );
 
+    // Editors see Notion's ⚡ in the toolbar while automations are on.
+    const automationCount =
+      user && !access.shareId && can(user, "update", database)
+        ? await DatabaseAutomation.count({
+            where: { databaseId: database.id, enabled: true },
+          })
+        : undefined;
+
     ctx.body = {
       data: {
         database:
           user && !access.shareId
-            ? presentDatabaseForUser(user, database)
+            ? { ...presentDatabaseForUser(user, database), automationCount }
             : presentDatabase(database),
         ...(await presentDatabaseSchema(database, schema)),
       },
