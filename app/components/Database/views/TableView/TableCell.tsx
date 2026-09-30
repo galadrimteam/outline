@@ -2,14 +2,16 @@ import { observer } from "mobx-react";
 import { SidebarIcon } from "outline-icons";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
+import styled from "styled-components";
 import type {
   DatabaseCellInput,
   DatabaseRecord,
 } from "@shared/databases/types";
 import type Database from "~/models/Database";
 import { getCell } from "../../cells/registry";
+import { RowIcon } from "../../RowIcon";
 import type { TableColumn } from "./layout";
-import { Cell, OpenButton, RowIcon } from "./styles";
+import { Cell, OpenButton } from "./styles";
 
 interface Props {
   database: Database;
@@ -66,9 +68,6 @@ export const TableCell = observer(function TableCell_({
   const cell = getCell(field.type);
   const editable = !readOnly && !!cell.Editor && cell.isEditable(field);
   const value = record.fields[field.id];
-  const iconFieldId = database.settings?.iconFieldId;
-  const icon =
-    field.isPrimary && iconFieldId ? record.fields[iconFieldId] : undefined;
 
   const handleClick = React.useCallback(() => {
     onActivate(record.id, field.id, editable);
@@ -130,10 +129,11 @@ export const TableCell = observer(function TableCell_({
       $active={isActive}
       $wrap={wrap}
       $editable={editable}
+      $primary={field.isPrimary}
       onClick={handleClick}
     >
-      {typeof icon === "string" && icon && (
-        <RowIcon aria-hidden>{icon}</RowIcon>
+      {field.isPrimary && (
+        <TitleIcon database={database} record={record} size={18} />
       )}
       {content}
       {field.isPrimary && !isEditing && (
@@ -150,3 +150,7 @@ export const TableCell = observer(function TableCell_({
     </Cell>
   );
 });
+
+const TitleIcon = styled(RowIcon)`
+  margin-right: 6px;
+`;

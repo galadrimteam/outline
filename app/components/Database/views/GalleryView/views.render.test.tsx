@@ -17,6 +17,7 @@ import stores from "~/stores";
 import { client } from "~/utils/ApiClient";
 import { DatabaseToolbar } from "../../toolbar/DatabaseToolbar";
 import type { DatabaseViewProps } from "../../types";
+import { BoardView } from "../BoardView";
 import { CalendarView } from "../CalendarView";
 import { ListView } from "../ListView";
 import { TimelineView } from "../TimelineView";
@@ -78,6 +79,12 @@ const fields = [
     isMultipleCellValue: true,
     options: { symmetricFieldId: "blocked" },
   }),
+  field({
+    id: "estimate",
+    name: "Estimation",
+    type: DatabaseFieldType.Number,
+    cellValueType: "number",
+  }),
 ];
 
 const today = new Date();
@@ -96,8 +103,10 @@ const records: DatabaseRecord[] = [
       status: "Terminé",
       start: iso(-3),
       end: iso(1),
-      blocking: [{ id: "rec2", title: "Intégration" }],
+      blocking: [{ id: "rec2", title: "Intégration", icon: "🧱" }],
     },
+    documentId: "50000000-0000-4000-8000-000000000001",
+    icon: "🎨",
   },
   {
     id: "rec2",
@@ -222,12 +231,71 @@ describe("database views", () => {
     expect(container.querySelectorAll("section")).toHaveLength(3);
   });
 
+  it("draws gallery cards with the icon of their page and the colour of their option", async () => {
+    await render(
+      GalleryView,
+      makeView({
+        type: "gallery",
+        layout: DatabaseLayout.Gallery,
+        options: { colorConfig: { type: "field", fieldId: "status" } },
+        columnMeta: { blocking: { order: 1, visible: true } },
+      })
+    );
+    const card = container.querySelector<HTMLElement>(
+      "[role='button'][style*='background']"
+    );
+    expect(card?.textContent).toContain("🎨");
+    expect(card?.textContent).toContain("Maquettes");
+    expect(card?.style.background).toBe("rgb(237, 243, 236)");
+    expect(container.textContent).toContain("🧱");
+  });
+
   it("draws a list", async () => {
     await render(
       ListView,
       makeView({ overrides: { layout: DatabaseLayout.List } })
     );
     expect(container.querySelectorAll("[role='listitem']")).toHaveLength(3);
+  });
+
+  it("heads board columns with the view's calculation in the option's colour", async () => {
+    vi.mocked(client.post).mockImplementation(async (path: string) =>
+      path === "/databaseRecords.aggregate"
+        ? { data: { estimate: { value: 42 } } }
+        : {
+            data: records,
+            pagination: { offset: 0, limit: 50, total: records.length },
+          }
+    );
+    await render(
+      BoardView,
+      makeView({
+        type: "kanban",
+        layout: DatabaseLayout.Board,
+        options: { stackFieldId: "status" },
+        overrides: {
+          groupCalculation: { func: "sum", fieldId: "estimate" },
+          stackOrder: ["Terminé"],
+          hiddenStacks: ["", "À faire"],
+        },
+      })
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    });
+
+    const header = container.querySelector("[aria-roledescription='Column']");
+    expect(header?.textContent).toContain("42");
+    expect(
+      vi
+        .mocked(client.post)
+        .mock.calls.some(
+          ([path, body]) =>
+            path === "/databaseRecords.aggregate" &&
+            JSON.stringify(body).includes('"estimate":"sum"')
+        )
+    ).toBe(true);
+    expect(container.textContent).toContain("New page");
   });
 
   it("draws a month calendar with dated rows only", async () => {

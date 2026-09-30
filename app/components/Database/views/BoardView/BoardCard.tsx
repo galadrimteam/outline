@@ -5,7 +5,7 @@ import { DuplicateIcon, MoreIcon, OpenIcon, TrashIcon } from "outline-icons";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import styled, { css } from "styled-components";
+import styled, { css, useTheme } from "styled-components";
 import type {
   DatabaseAttachmentValue,
   DatabaseCardSize,
@@ -13,7 +13,6 @@ import type {
   DatabaseRecord,
   DatabaseView,
 } from "@shared/databases/types";
-import EmojiIcon from "@shared/components/EmojiIcon";
 import { s, hover } from "@shared/styles";
 import { DropdownMenu } from "~/components/Menu/DropdownMenu";
 import { createAction } from "~/actions";
@@ -22,8 +21,10 @@ import useStores from "~/hooks/useStores";
 import type Database from "~/models/Database";
 import { isEmptyCell } from "~/stores/DatabaseRecordsStore";
 import { cellTitle } from "../../boardModel";
+import { compactPills } from "../../cells/components/ChoicePill";
 import { getCell } from "../../cells/registry";
 import { CommentCount } from "../../comments/CommentCount";
+import { CardHeading, recordCardColor } from "../GalleryView/cards";
 
 /** Drag data of a card, read by the board's collision detection. */
 export interface CardDragData {
@@ -66,6 +67,7 @@ export const SortableCard = observer(function SortableCard({
   const { t } = useTranslation();
   const { databaseRecords } = useStores();
   const record = databaseRecords.recordById(database.id, recordId);
+  const background = useCardBackground(database, view, record);
   const data: CardDragData = { type: "card", container };
   const {
     attributes,
@@ -107,6 +109,7 @@ export const SortableCard = observer(function SortableCard({
       style={{
         transform: CSS.Translate.toString(transform),
         transition,
+        background,
       }}
       $size={view.overrides.cardSize}
       $isPlaceholder={isDragging}
@@ -145,6 +148,7 @@ export const StaticCard = observer(function StaticCard({
   const { t } = useTranslation();
   const { databaseRecords } = useStores();
   const record = databaseRecords.recordById(database.id, recordId);
+  const background = useCardBackground(database, view, record);
 
   const handleClick = React.useCallback(
     () => onOpen(recordId),
@@ -169,6 +173,7 @@ export const StaticCard = observer(function StaticCard({
 
   return (
     <Card
+      style={{ background }}
       $size={view.overrides.cardSize}
       role="button"
       tabIndex={0}
@@ -197,11 +202,12 @@ export const CardOverlay = observer(function CardOverlay({
 }: Omit<SortableCardProps, "container" | "readOnly" | "onOpen">) {
   const { databaseRecords } = useStores();
   const record = databaseRecords.recordById(database.id, recordId);
+  const background = useCardBackground(database, view, record);
   if (!record) {
     return null;
   }
   return (
-    <Card $size={view.overrides.cardSize} $isOverlay>
+    <Card style={{ background }} $size={view.overrides.cardSize} $isOverlay>
       <CardContent
         database={database}
         view={view}
@@ -218,11 +224,6 @@ const CardContent = observer(function CardContent({
   record,
   fields,
 }: CardContentProps) {
-  const { t } = useTranslation();
-  const primary = database.primaryField;
-  const title = cellTitle(primary ? record.fields[primary.id] : undefined);
-  const iconFieldId = database.settings?.iconFieldId;
-  const icon = iconFieldId ? record.fields[iconFieldId] : undefined;
   const cover = coverOf(record, view);
   const showNames = view.options.isFieldNameHidden === false;
 
@@ -234,12 +235,7 @@ const CardContent = observer(function CardContent({
         </Cover>
       )}
       <Body>
-        <Title $empty={!title}>
-          {typeof icon === "string" && icon && (
-            <CardIcon emoji={icon} size={18} />
-          )}
-          <span>{title || t("Untitled")}</span>
-        </Title>
+        <Title database={database} record={record} />
         {fields.map((field) => {
           const value = record.fields[field.id];
           if (isEmptyCell(value) || value === false) {
@@ -328,6 +324,16 @@ const CardMenu = observer(function CardMenu({
 
 function stopPropagation(event: React.SyntheticEvent) {
   event.stopPropagation();
+}
+
+/** The background of a card the view colours, see `recordCardColor`. */
+function useCardBackground(
+  database: Database,
+  view: DatabaseView,
+  record: DatabaseRecord | undefined
+): string | undefined {
+  const theme = useTheme();
+  return record ? recordCardColor(database, view, record, theme) : undefined;
 }
 
 function coverOf(
@@ -465,26 +471,13 @@ const Cover = styled.div<{ $size?: DatabaseCardSize; $fit: boolean }>`
 const Body = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px 10px 10px;
+  gap: 8px;
+  padding: 10px 12px 12px;
   min-width: 0;
 `;
 
-const Title = styled.div<{ $empty: boolean }>`
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
+const Title = styled(CardHeading)`
   padding-right: 20px;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-  color: ${(props) => (props.$empty ? props.theme.placeholder : props.theme.text)};
-`;
-
-const CardIcon = styled(EmojiIcon)`
-  flex-shrink: 0;
-  margin-top: 2px;
 `;
 
 const Property = styled.div`
@@ -494,6 +487,7 @@ const Property = styled.div`
   min-width: 0;
   font-size: 12px;
   line-height: 1.5;
+  ${compactPills}
 `;
 
 const PropertyName = styled.span`
