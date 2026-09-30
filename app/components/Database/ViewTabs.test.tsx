@@ -82,11 +82,15 @@ describe("ViewTabs", () => {
     readOnly = false,
     onSelect = vi.fn(),
     onViewCreated,
+    lead,
+    shown = views,
   }: {
     activeViewId?: string;
     readOnly?: boolean;
     onSelect?: (viewId: string) => void;
     onViewCreated?: (view: DatabaseView) => void;
+    lead?: React.ReactNode;
+    shown?: DatabaseView[];
   } = {}) {
     const database = stores.databases.add({
       id: databaseId,
@@ -97,7 +101,7 @@ describe("ViewTabs", () => {
       url: `/db/${databaseId}`,
       settings: {},
       fields: [],
-      views,
+      views: shown,
     });
     await act(async () => {
       root.render(
@@ -107,11 +111,12 @@ describe("ViewTabs", () => {
               <ActionContextProvider value={{}}>
                 <ViewTabs
                   database={database}
-                  views={views}
+                  views={shown}
                   activeViewId={activeViewId}
                   readOnly={readOnly}
                   onSelect={onSelect}
                   onViewCreated={onViewCreated}
+                  lead={lead}
                 />
               </ActionContextProvider>
             </ThemeProvider>
@@ -166,7 +171,7 @@ describe("ViewTabs", () => {
     strip.metrics = narrow();
     const { onSelect } = await render();
     expect(tabNames()).toEqual(["Vue 0", "Vue 1", "Vue 2"]);
-    expect(button("More views")?.textContent).toBe("3 more");
+    expect(button("More views")?.textContent).toBe("3 more…");
     expect(button("Add a view")).toBeDefined();
 
     await openMenu(button("More views"));
@@ -179,6 +184,26 @@ describe("ViewTabs", () => {
       item?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     expect(onSelect).toHaveBeenCalledWith("viw5");
+  });
+
+  it("draws a view's own icon in its tab, else its layout's", async () => {
+    const own = { ...makeView(0), overrides: { icon: "🗺️" } };
+    await render({ shown: [own, makeView(1)] });
+
+    const [first, second] = Array.from(
+      container.querySelectorAll("[role='tab']")
+    );
+    expect(first.querySelector("text")?.textContent).toBe("🗺️");
+    expect(second.querySelector("text")).toBeNull();
+    expect(second.querySelector("svg")).not.toBeNull();
+  });
+
+  it("draws the lead in place of the tabs and keeps « + »", async () => {
+    await render({ shown: [makeView(0)], lead: <span>Suivi</span> });
+
+    expect(tabNames()).toEqual([]);
+    expect(container.textContent).toContain("Suivi");
+    expect(button("Add a view")).toBeDefined();
   });
 
   it("always draws the active tab", async () => {

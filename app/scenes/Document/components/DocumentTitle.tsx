@@ -48,6 +48,8 @@ type Props = {
   placeholder?: string;
   /** Should the title be editable, policies will also be considered separately */
   readOnly?: boolean;
+  /** galadrim: the document is nothing but a full-page database, laid out like Notion's. */
+  databasePage?: boolean;
   /** Callback called on any edits to text */
   onChangeTitle?: (text: string) => void;
   /** Callback called when the user selects an icon */
@@ -70,6 +72,7 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
     icon,
     color,
     readOnly,
+    databasePage,
     onChangeTitle,
     onChangeIcon,
     onSave,
@@ -239,8 +242,11 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
     <Icon value={icon} initial={initial} color={color} size={pageIconSize} />
   ) : null;
   // galadrim: without an icon the picker is only a small "add icon" button that
-  // appears just above the title on hover, where Notion shows its "Add icon".
+  // appears just above the title on hover, where Notion shows its "Add icon",
+  // or in the margin beside the title of a database page, which has no room
+  // above it.
   const pickerSize = icon ? pageIconSize : pageIconPlaceholderSize;
+  const pickerAbove = !!icon || !databasePage;
 
   return (
     <Title
@@ -253,6 +259,7 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
       value={title}
       $iconPickerIsOpen={iconPickerIsOpen}
       $containsIcon={!!icon}
+      $databasePage={databasePage}
       autoFocus={!title}
       maxLength={DocumentValidation.maxTitleLength}
       // galadrim: the title given here keeps up with what is typed (see
@@ -268,7 +275,7 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
       {can.update && !readOnly ? (
         <IconTitleWrapper
           dir={dir}
-          $above={pickerSize}
+          $above={pickerAbove ? pickerSize : undefined}
           $gap={icon ? undefined : 4}
         >
           <React.Suspense fallback={fallbackIcon}>
@@ -297,6 +304,7 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
 
 type TitleProps = {
   $containsIcon: boolean;
+  $databasePage?: boolean;
   $iconPickerIsOpen: boolean;
   readOnly?: boolean;
 };

@@ -31,6 +31,7 @@ import useQuery from "~/hooks/useQuery";
 import useStores from "~/hooks/useStores";
 import { decodeURIComponentSafe } from "~/utils/urls";
 import MultiplayerEditor from "./AsyncMultiplayerEditor";
+import { isDatabasePage } from "~/components/Database/databasePage";
 import { DatabaseProperties } from "./DatabaseProperties";
 import DocumentTitle from "./DocumentTitle";
 import { first } from "es-toolkit/compat";
@@ -221,6 +222,9 @@ function DocumentEditor(props: Props, ref: React.ForwardedRef<SharedEditor>) {
         }
         icon={document.icon}
         color={iconColor}
+        databasePage={
+          document instanceof Document && isDatabasePage(document.data)
+        }
         onChangeTitle={onChangeTitle}
         onChangeIcon={onChangeIcon}
         onGoToNextInput={handleGoToNextInput}

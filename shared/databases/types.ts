@@ -298,6 +298,8 @@ export interface DatabaseGroupCalculation {
 
 /** What Outline adds to a view the engine does not know about. */
 export interface DatabaseViewOverrides {
+  /** The icon of the view's tab, in place of its layout's: an emoji, an icon name or a custom emoji id, like a document icon. */
+  icon?: string;
   /** Draw the engine's grid view as a list or a timeline; null goes back to the table. */
   layout?: DatabaseLayout.List | DatabaseLayout.Timeline | null;
   /** Second level of grouping on a board (swimlanes). */

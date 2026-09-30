@@ -3,9 +3,10 @@ import copy from "copy-to-clipboard";
 import {
   AlignFullWidthIcon,
   CloseIcon,
+  EyeIcon,
+  HiddenIcon,
   LightningIcon,
   LinkIcon,
-  MoreIcon,
   SearchIcon,
   TrashIcon,
 } from "outline-icons";
@@ -38,6 +39,8 @@ import browserHistory from "~/utils/history";
 import lazyWithRetry from "~/utils/lazyWithRetry";
 import { databasePath } from "~/utils/routeHelpers";
 import { openRouteInSplit } from "~/utils/splitView";
+import type { BlockReveal } from "./blockChrome";
+import { blockChrome } from "./blockChrome";
 import { boardColumns, isStackable, stackValue } from "./boardModel";
 import type { FilterRequest } from "./DatabaseBlockContext";
 import { DatabaseBlockContext } from "./DatabaseBlockContext";
@@ -50,6 +53,8 @@ import { openDatabaseAutomations } from "./automations/openDatabaseAutomations";
 import { useDatabaseShare } from "./useDatabaseShare";
 import { FormSharing } from "~/scenes/DatabaseForm/FormSharing";
 import { DatabaseToolbar } from "./toolbar/DatabaseToolbar";
+import { DragHandleIcon } from "./toolbar/icons";
+import { OpenFullPageButton } from "./toolbar/OpenFullPageButton";
 import {
   canSaveView,
   draftFilter,
@@ -105,6 +110,7 @@ export const DatabaseBlock = observer(function DatabaseBlock(
           blockKey={attrs.id ?? attrs.databaseId}
           viewIds={attrs.viewIds}
           fullPage={attrs.fullPage}
+          hideTitle={attrs.hideTitle}
           title={attrs.title}
           isEditable={props.isEditable}
           isSelected={props.isSelected}
@@ -281,14 +287,14 @@ const EmptyBlock = observer(function EmptyBlock({
 
   if (!isEditable) {
     return (
-      <Frame $fullPage={attrs.fullPage}>
+      <Frame $fullPage={attrs.fullPage} $boxed>
         <Notice>{t("This block does not show any database yet.")}</Notice>
       </Frame>
     );
   }
 
   return (
-    <Frame $fullPage={attrs.fullPage}>
+    <Frame $fullPage={attrs.fullPage} $boxed>
       {error && <Notice role="alert">{error}</Notice>}
       <DatabasePicker
         autoFocus={pending?.kind === "link"}
@@ -304,6 +310,7 @@ interface FrameProps {
   blockKey: string;
   viewIds: string[] | null;
   fullPage: boolean;
+  hideTitle: boolean;
   /** The `title` attribute of the node. */
   title: string | null;
   isEditable: boolean;
@@ -336,12 +343,14 @@ const DatabaseFrame = observer(function DatabaseFrame({
   blockKey,
   viewIds,
   fullPage,
+  hideTitle,
   title,
   isEditable,
   isSelected,
   actions,
 }: FrameProps) {
   const { updateAttrs } = actions;
+  const editor = useEditor();
   const { t } = useTranslation();
   const { databases, policies } = useStores();
   const share = useDatabaseShare();
@@ -391,10 +400,11 @@ const DatabaseFrame = observer(function DatabaseFrame({
   if (!database || !isLoaded) {
     if (loadError) {
       return (
-        <Frame $fullPage={fullPage} $selected={isSelected}>
+        <Frame $fullPage={fullPage} $selected={isSelected} $boxed>
           <BlockOptions
             databaseId={databaseId}
             fullPage={fullPage}
+            hideTitle={hideTitle}
             isEditable={isEditable}
             actions={actions}
             floating
@@ -422,25 +432,21 @@ const DatabaseFrame = observer(function DatabaseFrame({
     );
   }
 
+  const chrome = blockChrome({ fullPage, hideTitle, viewCount: views.length });
+  const heading = chrome.showHeading ? (
+    <DatabaseHeader database={database} readOnly={readOnly} fullPage={false} />
+  ) : null;
+  const options = (
+    <BlockOptions
+      databaseId={database.id}
+      fullPage={fullPage}
+      hideTitle={hideTitle}
+      isEditable={isEditable}
+      actions={actions}
+    />
+  );
   return (
-    <Frame $fullPage={fullPage} $selected={isSelected}>
-      <HeaderRow>
-        {fullPage ? (
-          <Spacer />
-        ) : (
-          <DatabaseHeader
-            database={database}
-            readOnly={readOnly}
-            fullPage={fullPage}
-          />
-        )}
-        <BlockOptions
-          databaseId={database.id}
-          fullPage={fullPage}
-          isEditable={isEditable}
-          actions={actions}
-        />
-      </HeaderRow>
+    <Frame $fullPage={fullPage} $selected={isSelected} $reveal={chrome.reveal}>
       {activeView ? (
         <LoadedView
           database={database}
@@ -448,6 +454,10 @@ const DatabaseFrame = observer(function DatabaseFrame({
           views={views}
           readOnly={readOnly}
           fullPage={fullPage}
+          heading={heading}
+          headingAbove={chrome.headingAbove}
+          options={options}
+          documentId={editor.props.id}
           onSelectView={setActiveViewId}
           onViewCreated={handleViewCreated}
         />
@@ -460,6 +470,8 @@ const DatabaseFrame = observer(function DatabaseFrame({
             readOnly={readOnly}
             onSelect={setActiveViewId}
             onViewCreated={handleViewCreated}
+            lead={heading}
+            actions={options}
           />
           <Notice>{t("This database has no view yet.")}</Notice>
         </>
@@ -474,6 +486,14 @@ interface LoadedViewProps {
   views: DatabaseView[];
   readOnly: boolean;
   fullPage: boolean;
+  /** The database name, when the block shows it. */
+  heading: React.ReactNode;
+  /** Whether the name has a row of its own above the tabs. */
+  headingAbove: boolean;
+  /** The block's own menu. */
+  options: React.ReactNode;
+  /** The document the block is drawn in. */
+  documentId: string | undefined;
   onSelectView: (viewId: string) => void;
   onViewCreated: (view: DatabaseView) => void;
 }
@@ -484,6 +504,10 @@ const LoadedView = observer(function LoadedView({
   views,
   readOnly,
   fullPage,
+  heading,
+  headingAbove,
+  options,
+  documentId,
   onSelectView,
   onViewCreated,
 }: LoadedViewProps) {
@@ -615,6 +639,12 @@ const LoadedView = observer(function LoadedView({
 
   return (
     <DatabaseBlockContext.Provider value={context}>
+      {headingAbove && (
+        <HeaderRow data-database-chrome>
+          {heading}
+          {options}
+        </HeaderRow>
+      )}
       <ViewTabs
         database={database}
         views={views}
@@ -622,6 +652,7 @@ const LoadedView = observer(function LoadedView({
         readOnly={readOnly}
         onSelect={onSelectView}
         onViewCreated={onViewCreated}
+        lead={headingAbove ? undefined : heading}
         actions={
           <>
             <DatabaseToolbar
@@ -630,6 +661,9 @@ const LoadedView = observer(function LoadedView({
               query={query}
               readOnly={readOnly}
             />
+            {!fullPage && (
+              <OpenFullPageButton database={database} documentId={documentId} />
+            )}
             <SearchBox value={search} onChange={setSearch} />
             {!readOnly && (
               <NewRecordMenu
@@ -641,6 +675,7 @@ const LoadedView = observer(function LoadedView({
                 onOpenRecord={handleOpenRecord}
               />
             )}
+            {!headingAbove && options}
           </>
         }
       />
@@ -660,12 +695,14 @@ const LoadedView = observer(function LoadedView({
 const BlockOptions = observer(function BlockOptions({
   databaseId,
   fullPage,
+  hideTitle,
   isEditable,
   actions,
   floating,
 }: {
   databaseId: string;
   fullPage: boolean;
+  hideTitle: boolean;
   isEditable: boolean;
   actions: NodeActions;
   floating?: boolean;
@@ -703,6 +740,13 @@ const BlockOptions = observer(function BlockOptions({
       },
     }),
     createAction({
+      name: hideTitle ? t("Show database title") : t("Hide database title"),
+      section: "Database",
+      icon: hideTitle ? <EyeIcon /> : <HiddenIcon />,
+      visible: isEditable && !fullPage,
+      perform: () => actions.updateAttrs({ hideTitle: !hideTitle }),
+    }),
+    createAction({
       name: t("Automations"),
       section: "Database",
       icon: <LightningIcon />,
@@ -732,7 +776,7 @@ const BlockOptions = observer(function BlockOptions({
     <OptionsAnchor $floating={!!floating}>
       <DropdownMenu action={menu} ariaLabel={t("Database options")} align="end">
         <IconButton type="button" aria-label={t("Database options")}>
-          <MoreIcon size={18} />
+          <DragHandleIcon size={18} />
         </IconButton>
       </DropdownMenu>
     </OptionsAnchor>
@@ -847,7 +891,7 @@ function SearchBox({
   }
 
   return (
-    <SearchField>
+    <SearchField data-sticky>
       <SearchIcon size={18} />
       <SearchInput
         ref={inputRef}
@@ -902,11 +946,21 @@ const OptionsAnchor = styled.div<{ $floating: boolean }>`
   &:has([data-state="open"]) {
     opacity: 1;
   }
+
+  @media (hover: none) {
+    opacity: 1;
+  }
 `;
 
-const Frame = styled.div<{ $fullPage: boolean; $selected?: boolean }>`
+const Frame = styled.div<{
+  $fullPage: boolean;
+  $selected?: boolean;
+  $reveal?: BlockReveal;
+  /** Framed, for the states that are not a database yet: picker, errors. */
+  $boxed?: boolean;
+}>`
   position: relative;
-  margin: 12px 0 16px;
+  margin: ${(props) => (props.$fullPage ? "4px 0 16px" : "8px 0 12px")};
   white-space: normal;
   cursor: auto;
   user-select: text;
@@ -914,16 +968,38 @@ const Frame = styled.div<{ $fullPage: boolean; $selected?: boolean }>`
   line-height: 1.5;
 
   ${(props) =>
-    props.$fullPage
-      ? css`
-          margin-top: 4px;
-          --database-view-max-height: calc(100vh - 220px);
-        `
-      : css`
-          padding: 12px 14px 6px;
-          border: 1px solid ${props.theme.divider};
-          border-radius: 12px;
-        `}
+    props.$fullPage &&
+    css`
+      --database-view-max-height: calc(100vh - 220px);
+    `}
+
+  ${(props) =>
+    props.$boxed &&
+    css`
+      padding: 12px 14px 6px;
+      border: 1px solid ${props.theme.divider};
+      border-radius: 12px;
+    `}
+
+  ${(props) =>
+    (props.$reveal === "actions" || props.$reveal === "all") &&
+    css`
+      --database-actions-opacity: 0;
+      --database-tabs-opacity: ${props.$reveal === "all" ? 0 : 1};
+
+      &:hover,
+      &:focus-within,
+      &:has([data-database-chrome] [data-state="open"]),
+      &:has([data-sticky]) {
+        --database-actions-opacity: 1;
+        --database-tabs-opacity: 1;
+      }
+
+      @media (hover: none) {
+        --database-actions-opacity: 1;
+        --database-tabs-opacity: 1;
+      }
+    `}
 
   &:hover ${OptionsAnchor} {
     opacity: 1;
@@ -932,16 +1008,19 @@ const Frame = styled.div<{ $fullPage: boolean; $selected?: boolean }>`
   ${(props) =>
     props.$selected &&
     css`
+      --database-actions-opacity: 1;
+      --database-tabs-opacity: 1;
       outline: 2px solid ${props.theme.selected};
-      outline-offset: 2px;
-      border-radius: 12px;
+      outline-offset: 4px;
+      border-radius: 4px;
     `}
 `;
 
 const HeaderRow = styled.div`
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
+  margin-bottom: 4px;
 
   > :first-child {
     flex: 1;
@@ -1055,8 +1134,4 @@ const SkeletonBar = styled.div<{ $width: number; $height: number }>`
       opacity: 0.55;
     }
   }
-`;
-
-const Spacer = styled.div`
-  flex: 1;
 `;

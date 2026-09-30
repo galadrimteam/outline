@@ -1,5 +1,7 @@
+import { runInAction } from "mobx";
 import * as React from "react";
 import type { PresentedDatabaseAutomation } from "@shared/databases/automations";
+import useStores from "~/hooks/useStores";
 import type { AutomationDraft } from "./automationsApi";
 import {
   createAutomation,
@@ -38,6 +40,18 @@ export function useDatabaseAutomations(
   const [automations, setAutomations] =
     React.useState<PresentedDatabaseAutomation[]>();
   const [error, setError] = React.useState<Error>();
+  const { databases } = useStores();
+
+  React.useEffect(() => {
+    const database = databases.get(databaseId);
+    if (database && automations) {
+      runInAction(() => {
+        database.automationCount = automations.filter(
+          (item) => item.enabled
+        ).length;
+      });
+    }
+  }, [databases, databaseId, automations]);
 
   const load = React.useCallback(
     () =>

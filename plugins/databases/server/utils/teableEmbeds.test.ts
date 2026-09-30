@@ -2,6 +2,7 @@ import type { ProsemirrorData } from "@shared/types";
 import {
   convertTeableEmbeds,
   findTeableEmbeds,
+  parseTeableBlockSettings,
   parseTeableHref,
 } from "./teableEmbeds";
 
@@ -104,6 +105,39 @@ describe("parseTeableHref", () => {
   });
 });
 
+describe("parseTeableBlockSettings", () => {
+  it("reads the views of the block and its hidden title", () => {
+    expect(
+      parseTeableBlockSettings(`${framed}&views=viw1,viw2,viw3&notitle=1`)
+    ).toEqual({ blockViewIds: ["viw1", "viw2", "viw3"], hideTitle: true });
+  });
+
+  it("keeps the wrapped path readable", () => {
+    expect(parseTeableHref(`${framed}&views=viw1,viw2&notitle=1`)).toEqual({
+      baseId: "bse1",
+      tableId: "tbl1",
+      viewId: "viw1",
+    });
+  });
+
+  it("drops malformed and repeated view ids", () => {
+    expect(
+      parseTeableBlockSettings(`${framed}&views=viw2,,<b>,viw2,viw1`)
+    ).toEqual({ blockViewIds: ["viw2", "viw1"], hideTitle: false });
+  });
+
+  it("has no view list and shows the title by default", () => {
+    expect(parseTeableBlockSettings(framed)).toEqual({
+      blockViewIds: null,
+      hideTitle: false,
+    });
+    expect(parseTeableBlockSettings("not a url")).toEqual({
+      blockViewIds: null,
+      hideTitle: false,
+    });
+  });
+});
+
 describe("findTeableEmbeds", () => {
   it("finds an embed after a paragraph, with the heading before it", () => {
     const embeds = findTeableEmbeds(
@@ -115,6 +149,8 @@ describe("findTeableEmbeds", () => {
         baseId: "bse1",
         tableId: "tbl1",
         viewId: "viw1",
+        blockViewIds: null,
+        hideTitle: false,
         href: framed,
         fullPage: false,
         heading: "Roadmap",
@@ -187,6 +223,7 @@ describe("convertTeableEmbeds", () => {
             databaseId: "db-1",
             viewIds: ["viw1"],
             fullPage: false,
+            hideTitle: false,
             legacyHref: framed,
             title: "Roadmap",
           },
@@ -212,9 +249,38 @@ describe("convertTeableEmbeds", () => {
         databaseId: "db-1",
         viewIds: null,
         fullPage: true,
+        hideTitle: false,
         legacyHref: framed,
         title: null,
       },
+    });
+  });
+
+  it("gives the block the views and the title setting the migration listed", () => {
+    const inline = `${framed}&views=viw1,viw4,viw2&notitle=1`;
+    const page = `${framedDev}&views=viwDev,viwDev2`;
+
+    const inlineBlock = convertTeableEmbeds(
+      doc(paragraph("Intro"), embed(inline)),
+      () => ({ databaseId: "db-1" }),
+      ids()
+    ).doc.content?.[1];
+    const pageBlock = convertTeableEmbeds(
+      doc(embed(page)),
+      () => ({ databaseId: "db-2" }),
+      ids()
+    ).doc.content?.[0];
+
+    expect(inlineBlock?.attrs).toMatchObject({
+      viewIds: ["viw1", "viw4", "viw2"],
+      fullPage: false,
+      hideTitle: true,
+      legacyHref: inline,
+    });
+    expect(pageBlock?.attrs).toMatchObject({
+      viewIds: ["viwDev", "viwDev2"],
+      fullPage: true,
+      hideTitle: false,
     });
   });
 

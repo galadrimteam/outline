@@ -22,6 +22,8 @@ export interface DatabaseAttrs {
   viewIds: string[] | null;
   /** Drawn as a full page database rather than inline. */
   fullPage: boolean;
+  /** Hides the database name above the views, like Notion's « Hide database title ». */
+  hideTitle: boolean;
   /** The embed URL the block was converted from, to allow going back. */
   legacyHref: string | null;
   /** The database name when the block was last written, for text exports. */
@@ -41,6 +43,7 @@ export function databaseAttrs(node: ProsemirrorNode): DatabaseAttrs {
     databaseId: attrs.databaseId ?? null,
     viewIds: attrs.viewIds ?? null,
     fullPage: !!attrs.fullPage,
+    hideTitle: !!attrs.hideTitle,
     legacyHref: attrs.legacyHref ?? null,
     title: attrs.title ?? null,
   };
@@ -77,6 +80,7 @@ export default class Database extends Node {
         databaseId: { default: null, validate: "string|null" },
         viewIds: { default: null, validate: validateViewIds },
         fullPage: { default: false, validate: "boolean" },
+        hideTitle: { default: false, validate: "boolean" },
         legacyHref: { default: null, validate: "string|null" },
         title: { default: null, validate: "string|null" },
       },
@@ -91,6 +95,7 @@ export default class Database extends Node {
               ? dom.dataset.viewIds.split(",").filter(Boolean)
               : null,
             fullPage: dom.dataset.fullPage === "true",
+            hideTitle: dom.dataset.hideTitle === "true",
             legacyHref: dom.dataset.legacyHref || null,
             title: dom.textContent || null,
           }),
@@ -110,6 +115,7 @@ export default class Database extends Node {
             "data-database-id": attrs.databaseId ?? undefined,
             "data-view-ids": attrs.viewIds?.join(",") || undefined,
             "data-full-page": attrs.fullPage ? "true" : undefined,
+            "data-hide-title": attrs.hideTitle ? "true" : undefined,
             "data-legacy-href": attrs.legacyHref
               ? sanitizeUrl(attrs.legacyHref)
               : undefined,
@@ -171,13 +177,19 @@ export default class Database extends Node {
   }
 
   toMarkdown(state: MarkdownSerializerState, node: ProsemirrorNode) {
-    const { databaseId, viewIds, fullPage, legacyHref, title } =
+    const { databaseId, viewIds, fullPage, hideTitle, legacyHref, title } =
       databaseAttrs(node);
     if (!databaseId) {
       return;
     }
 
-    const href = databaseHref({ databaseId, viewIds, fullPage, legacyHref });
+    const href = databaseHref({
+      databaseId,
+      viewIds,
+      fullPage,
+      hideTitle,
+      legacyHref,
+    });
     const link = `[${state.esc(title || "Database", false)}](${sanitizeUrl(href)})`;
     if (state.inTable) {
       state.write(link);
@@ -201,6 +213,7 @@ export default class Database extends Node {
           databaseId: token.attrGet("databaseId"),
           viewIds: viewIds.length ? viewIds : null,
           fullPage: token.attrGet("fullPage") === "true",
+          hideTitle: token.attrGet("hideTitle") === "true",
           legacyHref: token.attrGet("legacyHref") || null,
           title: token.attrGet("title") || null,
         };

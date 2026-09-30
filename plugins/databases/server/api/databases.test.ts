@@ -1,6 +1,6 @@
 import type { Job } from "bull";
 import { DatabaseLayout, DatabaseStatusGroup } from "@shared/databases/types";
-import { Database, Document } from "@server/models";
+import { Database, DatabaseAutomation, Document } from "@server/models";
 import { BaseTask } from "@server/queues/tasks/base/BaseTask";
 import {
   buildAdmin,
@@ -131,6 +131,43 @@ describe("#databases.info", () => {
       externalTableId: database.externalTableId,
     });
     expect(call.actor).toMatchObject({ outlineUserId: user.id });
+  });
+
+  it("counts the automations turned on for editors only", async () => {
+    const user = await buildUser();
+    const collection = await buildCollection({
+      teamId: user.teamId,
+      userId: user.id,
+    });
+    const database = await buildDatabase({
+      teamId: user.teamId,
+      collectionId: collection.id,
+    });
+    for (const enabled of [true, true, false]) {
+      await DatabaseAutomation.create({
+        teamId: database.teamId,
+        databaseId: database.id,
+        name: "Done",
+        enabled,
+        trigger: { type: "recordCreated" },
+        actions: [],
+        createdById: user.id,
+      });
+    }
+    const viewer = await buildViewer({ teamId: user.teamId });
+
+    const editorRes = await server.post("/api/databases.info", user, {
+      body: { id: database.id },
+    });
+    const viewerRes = await server.post("/api/databases.info", viewer, {
+      body: { id: database.id },
+    });
+
+    expect((await editorRes.json()).data.database.automationCount).toBe(2);
+    expect(viewerRes.status).toEqual(200);
+    expect(
+      (await viewerRes.json()).data.database.automationCount
+    ).toBeUndefined();
   });
 });
 
