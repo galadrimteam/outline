@@ -1,6 +1,6 @@
 import fractionalIndex from "fractional-index";
 import { observer } from "mobx-react";
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Pagination } from "@shared/constants";
@@ -22,7 +22,9 @@ import SidebarContext, { groupSidebarContext } from "./SidebarContext";
 import SidebarLink from "./SidebarLink";
 import { useHistory } from "react-router-dom";
 import { useLocationSidebarContext } from "~/hooks/useLocationSidebarContext";
+import type { PaginationParams } from "~/types";
 import { patchLocation } from "~/utils/history";
+import { isTransientError, retryTransient } from "~/utils/retryTransient";
 
 function SharedWithMe() {
   const { ui, userMemberships, groupMemberships } = useStores();
@@ -31,10 +33,23 @@ function SharedWithMe() {
   const history = useHistory();
   const locationSidebarContext = useLocationSidebarContext();
 
-  usePaginatedRequest<GroupMembership>(groupMemberships.fetchAll);
+  // galadrim: these loads are retried when the server is busy or restarting,
+  // and such a failure no longer ends in a toast (Notion never shows one).
+  const fetchGroupMemberships = useCallback(
+    (params?: PaginationParams) =>
+      retryTransient(() => groupMemberships.fetchAll(params)),
+    [groupMemberships]
+  );
+  const fetchUserMemberships = useCallback(
+    (params?: PaginationParams) =>
+      retryTransient(() => userMemberships.fetchPage(params)),
+    [userMemberships]
+  );
+
+  usePaginatedRequest<GroupMembership>(fetchGroupMemberships);
 
   const { loading, next, end, error, page } =
-    usePaginatedRequest<UserMembership>(userMemberships.fetchPage, {
+    usePaginatedRequest<UserMembership>(fetchUserMemberships, {
       limit: Pagination.sidebarLimit,
     });
 
@@ -44,7 +59,7 @@ function SharedWithMe() {
   );
 
   useEffect(() => {
-    if (error) {
+    if (error && !isTransientError(error)) {
       toast.error(t("Could not load shared documents"));
     }
   }, [error, t]);
