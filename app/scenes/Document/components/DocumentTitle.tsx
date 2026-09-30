@@ -24,6 +24,10 @@ import ContentEditable from "~/components/ContentEditable";
 import { useDocumentContext } from "~/components/DocumentContext";
 import { PopoverButton } from "~/components/IconPicker/components/PopoverButton";
 import useBoolean from "~/hooks/useBoolean";
+import {
+  dateMentionHighlight,
+  useDateMentionHighlight,
+} from "~/hooks/useDateMentionHighlight";
 import usePolicy from "~/hooks/usePolicy";
 import { useTranslation } from "react-i18next";
 import lazyWithRetry from "~/utils/lazyWithRetry";
@@ -88,6 +92,12 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
   const handleClick = React.useCallback(() => {
     ref.current?.focus();
   }, [ref]);
+
+  const getTitleElement = React.useCallback(
+    () => ref.current?.getElement(),
+    [ref]
+  );
+  useDateMentionHighlight(getTitleElement, title);
 
   const restoreFocus = React.useCallback(() => {
     ref.current?.focusAtEnd();
@@ -327,6 +337,11 @@ const Title = styled(ContentEditable)<TitleProps>`
 
   > span {
     outline: none;
+  }
+
+  > span::highlight(${dateMentionHighlight}) {
+    color: ${s("textTertiary")};
+    -webkit-text-fill-color: ${s("textTertiary")};
   }
 
   &::placeholder {

@@ -31,6 +31,8 @@ export type RefHandle = {
   focusAtStart: () => void;
   focusAtEnd: () => void;
   getComputedDirection: () => string;
+  /** The element holding the text. */
+  getElement: () => HTMLSpanElement | null;
 };
 
 /**
@@ -92,6 +94,7 @@ const ContentEditable = React.forwardRef(function ContentEditable_(
       }
       return "ltr";
     },
+    getElement: () => contentRef.current,
   }));
 
   const wrappedEvent =

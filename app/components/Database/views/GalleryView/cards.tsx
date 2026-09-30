@@ -10,6 +10,7 @@ import type {
   DatabaseView,
 } from "@shared/databases/types";
 import { ellipsis, s } from "@shared/styles";
+import { DateMentionText } from "~/components/DateMentionText";
 import type Database from "~/models/Database";
 import { cellTitle } from "../../boardModel";
 import { toneColors } from "../../colors";
@@ -134,7 +135,13 @@ export const RecordTitle = observer(function RecordTitle({
   return (
     <>
       {icon && <Emoji aria-hidden>{icon}</Emoji>}
-      {title ? <span>{title}</span> : <Untitled>{t("Untitled")}</Untitled>}
+      {title ? (
+        <span>
+          <DateMentionText text={title} />
+        </span>
+      ) : (
+        <Untitled>{t("Untitled")}</Untitled>
+      )}
     </>
   );
 });

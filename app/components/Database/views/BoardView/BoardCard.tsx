@@ -21,6 +21,7 @@ import { useMenuAction } from "~/hooks/useMenuAction";
 import useStores from "~/hooks/useStores";
 import type Database from "~/models/Database";
 import { isEmptyCell } from "~/stores/DatabaseRecordsStore";
+import { DateMentionText } from "~/components/DateMentionText";
 import { cellTitle } from "../../boardModel";
 import { getCell } from "../../cells/registry";
 import { CommentCount } from "../../comments/CommentCount";
@@ -238,7 +239,9 @@ const CardContent = observer(function CardContent({
           {typeof icon === "string" && icon && (
             <CardIcon emoji={icon} size={18} />
           )}
-          <span>{title || t("Untitled")}</span>
+          <span>
+            {title ? <DateMentionText text={title} /> : t("Untitled")}
+          </span>
         </Title>
         {fields.map((field) => {
           const value = record.fields[field.id];

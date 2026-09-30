@@ -2,6 +2,7 @@ import * as React from "react";
 import { useTranslation } from "react-i18next";
 import styled from "styled-components";
 import { s } from "@shared/styles";
+import { DateMentionText } from "~/components/DateMentionText";
 import {
   Popover,
   PopoverAnchor,
@@ -85,7 +86,7 @@ function TextRenderer({ field, value, variant, wrap }: CellRendererProps) {
 
   return (
     <CellText $variant={variant} $wrap={wrap}>
-      {text}
+      {field.isPrimary ? <DateMentionText text={text} /> : text}
     </CellText>
   );
 }
