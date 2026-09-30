@@ -581,7 +581,7 @@
   "Direction": "Ordre",
   "Add subgroup": "Ajouter un sous-groupe",
   "Remove grouping": "Retirer le groupement",
-  "No {{ name }}": "Sans {{ name }}",
+  "No {{ name }}": "Sans « {{ name }} »",
   "Show group": "Afficher le groupe",
   "Hide group": "Masquer le groupe",
   "Select a property": "Choisir une propriété",

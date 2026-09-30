@@ -100,6 +100,16 @@ export interface OutlineQuery {
     group: DatabaseGroup
   ): DatabaseGroupPoint[];
 
+  /**
+   * The records of each group of already selected records, at every level,
+   * keyed by the header ids `groupPoints` gives them.
+   */
+  groupMembers(
+    table: TableSnapshot,
+    records: ComputedRecord[],
+    group: DatabaseGroup
+  ): Map<string, ComputedRecord[]>;
+
   /** One statistic per field over already selected records. */
   aggregate(
     table: TableSnapshot,
@@ -138,7 +148,10 @@ export interface OutlineQuery {
    *
    * @throws Error with a message fit for the user when the value cannot go in.
    */
-  normalizeInput(value: DatabaseCellValue, field: DatabaseField): DatabaseCellValue;
+  normalizeInput(
+    value: DatabaseCellValue,
+    field: DatabaseField
+  ): DatabaseCellValue;
 
   /** The text a cell shows (search, link titles, text conversions). */
   cellText(value: DatabaseCellValue, field: DatabaseField): string;

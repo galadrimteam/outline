@@ -82,7 +82,16 @@ describe("TableView", () => {
         case "/databaseRecords.groups":
           return { data: points };
         case "/databaseRecords.aggregate":
-          return { data: { estimate: { value: 5 } } };
+          return {
+            data: {
+              estimate: {
+                value: 5,
+                ...((body as { byGroup?: boolean })?.byGroup
+                  ? { groups: { g1: 2, g2: 3 } }
+                  : {}),
+              },
+            },
+          };
         case "/databaseRecords.update":
           return { data: records[0] };
         default:
@@ -341,7 +350,18 @@ describe("TableView", () => {
     ]);
   });
 
-  it("draws groups with their counts and the calculations", async () => {
+  it("draws the calculations of the whole table", async () => {
+    await render(
+      makeView({
+        id: "viwTable11",
+        columnMeta: { estimate: { order: 2, statisticFunc: "sum" } },
+      })
+    );
+    await wait(500);
+    expect(container.textContent).toMatch(/Sum5[.,]0/);
+  });
+
+  it("draws each group with its column headers and its calculations", async () => {
     await render(
       makeView({
         id: "viwTable4",
@@ -352,7 +372,22 @@ describe("TableView", () => {
     await wait(500);
     const text = container.textContent ?? "";
     expect(text.indexOf("Terminé")).toBeLessThan(text.indexOf("Maquettes"));
-    expect(text).toMatch(/Sum5[.,]0/);
+    expect(text).toMatch(/Sum2[.,]0[\s\S]*Sum3[.,]0/);
+    expect(text).not.toMatch(/Sum5/);
+    const headers = Array.from(
+      container.querySelectorAll("[role='columnheader']")
+    ).map((header) => header.textContent);
+    expect(headers).toEqual([
+      "Nom",
+      "Estimation",
+      "Statut",
+      "Nom",
+      "Estimation",
+      "Statut",
+    ]);
+    expect(
+      calls.find((call) => call.path === "/databaseRecords.aggregate")?.body
+    ).toMatchObject({ byGroup: true });
     expect(calls.some((call) => call.path === "/databaseRecords.groups")).toBe(
       true
     );

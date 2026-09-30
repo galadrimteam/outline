@@ -573,6 +573,7 @@ export const DatabaseRecordsAggregateSchema = BaseSchema.extend({
       }),
     filter: zFilter.nullish(),
     search: zSearch,
+    byGroup: z.boolean().optional(),
   }),
 });
 

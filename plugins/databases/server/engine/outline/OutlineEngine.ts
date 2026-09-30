@@ -359,21 +359,37 @@ export class OutlineEngine implements DatabaseEngine {
     query: DatabaseAggregateQuery
   ): Promise<Record<string, DatabaseAggregateValue>> {
     const state = await this.reader.read(ref);
+    const view = viewOf(state.table, query.viewId);
     const selected = this.options.query.select(
       state.table,
       state.computed,
-      {
-        view: viewOf(state.table, query.viewId),
-        filter: query.filter,
-        search: query.search,
-      },
+      { view, filter: query.filter, search: query.search },
       this.context(actor)
     );
-    return this.options.query.aggregate(
+    const totals: Record<string, DatabaseAggregateValue> =
+      this.options.query.aggregate(state.table, selected, query.fieldStats);
+    if (!query.byGroup || !view.group?.length) {
+      return totals;
+    }
+    const members = this.options.query.groupMembers(
       state.table,
       selected,
-      query.fieldStats
+      view.group
     );
+    for (const [groupId, records] of members) {
+      const values = this.options.query.aggregate(
+        state.table,
+        records,
+        query.fieldStats
+      );
+      for (const [fieldId, result] of Object.entries(values)) {
+        const total = totals[fieldId];
+        if (total) {
+          total.groups = { ...total.groups, [groupId]: result.value };
+        }
+      }
+    }
+    return totals;
   }
 
   async linkCandidates(

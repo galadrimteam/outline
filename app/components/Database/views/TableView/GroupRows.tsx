@@ -1,11 +1,11 @@
 import { observer } from "mobx-react";
 import { CollapsedIcon, PlusIcon } from "outline-icons";
-import * as React from "react";
+import type * as React from "react";
 import { useTranslation } from "react-i18next";
 import styled from "styled-components";
 import { s } from "@shared/styles";
 import type Database from "~/models/Database";
-import { getCell } from "../../cells/registry";
+import { GroupLabel } from "../GroupLabel";
 import type { AddDisplayRow, GroupDisplayRow } from "./rows";
 import { NewButton, SpanningContent, SpanningLine } from "./styles";
 
@@ -23,7 +23,8 @@ interface GroupProps extends PositionProps {
 }
 
 /**
- * The header of a group: fold button, the group value drawn like a cell, and the row count.
+ * The header of a group, like Notion's: fold button and the group's title; the row count shows
+ * when the header is hovered.
  *
  * @param props the group and its position.
  * @returns the header line.
@@ -39,10 +40,6 @@ export const GroupHeaderRow = observer(function GroupHeaderRow_({
 }: GroupProps) {
   const { t } = useTranslation();
   const field = database.fieldById(row.fieldId);
-  const empty =
-    row.value === null ||
-    row.value === "" ||
-    (Array.isArray(row.value) && !row.value.length);
 
   return (
     <GroupLine
@@ -62,33 +59,16 @@ export const GroupHeaderRow = observer(function GroupHeaderRow_({
         >
           <CollapsedIcon size={20} />
         </Fold>
-        {field && !empty ? (
-          <GroupValue field={field} database={database} value={row.value} />
+        {field ? (
+          <GroupLabel database={database} field={field} value={row.value} />
         ) : (
-          <NoValue>
-            {field ? t("No {{ name }}", { name: field.name }) : t("Empty")}
-          </NoValue>
+          <NoValue>{t("Empty")}</NoValue>
         )}
         <Count>{row.count}</Count>
       </GroupContent>
     </GroupLine>
   );
 });
-
-function GroupValue({
-  field,
-  database,
-  value,
-}: {
-  field: NonNullable<ReturnType<Database["fieldById"]>>;
-  database: Database;
-  value: GroupDisplayRow["value"];
-}) {
-  const { Renderer } = getCell(field.type);
-  return (
-    <Renderer field={field} database={database} value={value} variant="card" />
-  );
-}
 
 interface AddProps extends PositionProps {
   row: AddDisplayRow;
@@ -128,6 +108,47 @@ export function GroupAddRow({
   );
 }
 
+interface LineProps {
+  index: number;
+  start: number;
+  measureElement: (element: Element | null) => void;
+  /** Room left under the line, before the next group. */
+  gap?: number;
+  children: React.ReactNode;
+}
+
+/**
+ * A line placed among the rows by the virtualizer: the column headers or the calculations that
+ * Notion repeats in every group.
+ *
+ * @param props its position and content.
+ * @returns the line.
+ */
+export function PositionedLine({
+  index,
+  start,
+  measureElement,
+  gap = 0,
+  children,
+}: LineProps) {
+  return (
+    <Positioned
+      ref={measureElement}
+      data-index={index}
+      style={{ transform: `translateY(${start}px)`, paddingBottom: gap }}
+    >
+      {children}
+    </Positioned>
+  );
+}
+
+const Positioned = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+`;
+
 const GroupLine = styled(SpanningLine)`
   position: absolute;
   top: 0;
@@ -163,4 +184,10 @@ const NoValue = styled.span`
 const Count = styled.span`
   font-weight: 400;
   color: ${s("textTertiary")};
+  opacity: 0;
+  transition: opacity 100ms ease;
+
+  ${GroupLine}:hover & {
+    opacity: 1;
+  }
 `;

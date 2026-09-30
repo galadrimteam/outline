@@ -58,6 +58,60 @@ describe("buildDisplayRows", () => {
     ]);
   });
 
+  it("repeats the column headers and the calculations in every open group", () => {
+    const rows = buildDisplayRows({
+      records,
+      points,
+      group,
+      canCreate: true,
+      perGroupLines: true,
+      collapsed: { gB: true },
+    });
+    expect(rows.map((row) => row.key)).toEqual([
+      "group:gA",
+      "columns:gA",
+      "r1",
+      "r2",
+      'add:"A"',
+      "calculations:gA",
+      "group:gB",
+    ]);
+  });
+
+  it("closes a group with its calculations only once its rows are loaded", () => {
+    const rows = buildDisplayRows({
+      records: records.slice(0, 1),
+      points,
+      group,
+      hasMore: true,
+      perGroupLines: true,
+    });
+    expect(rows.map((row) => row.type)).toEqual(["group", "columns", "record"]);
+  });
+
+  it("repeats the lines in the groups of the last level only", () => {
+    const nested: DatabaseGroupPoint[] = [
+      { type: "header", id: "g1", depth: 0, value: "A", isCollapsed: false },
+      { type: "header", id: "g1a", depth: 1, value: "x", isCollapsed: false },
+      { type: "row", count: 3 },
+    ];
+    const rows = buildDisplayRows({
+      records,
+      points: nested,
+      group: [...group, { fieldId: "other", order: "asc" }],
+      perGroupLines: true,
+    });
+    expect(rows.map((row) => row.key)).toEqual([
+      "group:g1",
+      "group:g1a",
+      "columns:g1a",
+      "r1",
+      "r2",
+      "r3",
+      "calculations:g1a",
+    ]);
+  });
+
   it("skips the rows of folded groups", () => {
     const rows = buildDisplayRows({
       records,

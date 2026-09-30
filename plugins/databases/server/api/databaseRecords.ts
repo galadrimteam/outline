@@ -327,7 +327,7 @@ router.post(
   auth({ optional: true }),
   validate(T.DatabaseRecordsAggregateSchema),
   async (ctx: APIContext<T.DatabaseRecordsAggregateReq>) => {
-    const { databaseId, viewId, fieldStats, filter, search, shareId } =
+    const { databaseId, viewId, fieldStats, filter, search, byGroup, shareId } =
       ctx.input.body;
     const access = await loadDatabaseForRead(ctx, databaseId, shareId);
     const { database } = access;
@@ -338,6 +338,7 @@ router.post(
           fieldStats,
           filter,
           search,
+          byGroup,
         })
       : {};
 

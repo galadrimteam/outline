@@ -363,6 +363,21 @@ describe("#databaseRecords reads", () => {
     expect(historyBody.data).toEqual([]);
     expect(historyBody.pagination).toEqual({ nextCursor: null });
   });
+
+  it("asks the engine for the calculations of each group", async () => {
+    await server.post("/api/databaseRecords.aggregate", user, {
+      body: {
+        databaseId: database.id,
+        viewId: "viwGrid",
+        fieldStats: { fldName: "filled" },
+        byGroup: true,
+      },
+    });
+    expect(engine.callsTo("aggregate")[0].args[0]).toMatchObject({
+      viewId: "viwGrid",
+      byGroup: true,
+    });
+  });
 });
 
 describe("#databaseRecords.upload", () => {

@@ -252,6 +252,13 @@ export type DatabaseStatisticFunc =
   | "dateRangeOfMonths"
   | "totalAttachmentSize";
 
+/** A calculation of a view (a footer of a table): its value over all the rows, and in each group when asked. */
+export interface DatabaseStatisticResult {
+  value: number | string | null;
+  /** The value in each group of the view, keyed by the ids of the group headers. */
+  groups?: Record<string, number | string | null>;
+}
+
 export interface DatabaseColumnMeta {
   order: number;
   width?: number;

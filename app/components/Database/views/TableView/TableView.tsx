@@ -24,6 +24,7 @@ import type {
   DatabaseGroupPoint,
   DatabaseRecordPosition,
   DatabaseStatisticFunc,
+  DatabaseStatisticResult,
 } from "@shared/databases/types";
 import { s } from "@shared/styles";
 import ConfirmationDialog from "~/components/ConfirmationDialog";
@@ -33,7 +34,7 @@ import { cellValueToText } from "../../cells/format";
 import { getCell } from "../../cells/registry";
 import { orderPatch, orderedFields } from "../../toolbar/columns";
 import type { DatabaseViewProps } from "../../types";
-import { GroupAddRow, GroupHeaderRow } from "./GroupRows";
+import { GroupAddRow, GroupHeaderRow, PositionedLine } from "./GroupRows";
 import { GUTTER_WIDTH, moveId, tableColumns, tableRowLayout } from "./layout";
 import { moveCell, navigationKey } from "./navigation";
 import type { AddDisplayRow, GroupPathItem, RecordDisplayRow } from "./rows";
@@ -69,6 +70,17 @@ interface DropTarget {
   side: DatabaseRecordPosition;
 }
 
+/** The column menu that is open: which header line (the top one or a group's) and which column. */
+interface OpenMenu {
+  scope: string;
+  fieldId: string;
+}
+
+const TOP_HEADER = "top";
+
+/** Room between the calculations of a group and the next group. */
+const GROUP_GAP = 16;
+
 /** Width of the last column, holding the "+" that adds a property. */
 const ADD_COLUMN_WIDTH = 48;
 
@@ -100,13 +112,13 @@ export const TableView = observer(function TableView_({
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const [points, setPoints] = React.useState<DatabaseGroupPoint[]>();
   const [results, setResults] = React.useState<
-    Record<string, { value: number | string | null }>
+    Record<string, DatabaseStatisticResult>
   >({});
   const [selected, setSelected] = React.useState<string[]>([]);
   const [active, setActive] = React.useState<ActiveCell | null>(null);
   const [editing, setEditing] = React.useState(false);
   const [editInput, setEditInput] = React.useState<string>();
-  const [menuFieldId, setMenuFieldId] = React.useState<string | null>(null);
+  const [menu, setMenu] = React.useState<OpenMenu | null>(null);
   const [drop, setDrop] = React.useState<DropTarget | null>(null);
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
   const [scrolled, setScrolled] = React.useState(false);
@@ -149,6 +161,7 @@ export const TableView = observer(function TableView_({
         collapsed,
         hasMore: query.hasMore,
         canCreate,
+        perGroupLines: true,
       }),
     [records, grouped, points, view.group, collapsed, query.hasMore, canCreate]
   );
@@ -236,7 +249,10 @@ export const TableView = observer(function TableView_({
     let cancelled = false;
     const timeout = setTimeout(() => {
       databaseRecords
-        .aggregate(database.id, view.id, fieldStats, searchParams)
+        .aggregate(database.id, view.id, fieldStats, {
+          ...searchParams,
+          byGroup: grouped,
+        })
         .then((next) => {
           if (!cancelled) {
             setResults(next);
@@ -253,6 +269,8 @@ export const TableView = observer(function TableView_({
   }, [
     database.id,
     databaseRecords,
+    grouped,
+    groupKey,
     query.total,
     records,
     searchParams,
@@ -266,8 +284,11 @@ export const TableView = observer(function TableView_({
       if (row?.type === "group") {
         return 41;
       }
-      if (row?.type === "add") {
+      if (row?.type === "add" || row?.type === "columns") {
         return 35;
+      }
+      if (row?.type === "calculations") {
+        return 35 + GROUP_GAP;
       }
       return layout.height + 1;
     },
@@ -618,7 +639,7 @@ export const TableView = observer(function TableView_({
 
   const handleKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (menuFieldId || event.nativeEvent.isComposing) {
+      if (menu || event.nativeEvent.isComposing) {
         return;
       }
       if (editing) {
@@ -693,7 +714,7 @@ export const TableView = observer(function TableView_({
       focusGrid,
       handleChange,
       handleClipboardKey,
-      menuFieldId,
+      menu,
       moveActive,
       onOpenRecord,
       readOnly,
@@ -728,6 +749,44 @@ export const TableView = observer(function TableView_({
     []
   );
 
+  const headersInGroups = displayRows.some((row) => row.type === "columns");
+  const calculationsInGroups = displayRows.some(
+    (row) => row.type === "calculations"
+  );
+
+  const renderHeader = (scope: string) => (
+    <TableHeader
+      database={database}
+      view={view}
+      columns={columns}
+      template={template}
+      readOnly={readOnly}
+      sortOrderOf={sortOrderOf}
+      selectedCount={selectedIds.length}
+      rowCount={records.length}
+      onToggleAll={handleToggleAll}
+      menuFieldId={menu?.scope === scope ? menu.fieldId : null}
+      onMenuChange={(fieldId) => setMenu(fieldId ? { scope, fieldId } : null)}
+      onResize={handleResize}
+      onResizeEnd={handleResizeEnd}
+      onReorder={handleReorderColumn}
+      onFilter={onFilter}
+    />
+  );
+
+  const renderFooter = (
+    values: Record<string, { value: number | string | null }>
+  ) => (
+    <TableFooter
+      database={database}
+      view={view}
+      columns={columns}
+      template={template}
+      readOnly={readOnly}
+      results={values}
+    />
+  );
+
   const draggedRecord = draggingId
     ? databaseRecords.recordById(database.id, draggingId)
     : undefined;
@@ -755,23 +814,7 @@ export const TableView = observer(function TableView_({
           style={{ width: totalWidth }}
           onKeyDown={handleKeyDown}
         >
-          <TableHeader
-            database={database}
-            view={view}
-            columns={columns}
-            template={template}
-            readOnly={readOnly}
-            sortOrderOf={sortOrderOf}
-            selectedCount={selectedIds.length}
-            rowCount={records.length}
-            onToggleAll={handleToggleAll}
-            menuFieldId={menuFieldId}
-            onMenuChange={setMenuFieldId}
-            onResize={handleResize}
-            onResizeEnd={handleResizeEnd}
-            onReorder={handleReorderColumn}
-            onFilter={onFilter}
-          />
+          {headersInGroups ? null : renderHeader(TOP_HEADER)}
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -805,6 +848,31 @@ export const TableView = observer(function TableView_({
                       measureElement={virtualizer.measureElement}
                       onToggle={handleToggleGroup}
                     />
+                  );
+                }
+                if (row.type === "columns") {
+                  return (
+                    <PositionedLine
+                      key={row.key}
+                      index={item.index}
+                      start={start}
+                      measureElement={virtualizer.measureElement}
+                    >
+                      {renderHeader(row.groupId)}
+                    </PositionedLine>
+                  );
+                }
+                if (row.type === "calculations") {
+                  return (
+                    <PositionedLine
+                      key={row.key}
+                      index={item.index}
+                      start={start}
+                      gap={GROUP_GAP}
+                      measureElement={virtualizer.measureElement}
+                    >
+                      {renderFooter(groupResults(results, row.groupId))}
+                    </PositionedLine>
                   );
                 }
                 if (row.type === "add") {
@@ -897,14 +965,7 @@ export const TableView = observer(function TableView_({
               </SpanningContent>
             </SpanningLine>
           )}
-          <TableFooter
-            database={database}
-            view={view}
-            columns={columns}
-            template={template}
-            readOnly={readOnly}
-            results={results}
-          />
+          {calculationsInGroups ? null : renderFooter(results)}
         </Grid>
       </Scroller>
     </Wrapper>
@@ -939,6 +1000,17 @@ function isTypedCharacter(event: React.KeyboardEvent): boolean {
   return (
     event.key.length === 1 && !event.metaKey && (!event.ctrlKey || event.altKey)
   );
+}
+
+function groupResults(
+  results: Record<string, DatabaseStatisticResult>,
+  groupId: string
+): Record<string, { value: number | string | null }> {
+  const values: Record<string, { value: number | string | null }> = {};
+  for (const [fieldId, result] of Object.entries(results)) {
+    values[fieldId] = { value: result.groups?.[groupId] ?? null };
+  }
+  return values;
 }
 
 function combineFilters(

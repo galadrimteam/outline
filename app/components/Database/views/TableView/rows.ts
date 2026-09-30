@@ -45,7 +45,26 @@ export interface AddDisplayRow {
   path: GroupPathItem[];
 }
 
-export type DisplayRow = GroupDisplayRow | RecordDisplayRow | AddDisplayRow;
+/** The column headers repeated at the top of a group, as Notion draws grouped tables. */
+export interface ColumnsDisplayRow {
+  type: "columns";
+  key: string;
+  groupId: string;
+}
+
+/** The calculations of one group, under its rows. */
+export interface CalculationsDisplayRow {
+  type: "calculations";
+  key: string;
+  groupId: string;
+}
+
+export type DisplayRow =
+  | GroupDisplayRow
+  | RecordDisplayRow
+  | AddDisplayRow
+  | ColumnsDisplayRow
+  | CalculationsDisplayRow;
 
 interface BuildParams {
   /** Loaded rows, in view order (the engine sorts them by group first). */
@@ -60,12 +79,16 @@ interface BuildParams {
   hasMore?: boolean;
   /** Whether groups end with a "+ New" line. */
   canCreate?: boolean;
+  /** Whether each group of the last level has its own column headers and calculations. */
+  perGroupLines?: boolean;
 }
 
 /**
  * The lines of a table: rows, preceded by group headers when the view is grouped. The engine
  * returns rows sorted by group and tells how many rows each group holds, so rows are handed out
- * to groups in order; folded groups skip theirs. Lines stop where loaded rows stop.
+ * to groups in order; folded groups skip theirs. With `perGroupLines`, each open group of the
+ * last level repeats the column headers above its rows and ends with its calculations, like
+ * Notion. Lines stop where loaded rows stop.
  *
  * @param params rows, group points and folding.
  * @returns the lines to draw.
@@ -77,6 +100,7 @@ export function buildDisplayRows({
   collapsed = {},
   hasMore = false,
   canCreate = false,
+  perGroupLines = false,
 }: BuildParams): DisplayRow[] {
   if (!group?.length || !points?.length) {
     return records.map((record) => ({
@@ -90,8 +114,10 @@ export function buildDisplayRows({
   const counts = groupCounts(points);
   const rows: DisplayRow[] = [];
   const path: GroupPathItem[] = [];
+  const lastDepth = group.length - 1;
   let hiddenBelow: number | null = null;
   let cursor = 0;
+  let openGroupId: string | null = null;
 
   for (let index = 0; index < points.length; index++) {
     const point = points[index];
@@ -121,6 +147,13 @@ export function buildDisplayRows({
       });
       if (isCollapsed) {
         hiddenBelow = point.depth;
+      } else if (perGroupLines && point.depth >= lastDepth) {
+        openGroupId = point.id;
+        rows.push({
+          type: "columns",
+          key: `columns:${point.id}`,
+          groupId: point.id,
+        });
       }
       continue;
     }
@@ -132,14 +165,23 @@ export function buildDisplayRows({
       for (const record of slice) {
         rows.push({ type: "record", key: record.id, record, path: groupPath });
       }
-      if (canCreate && slice.length === point.count) {
+      const complete = slice.length === point.count;
+      if (canCreate && complete) {
         rows.push({
           type: "add",
           key: `add:${groupPath.map((item) => JSON.stringify(item.value)).join("/")}`,
           path: groupPath,
         });
       }
+      if (openGroupId && complete) {
+        rows.push({
+          type: "calculations",
+          key: `calculations:${openGroupId}`,
+          groupId: openGroupId,
+        });
+      }
     }
+    openGroupId = null;
     if (cursor > records.length && hasMore) {
       break;
     }

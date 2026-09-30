@@ -16,6 +16,7 @@ import type {
   DatabaseRecordPosition,
   DatabaseSort,
   DatabaseStatisticFunc,
+  DatabaseStatisticResult,
   DatabaseView,
   DatabaseViewOptions,
 } from "@shared/databases/types";
@@ -467,11 +468,11 @@ export interface DatabaseAggregateQuery {
   fieldStats: Record<string, DatabaseStatisticFunc>;
   filter?: DatabaseFilter | null;
   search?: string;
+  /** Also compute each statistic per group of the view (Notion's calculation under every group). */
+  byGroup?: boolean;
 }
 
-export interface DatabaseAggregateValue {
-  value: number | string | null;
-}
+export type DatabaseAggregateValue = DatabaseStatisticResult;
 
 export interface DatabaseLinkCandidateQuery {
   fieldId: string;

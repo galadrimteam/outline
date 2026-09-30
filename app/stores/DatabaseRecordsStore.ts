@@ -21,6 +21,7 @@ import type {
   DatabaseRecordPosition,
   DatabaseSort,
   DatabaseStatisticFunc,
+  DatabaseStatisticResult,
   DatabaseUserInput,
   DatabaseUserValue,
 } from "@shared/databases/types";
@@ -758,28 +759,30 @@ export default class DatabaseRecordsStore {
   };
 
   /**
-   * Computes column statistics (footer of a table).
+   * Computes column statistics (footer of a table), per group too with
+   * `byGroup`.
    *
    * @param databaseId the database id.
    * @param viewId the view id.
    * @param fieldStats the function per field.
-   * @param params the filter and search.
+   * @param params the filter and search, and whether to compute per group.
    * @returns the value per field.
    */
   aggregate = async (
     databaseId: string,
     viewId: string,
     fieldStats: Record<string, DatabaseStatisticFunc>,
-    params: RecordSearchParams = {}
-  ): Promise<Record<string, { value: number | string | null }>> => {
-    const res = await databaseRpc<
-      Record<string, { value: number | string | null }>
-    >("/databaseRecords.aggregate", {
-      databaseId,
-      viewId,
-      fieldStats,
-      ...params,
-    });
+    params: RecordSearchParams & { byGroup?: boolean } = {}
+  ): Promise<Record<string, DatabaseStatisticResult>> => {
+    const res = await databaseRpc<Record<string, DatabaseStatisticResult>>(
+      "/databaseRecords.aggregate",
+      {
+        databaseId,
+        viewId,
+        fieldStats,
+        ...params,
+      }
+    );
     return res.data;
   };
 

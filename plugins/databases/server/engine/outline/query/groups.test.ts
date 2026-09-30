@@ -1,7 +1,7 @@
 import type { DatabaseGroupPoint } from "@shared/databases/types";
 import { DatabaseFieldType } from "@shared/databases/types";
 import { computeBase } from "./computed/computeBase";
-import { groupPoints, groupValue } from "./groups";
+import { groupMembers, groupPoints, groupValue } from "./groups";
 import { selectRecords } from "./select";
 import {
   PARIS,
@@ -154,6 +154,37 @@ describe("groupPoints", () => {
         { fieldId: "gone", order: "asc" },
       ])
     ).toEqual([]);
+  });
+});
+
+describe("groupMembers", () => {
+  it("gives the records of every group under the ids of the headers", () => {
+    const group = [
+      { fieldId: "status", order: "desc" as const },
+      { fieldId: "owner", order: "asc" as const },
+    ];
+    const records = selectRecords(
+      table,
+      base,
+      { view: makeView({ id: "v", group }) },
+      context
+    );
+    const members = groupMembers(table, records, group);
+    const ids = (value: string) =>
+      (members.get(value) ?? []).map((record) => record.row.id);
+    const headers = groupPoints(table, records, group).flatMap((point) =>
+      point.type === "header" ? [point] : []
+    );
+    expect(headers.map((header) => ids(header.id))).toEqual([
+      ["rec1", "rec3", "rec5"],
+      ["rec1", "rec3"],
+      ["rec5"],
+      ["rec2"],
+      ["rec2"],
+      ["rec4"],
+      ["rec4"],
+    ]);
+    expect(members.size).toBe(headers.length);
   });
 });
 

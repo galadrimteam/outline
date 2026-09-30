@@ -86,6 +86,42 @@ export function groupPoints(
 }
 
 /**
+ * Returns the records of each group, at every level, keyed by the header ids
+ * `groupPoints` gives the same records.
+ *
+ * @param table the table.
+ * @param records the selected records.
+ * @param group the grouping levels.
+ * @returns the records of each group, in their order.
+ */
+export function groupMembers(
+  table: TableSnapshot,
+  records: ComputedRecord[],
+  group: DatabaseGroup
+): Map<string, ComputedRecord[]> {
+  const levels = sortLevels(group, fieldsById(table.fields));
+  const members = new Map<string, ComputedRecord[]>();
+  if (!levels.length) {
+    return members;
+  }
+  for (const record of orderByGroups(records, levels)) {
+    const keys = levels.map((level) =>
+      JSON.stringify(groupValue(level.field, record.cells[level.field.id]))
+    );
+    levels.forEach((level, depth) => {
+      const id = groupId(level.field.id, keys.slice(0, depth + 1));
+      const list = members.get(id);
+      if (list) {
+        list.push(record);
+      } else {
+        members.set(id, [record]);
+      }
+    });
+  }
+  return members;
+}
+
+/**
  * Returns the value a cell is grouped under.
  *
  * @param field the grouping field.
