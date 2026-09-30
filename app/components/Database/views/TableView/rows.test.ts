@@ -158,6 +158,83 @@ describe("buildDisplayRows", () => {
   });
 });
 
+describe("sub-items", () => {
+  const parent = (id: string, children: string[]): DatabaseRecord => ({
+    id,
+    fields: { children: children.map((child) => ({ id: child })) },
+  });
+  const tree: Record<string, DatabaseRecord[]> = {
+    p1: [parent("c1", ["g1"]), parent("c2", [])],
+    c1: [parent("g1", ["p1"])],
+    g1: [parent("p1", ["c1"])],
+  };
+  const subItems = (expanded: string[]) => ({
+    hasChildren: (record: DatabaseRecord) =>
+      Array.isArray(record.fields.children) &&
+      record.fields.children.length > 0,
+    expanded: new Set(expanded),
+    childrenOf: (recordId: string) => tree[recordId],
+  });
+
+  it("nests the sub-items of unfolded rows, level by level", () => {
+    const rows = buildDisplayRows({
+      records: [parent("p1", ["c1", "c2"]), parent("p2", [])],
+      subItems: subItems(["p1", "c1"]),
+    });
+    expect(
+      rows.map((row) =>
+        row.type === "record"
+          ? `${row.key}:${row.level}:${row.hasChildren}:${row.expanded}`
+          : row.key
+      )
+    ).toEqual([
+      "p1:0:true:true",
+      "p1>c1:1:true:true",
+      "p1>c1>g1:2:true:false",
+      "p1>c2:1:false:false",
+      "p2:0:false:false",
+    ]);
+  });
+
+  it("does not unfold a row inside itself", () => {
+    const rows = buildDisplayRows({
+      records: [parent("p1", ["c1"])],
+      subItems: subItems(["p1", "c1", "g1"]),
+    });
+    expect(rows.map((row) => row.key)).toEqual([
+      "p1",
+      "p1>c1",
+      "p1>c1>g1",
+      "p1>c1>g1>p1",
+      "p1>c2",
+    ]);
+    const cycle = rows[3];
+    expect(cycle.type === "record" && cycle.expanded).toBe(false);
+  });
+
+  it("nests inside groups too", () => {
+    const rows = buildDisplayRows({
+      records: [
+        { id: "p1", fields: { status: "A", children: [{ id: "c2" }] } },
+        record("r2", "A"),
+        record("r3", "B"),
+      ],
+      points,
+      group,
+      subItems: subItems(["p1"]),
+    });
+    expect(rows.map((row) => row.key)).toEqual([
+      "group:gA",
+      "p1",
+      "p1>c1",
+      "p1>c2",
+      "r2",
+      "group:gB",
+      "r3",
+    ]);
+  });
+});
+
 describe("group paths", () => {
   const fieldById = (id: string) => (id === "status" ? status : undefined);
 

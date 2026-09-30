@@ -25,6 +25,10 @@ interface Props {
   wrap: boolean;
   /** Whether rows can be taller than a line: cells then start at the top, like Notion's. */
   alignTop: boolean;
+  /** Drawn before the value (the sub-item toggle of a title). */
+  leading?: React.ReactNode;
+  /** Drawn after the value (the parents of a sub-item). */
+  trailing?: React.ReactNode;
   readOnly: boolean;
   /** Makes the cell active, and starts editing it when `edit` is set. */
   onActivate: (recordId: string, fieldId: string, edit: boolean) => void;
@@ -58,6 +62,8 @@ export const TableCell = observer(function TableCell_({
   scrollMarginLeft,
   wrap,
   alignTop,
+  leading,
+  trailing,
   readOnly,
   onActivate,
   onChange,
@@ -136,10 +142,12 @@ export const TableCell = observer(function TableCell_({
       $editable={editable}
       onClick={handleClick}
     >
+      {leading}
       {typeof icon === "string" && icon && (
         <RowIcon aria-hidden>{icon}</RowIcon>
       )}
       {content}
+      {!isEditing && trailing}
       {field.isPrimary && !isEditing && (
         <OpenButton
           type="button"

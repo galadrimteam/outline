@@ -9,6 +9,7 @@ import type {
   DatabaseCardSize,
   DatabaseField,
   DatabaseOpenPagesIn,
+  DatabaseSubItemsMode,
   DatabaseView,
   DatabaseViewOptions,
 } from "@shared/databases/types";
@@ -241,6 +242,12 @@ const LayoutOptions = observer(function LayoutOptions({
               />
             </Setting>
           )}
+          <SubItemSettings
+            database={database}
+            view={view}
+            onUpdate={onUpdate}
+            disabled={disabled}
+          />
           <Setting label={t("Freeze columns up to")}>
             <CompactSelect
               ariaLabel={t("Freeze columns up to")}
@@ -517,6 +524,74 @@ export function layoutLabel(layout: DatabaseLayout, t: TFunction): string {
 }
 
 // Radix select values cannot be empty strings; "" is saved to mean "none".
+/**
+ * Notion's « Sub-items » of a table: the relation of the database to itself
+ * that lists a row's sub-items (a setting of the database), and how this view
+ * shows them.
+ *
+ * @param props the view, the save callback and whether it is locked.
+ * @returns the settings, nothing when the database has no such relation.
+ */
+const SubItemSettings = observer(function SubItemSettings({
+  database,
+  view,
+  onUpdate,
+  disabled,
+}: LayoutOptionsProps) {
+  const { t } = useTranslation();
+  const { databases } = useStores();
+  const relations = (database.fields ?? []).filter(
+    (field) =>
+      field.type === DatabaseFieldType.Link &&
+      field.options.foreignDatabaseId === database.id &&
+      !!field.options.symmetricFieldId
+  );
+  if (!relations.length) {
+    return null;
+  }
+  const subItemFieldId = database.settings?.subItemFieldId;
+  const handleRelation = (value: string) =>
+    void databases
+      .update(database.id, {
+        settings: { subItemFieldId: value === NONE ? null : value },
+      })
+      .catch((err: unknown) =>
+        toast.error(err instanceof Error ? err.message : String(err))
+      );
+
+  return (
+    <>
+      <Setting label={t("Sub-items")}>
+        <CompactSelect
+          ariaLabel={t("Sub-items")}
+          value={subItemFieldId || NONE}
+          disabled={disabled}
+          options={[
+            { value: NONE, label: t("None") },
+            ...fieldOptions(relations),
+          ]}
+          onChange={handleRelation}
+        />
+      </Setting>
+      {subItemFieldId && (
+        <Setting label={t("Show sub-items")}>
+          <CompactSelect<DatabaseSubItemsMode>
+            ariaLabel={t("Show sub-items")}
+            value={view.overrides.subItems ?? "nested"}
+            disabled={disabled}
+            options={[
+              { value: "nested", label: t("Nested") },
+              { value: "flattened", label: t("Flattened") },
+              { value: "off", label: t("As rows") },
+            ]}
+            onChange={(subItems) => onUpdate({ overrides: { subItems } })}
+          />
+        </Setting>
+      )}
+    </>
+  );
+});
+
 const NONE = "\u0000none";
 
 function fieldOptions(fields: DatabaseField[]) {

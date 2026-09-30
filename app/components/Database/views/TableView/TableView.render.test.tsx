@@ -5,14 +5,17 @@ import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "styled-components";
 import { vi } from "vitest";
 import type {
+  DatabaseField,
   DatabaseGroupPoint,
   DatabaseRecord,
+  DatabaseSettings,
   DatabaseView,
 } from "@shared/databases/types";
 import { DatabaseFieldType } from "@shared/databases/types";
 import { light } from "@shared/styles/theme";
 import { ActionContextProvider } from "~/hooks/useActionContext";
 import stores from "~/stores";
+import type { RecordQueryParams } from "~/stores/DatabaseRecordsStore";
 import { client } from "~/utils/ApiClient";
 import { makeField, makeView } from "./testFixtures";
 import { TableView } from ".";
@@ -50,6 +53,31 @@ const records: DatabaseRecord[] = [
   { id: "rec3", fields: { name: "Recette", status: "À faire" } },
 ];
 
+const subItemFields = [
+  ...fields,
+  makeField({
+    id: "children",
+    name: "Sous-élément",
+    type: DatabaseFieldType.Link,
+    isMultipleCellValue: true,
+    options: { symmetricFieldId: "parent" },
+  }),
+  makeField({
+    id: "parent",
+    name: "Élément parent",
+    type: DatabaseFieldType.Link,
+    isMultipleCellValue: true,
+    options: { symmetricFieldId: "children" },
+  }),
+];
+
+const subItemRecords: DatabaseRecord[] = [
+  {
+    id: "sub1",
+    fields: { name: "Chat vocal", parent: [{ id: "rec1", title: "Visio" }] },
+  },
+];
+
 const points: DatabaseGroupPoint[] = [
   { type: "header", id: "g1", depth: 0, value: "Terminé", isCollapsed: false },
   { type: "row", count: 1 },
@@ -61,6 +89,7 @@ describe("TableView", () => {
   let container: HTMLDivElement;
   let root: Root;
   let calls: { path: string; body: Record<string, unknown> }[];
+  let listed: DatabaseRecord[];
 
   beforeEach(() => {
     // @ts-expect-error the flag React reads to allow act() outside of its own test utilities.
@@ -75,6 +104,7 @@ describe("TableView", () => {
     Element.prototype.scrollIntoView = vi.fn();
     globalThis.CSS ??= { escape: (value: string) => value } as typeof CSS;
     calls = [];
+    listed = records;
     vi.mocked(client.post).mockReset();
     vi.mocked(client.post).mockImplementation(async (path, body) => {
       calls.push({ path, body: (body ?? {}) as Record<string, unknown> });
@@ -94,6 +124,21 @@ describe("TableView", () => {
           };
         case "/databaseRecords.update":
           return { data: records[0] };
+        case "/databaseRecords.list":
+          if (JSON.stringify(body).includes("hasAnyOf")) {
+            return {
+              data: subItemRecords,
+              pagination: {
+                offset: 0,
+                limit: 200,
+                total: subItemRecords.length,
+              },
+            };
+          }
+          return {
+            data: listed,
+            pagination: { offset: 0, limit: 100, total: listed.length },
+          };
         default:
           return {
             data: records,
@@ -111,7 +156,14 @@ describe("TableView", () => {
     container.remove();
   });
 
-  async function render(view: DatabaseView) {
+  async function render(
+    view: DatabaseView,
+    options: {
+      settings?: DatabaseSettings;
+      fields?: DatabaseField[];
+      params?: RecordQueryParams;
+    } = {}
+  ) {
     const database = stores.databases.add({
       id: databaseId,
       title: "Suivi",
@@ -119,11 +171,15 @@ describe("TableView", () => {
       collectionId: "40000000-0000-4000-8000-000000000002",
       documentId: null,
       url: `/db/${databaseId}`,
-      settings: {},
-      fields,
+      settings: options.settings ?? {},
+      fields: options.fields ?? fields,
       views: [view],
     });
-    const query = stores.databaseRecords.query(databaseId, view.id, {});
+    const query = stores.databaseRecords.query(
+      databaseId,
+      view.id,
+      options.params ?? {}
+    );
     await act(async () => {
       root.render(
         <Provider rootStore={stores}>
@@ -391,5 +447,51 @@ describe("TableView", () => {
     expect(calls.some((call) => call.path === "/databaseRecords.groups")).toBe(
       true
     );
+  });
+
+  it("unfolds the sub-items of a row under it", async () => {
+    listed = [
+      {
+        id: "rec1",
+        fields: { name: "Visio", children: [{ id: "sub1", title: "Chat" }] },
+      },
+      { id: "rec2", fields: { name: "Divers" } },
+    ];
+    await render(makeView({ id: "viwTable12" }), {
+      settings: { subItemFieldId: "children" },
+      fields: subItemFields,
+    });
+    expect(container.textContent).not.toContain("Chat vocal");
+    const toggles = container.querySelectorAll<HTMLElement>(
+      "[aria-label='Show sub-items']"
+    );
+    expect(toggles).toHaveLength(1);
+    await act(async () => {
+      toggles[0].click();
+    });
+    await wait(50);
+    const text = container.textContent ?? "";
+    expect(text).toContain("Chat vocal");
+    expect(text.indexOf("Chat vocal")).toBeLessThan(text.indexOf("Divers"));
+    expect(
+      calls.some(
+        (call) =>
+          call.path === "/databaseRecords.list" &&
+          JSON.stringify(call.body.filter ?? null).includes('"hasAnyOf"') &&
+          JSON.stringify(call.body.filter ?? null).includes('"rec1"')
+      )
+    ).toBe(true);
+  });
+
+  it("writes the parent of a sub-item in a flattened table", async () => {
+    listed = subItemRecords;
+    await render(
+      makeView({ id: "viwTable13", overrides: { subItems: "flattened" } }),
+      { settings: { subItemFieldId: "children" }, fields: subItemFields }
+    );
+    const title = container.querySelector("[data-cell='sub1:name']");
+    expect(title?.textContent).toContain("Chat vocal");
+    expect(title?.textContent).toContain("Visio");
+    expect(container.querySelector("[aria-label='Show sub-items']")).toBeNull();
   });
 });

@@ -21,6 +21,7 @@ import styled from "styled-components";
 import type {
   DatabaseCellInput,
   DatabaseFilter,
+  DatabaseRecord,
   DatabaseGroupPoint,
   DatabaseRecordPosition,
   DatabaseStatisticFunc,
@@ -39,6 +40,7 @@ import { GUTTER_WIDTH, moveId, tableColumns, tableRowLayout } from "./layout";
 import { moveCell, navigationKey } from "./navigation";
 import type { AddDisplayRow, GroupPathItem, RecordDisplayRow } from "./rows";
 import { buildDisplayRows, dropSide, pathChange, pathPrefill } from "./rows";
+import { hasSubItems, parentTitles, subItemsOf } from "./subItems";
 import { SelectionBar } from "./SelectionBar";
 import {
   Body,
@@ -50,8 +52,10 @@ import {
 } from "./styles";
 import { TableFooter } from "./TableFooter";
 import { TableHeader } from "./TableHeader";
+import type { RowSubItems } from "./TableRow";
 import { TableRow } from "./TableRow";
 import { useRowVirtualizer } from "./useRowVirtualizer";
+import { useSubItemRecords } from "./useSubItemRecords";
 import { useTableClipboard } from "./useTableClipboard";
 
 /** Props of the table view: the block's view props, and the hook that opens the view's filter. */
@@ -152,6 +156,35 @@ export const TableView = observer(function TableView_({
     [database]
   );
 
+  const subItems = React.useMemo(
+    () =>
+      subItemsOf(
+        {
+          settings: database.settings,
+          fieldById: (id) => fields?.find((field) => field.id === id),
+        },
+        view
+      ),
+    [database.settings, fields, view]
+  );
+  const nested = subItems?.mode === "nested" ? subItems : undefined;
+  const [unfolded, setUnfolded] = React.useState<ReadonlySet<string>>(
+    () => new Set()
+  );
+  const childrenOf = useSubItemRecords(query, nested, unfolded);
+  const subItemRows = React.useMemo(
+    () =>
+      nested
+        ? {
+            hasChildren: (record: DatabaseRecord) =>
+              hasSubItems(record, nested),
+            expanded: unfolded,
+            childrenOf: (recordId: string) => childrenOf.get(recordId),
+          }
+        : undefined,
+    [nested, unfolded, childrenOf]
+  );
+
   const displayRows = React.useMemo(
     () =>
       buildDisplayRows({
@@ -162,8 +195,18 @@ export const TableView = observer(function TableView_({
         hasMore: query.hasMore,
         canCreate,
         perGroupLines: true,
+        subItems: subItemRows,
       }),
-    [records, grouped, points, view.group, collapsed, query.hasMore, canCreate]
+    [
+      records,
+      grouped,
+      points,
+      view.group,
+      collapsed,
+      query.hasMore,
+      canCreate,
+      subItemRows,
+    ]
   );
   const recordRows = React.useMemo(
     () =>
@@ -399,6 +442,29 @@ export const TableView = observer(function TableView_({
     (row: AddDisplayRow) => void handleCreate(row.path),
     [handleCreate]
   );
+
+  const handleToggleSubItems = React.useCallback((recordId: string) => {
+    setUnfolded((current) => {
+      const next = new Set(current);
+      if (next.has(recordId)) {
+        next.delete(recordId);
+      } else {
+        next.add(recordId);
+      }
+      return next;
+    });
+  }, []);
+
+  const rowSubItems = (row: RecordDisplayRow): RowSubItems | undefined =>
+    subItems && {
+      mode: subItems.mode,
+      level: row.level,
+      hasChildren: row.hasChildren,
+      expanded: row.expanded,
+      parentTitles:
+        subItems.mode === "flattened" ? parentTitles(row.record, subItems) : [],
+      onToggle: handleToggleSubItems,
+    };
 
   const handleToggleGroup = React.useCallback(
     (groupId: string) => {
@@ -901,7 +967,7 @@ export const TableView = observer(function TableView_({
                     autoFit={layout.autoFit}
                     tall={layout.wrap}
                     readOnly={readOnly}
-                    draggable={draggable}
+                    draggable={draggable && row.level === 0}
                     isSelected={selectedIds.includes(row.record.id)}
                     activeFieldId={
                       active?.recordId === row.record.id
@@ -917,6 +983,7 @@ export const TableView = observer(function TableView_({
                     dropSide={
                       drop?.recordId === row.record.id ? drop.side : undefined
                     }
+                    subItems={rowSubItems(row)}
                     measureElement={virtualizer.measureElement}
                     onToggleSelected={handleToggleSelected}
                     onActivate={handleActivate}
