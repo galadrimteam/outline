@@ -288,6 +288,14 @@ export type DatabaseOpenPagesIn = "sidePeek" | "centerPeek" | "fullPage";
 
 export type DatabaseTimelineZoom = "week" | "month" | "quarter" | "year";
 
+/** What a board column header shows after the group's name, Notion's calculation of a grouped view. */
+export interface DatabaseGroupCalculation {
+  /** "count" counts the cards, "none" shows nothing. */
+  func: DatabaseStatisticFunc | "none";
+  /** The property calculated; not used by "count" and "none". */
+  fieldId?: string;
+}
+
 /** What Outline adds to a view the engine does not know about. */
 export interface DatabaseViewOverrides {
   /** Draw the engine's grid view as a list or a timeline; null goes back to the table. */
@@ -300,6 +308,10 @@ export interface DatabaseViewOverrides {
   hiddenStacks?: string[];
   cardSize?: DatabaseCardSize;
   openPagesIn?: DatabaseOpenPagesIn;
+  /** Board column headers; the number of cards when absent. */
+  groupCalculation?: DatabaseGroupCalculation;
+  /** Rows shown before « Load more » when the view is inline in a page, Notion's load limit. */
+  loadLimit?: number;
   /** Outline template document used by "New" in this view. */
   defaultTemplateId?: string | null;
   timeline?: {

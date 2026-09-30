@@ -253,6 +253,13 @@ const zTimelineOverrides = z.object({
   showTable: z.boolean().optional(),
 });
 
+const zGroupCalculation = z.object({
+  func: z.union([zStatisticFunc, z.literal("none")]),
+  fieldId: zEngineId.optional(),
+});
+
+const zLoadLimit = z.number().int().min(1).max(200);
+
 const zViewOverrides = z.object({
   layout: z.enum([DatabaseLayout.List, DatabaseLayout.Timeline]).optional(),
   subGroupFieldId: zIdOrEmpty,
@@ -262,6 +269,8 @@ const zViewOverrides = z.object({
   openPagesIn: z.enum(["sidePeek", "centerPeek", "fullPage"]).optional(),
   defaultTemplateId: z.uuid().optional(),
   timeline: zTimelineOverrides.optional(),
+  groupCalculation: zGroupCalculation.optional(),
+  loadLimit: zLoadLimit.optional(),
 });
 
 /** Overrides of `databaseViews.update`: null (or "" for an id) removes a key. */
@@ -274,6 +283,8 @@ const zViewOverridesPatch = z.object({
   openPagesIn: z.enum(["sidePeek", "centerPeek", "fullPage"]).nullish(),
   defaultTemplateId: z.uuid().nullish(),
   timeline: zTimelineOverrides.nullish(),
+  groupCalculation: zGroupCalculation.nullish(),
+  loadLimit: zLoadLimit.nullish(),
 });
 
 const zFieldMeta = z.object({

@@ -89,6 +89,27 @@ describe("DatabaseSettingsHelper", () => {
     expect(emptied.viewOverrides).toEqual({});
   });
 
+  it("keeps a board's calculation and an inline load limit", () => {
+    const settings = DatabaseSettingsHelper.mergeViewOverrides({}, "viwA", {
+      groupCalculation: { func: "sum", fieldId: "fldEstimate" },
+      loadLimit: 10,
+    });
+
+    expect(settings.viewOverrides).toEqual({
+      viwA: {
+        groupCalculation: { func: "sum", fieldId: "fldEstimate" },
+        loadLimit: 10,
+      },
+    });
+
+    const cleared = DatabaseSettingsHelper.mergeViewOverrides(
+      settings,
+      "viwA",
+      { groupCalculation: null }
+    );
+    expect(cleared.viewOverrides).toEqual({ viwA: { loadLimit: 10 } });
+  });
+
   it("forgets a deleted field", () => {
     const settings = DatabaseSettingsHelper.withoutField(
       {
