@@ -654,6 +654,28 @@ width: 100%;
     font-weight: inherit;
   }
 
+  /* galadrim: a link to a page reads like Notion's, its icon and its
+     underlined title, where upstream draws a grey pill. */
+  &[data-type="document"],
+  &[data-type="collection"] {
+    background: none;
+    border-radius: 3px;
+    padding: 0 2px;
+    font-size: 1em;
+    vertical-align: baseline;
+
+    > span {
+      text-decoration: underline;
+      text-decoration-color: ${lighten(0.5, props.theme.text)};
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.15em;
+    }
+
+    &:${hover} {
+      background: ${props.theme.listItemHoverBackground};
+    }
+  }
+
   &.mention-user::before {
     content: "@";
   }
@@ -797,6 +819,11 @@ width: 100%;
 
   & > p + p {
     margin-top: 1em;
+  }
+
+  /* galadrim: Notion lists sub-pages tightly, one link per line. */
+  & > p.${EditorStyleHelper.pageLink} + p.${EditorStyleHelper.pageLink} {
+    margin-top: 4px;
   }
 
   [data-heading-prefix]::before {
