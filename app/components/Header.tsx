@@ -135,22 +135,18 @@ function Header(
   );
 }
 
+// galadrim: the breadcrumb takes the room it needs and gives it up first, as in
+// Notion: a long title is cut, the actions on the right never leave the screen.
 const Breadcrumbs = styled("div")`
-  flex-grow: 1;
-  flex-basis: 0;
+  flex: 1 1 auto;
   min-width: 0;
   align-items: center;
   padding-inline: 0 8px;
   display: flex;
-
-  ${breakpoint("tablet")`
-    min-width: auto;
-  `};
 `;
 
 const Actions = styled(Flex)`
-  flex-grow: 1;
-  flex-basis: 0;
+  flex: 1 0 auto;
   min-width: auto;
   padding-inline: 8px 0;
   gap: 8px;
