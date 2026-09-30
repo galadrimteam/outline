@@ -65,6 +65,12 @@ const fields = [
     options: { formatting: { timeZone: "Europe/Paris" } },
   }),
   field({
+    id: "done",
+    name: "Inclus",
+    type: DatabaseFieldType.Checkbox,
+    cellValueType: "boolean",
+  }),
+  field({
     id: "blocked",
     name: "Bloqué par",
     type: DatabaseFieldType.Link,
@@ -94,6 +100,7 @@ const records: DatabaseRecord[] = [
     fields: {
       name: "Maquettes",
       status: "Terminé",
+      done: true,
       start: iso(-3),
       end: iso(1),
       blocking: [{ id: "rec2", title: "Intégration" }],
@@ -220,6 +227,31 @@ describe("database views", () => {
     expect(container.textContent).toContain("Maquettes");
     expect(container.textContent).toContain("Sans date");
     expect(container.querySelectorAll("section")).toHaveLength(3);
+    expect(container.querySelector("section")?.textContent).toContain(
+      "No Statut"
+    );
+  });
+
+  it("titles the groups of a checkbox with the box and the property name", async () => {
+    await render(
+      GalleryView,
+      makeView({
+        type: "gallery",
+        layout: DatabaseLayout.Gallery,
+        group: [{ fieldId: "done", order: "desc" }],
+      })
+    );
+    const sections = Array.from(container.querySelectorAll("section"));
+    expect(sections).toHaveLength(2);
+    const titles = sections.map(
+      (section) => section.querySelector("button")?.textContent
+    );
+    expect(titles).toEqual(["Inclus1", "Inclus2"]);
+    expect(
+      sections.map((section) =>
+        section.querySelector("[aria-checked]")?.getAttribute("aria-checked")
+      )
+    ).toEqual(["true", "false"]);
   });
 
   it("draws a list", async () => {
