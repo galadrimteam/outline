@@ -82,7 +82,7 @@ export const DatabaseHeader = observer(function DatabaseHeader({
     [databases, database.id, t]
   );
 
-  const iconSize = fullPage ? 32 : 22;
+  const iconSize = fullPage ? 32 : 24;
   const initial = (database.title || "D").charAt(0).toUpperCase();
 
   return (
@@ -139,13 +139,16 @@ export const DatabaseHeader = observer(function DatabaseHeader({
 });
 
 const Wrapper = styled.div<{ $fullPage: boolean }>`
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  margin-bottom: ${(props) => (props.$fullPage ? 12 : 4)}px;
+  margin-bottom: ${(props) => (props.$fullPage ? 12 : 0)}px;
 `;
 
+// Without an icon, « add an icon » waits in the margin on hover so that the
+// name starts at the edge of the text, as in Notion.
 const IconSlot = styled.div<{ $placeholder?: boolean }>`
   display: flex;
   flex-shrink: 0;
@@ -153,6 +156,11 @@ const IconSlot = styled.div<{ $placeholder?: boolean }>`
   ${(props) =>
     props.$placeholder &&
     css`
+      position: absolute;
+      right: 100%;
+      top: 50%;
+      margin-right: 4px;
+      transform: translateY(-50%);
       opacity: 0;
       transition: opacity 100ms ease-in-out;
 
@@ -173,7 +181,7 @@ const Title = styled.input<{ $fullPage: boolean; $empty: boolean }>`
   background: none;
   color: ${(props) => (props.$empty ? props.theme.placeholder : props.theme.text)};
   font: inherit;
-  font-size: ${(props) => (props.$fullPage ? 32 : 20)}px;
+  font-size: ${(props) => (props.$fullPage ? 32 : 24)}px;
   font-weight: 700;
   line-height: 1.25;
   letter-spacing: -0.01em;

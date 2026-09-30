@@ -472,6 +472,8 @@
   "Copy link to database": "Copier le lien vers la base de données",
   "Show inline": "Afficher intégrée",
   "Show as full page": "Afficher en pleine page",
+  "Show database title": "Afficher le titre de la base",
+  "Hide database title": "Masquer le titre de la base",
   "Open as full page": "Ouvrir en pleine page",
   "Remove from page": "Retirer de la page",
   "Database options": "Options de la base de données",
