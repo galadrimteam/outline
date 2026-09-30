@@ -15,10 +15,9 @@ import { getCell } from "~/components/Database/cells/registry";
 import { FieldKindIcon } from "~/components/Database/fields/FieldKindIcon";
 import type { RelationPageTab } from "~/components/Database/fields/pageTabs";
 import { relationTabColumns } from "~/components/Database/fields/pageTabs";
-import {
-  recordIcon,
-  recordTitle,
-} from "~/components/Database/views/GalleryView/cards";
+import { recordTitle } from "~/components/Database/views/GalleryView/cards";
+import { IconGlyph } from "~/components/Database/RowIcon";
+import { linkIcon, rowIcon } from "~/components/Database/rowIcons";
 import useStores from "~/hooks/useStores";
 import type Database from "~/models/Database";
 
@@ -171,13 +170,13 @@ const LinkedRow = observer(function LinkedRow({
   const record = database
     ? databaseRecords.recordById(database.id, link.id)
     : undefined;
-  const icon = database && record ? recordIcon(database, record) : undefined;
+  const icon = database && record ? rowIcon(database, record) : linkIcon(link);
   const title =
     (database && record ? recordTitle(database, record) : "") || link.title;
   const path = linkedRecordPath(field, link.id);
   const content = (
     <>
-      {icon ? <Emoji aria-hidden>{icon}</Emoji> : <DocumentIcon size={16} />}
+      {icon ? <IconGlyph icon={icon} size={16} /> : <DocumentIcon size={16} />}
       {title ? (
         <TitleText>{title}</TitleText>
       ) : (
@@ -307,10 +306,6 @@ const TitleText = styled.span`
 
 const Untitled = styled.span`
   color: ${s("placeholder")};
-`;
-
-const Emoji = styled.span`
-  flex-shrink: 0;
 `;
 
 const Empty = styled.p`

@@ -470,7 +470,12 @@ describe("#databases.update", () => {
             viwGrid: { openPagesIn: "fullPage" },
             viwBoard: null,
           },
-          pageLayout: { hideEmpty: true },
+          pageLayout: {
+            hideEmpty: true,
+            fieldOrder: ["fldStatusAAAAAAAAAA", "fldIconAAAAAAAAAAAA"],
+            pinnedFieldIds: ["fldStatusAAAAAAAAAA"],
+          },
+          fieldMeta: { fldStatusAAAAAAAAAA: { icon: "💵" } },
         },
       },
     });
@@ -481,7 +486,12 @@ describe("#databases.update", () => {
     expect(body.data.settings).toEqual({
       viewOverrides: { viwGrid: { openPagesIn: "fullPage" } },
       iconFieldId: "fldIcon",
-      pageLayout: { hideEmpty: true },
+      pageLayout: {
+        hideEmpty: true,
+        fieldOrder: ["fldStatusAAAAAAAAAA", "fldIconAAAAAAAAAAAA"],
+        pinnedFieldIds: ["fldStatusAAAAAAAAAA"],
+      },
+      fieldMeta: { fldStatusAAAAAAAAAA: { icon: "💵" } },
     });
   });
 

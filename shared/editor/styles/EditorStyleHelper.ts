@@ -137,6 +137,12 @@ export class EditorStyleHelper {
   /** Full-width table layout */
   static readonly tableFullWidth = "table-full-width";
 
+  /** galadrim: a paragraph that is only a link to a page, Notion's « link to page » block */
+  static readonly pageLink = "page-link";
+
+  /** galadrim: a table without column widths, as wide as its content like Notion's simple tables */
+  static readonly tableFitContent = "table-fit-content";
+
   /** Shadow on the right side of the table */
   static readonly tableShadowRight = "table-shadow-right";
 

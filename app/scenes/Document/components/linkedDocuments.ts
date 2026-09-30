@@ -71,6 +71,33 @@ export function getLinkedDocumentKeys(
 }
 
 /**
+ * Collects the databases a document shows, through its database blocks.
+ *
+ * @param data the content of the document.
+ * @returns the ids of the databases.
+ */
+export function getShownDatabaseIds(
+  data: ProsemirrorData | undefined | null
+): Set<string> {
+  const ids = new Set<string>();
+
+  const visit = (node: ProsemirrorData) => {
+    if (
+      node.type === "database" &&
+      typeof node.attrs?.databaseId === "string"
+    ) {
+      ids.add(node.attrs.databaseId);
+    }
+    node.content?.forEach(visit);
+  };
+
+  if (data) {
+    visit(data);
+  }
+  return ids;
+}
+
+/**
  * Whether a document is among those collected by `getLinkedDocumentKeys`.
  *
  * @param keys the result of `getLinkedDocumentKeys`.

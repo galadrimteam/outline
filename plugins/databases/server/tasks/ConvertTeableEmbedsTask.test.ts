@@ -150,6 +150,8 @@ describe("ConvertTeableEmbedsTask", () => {
       legacyHref: framed("tblA"),
     });
     expect(nodesOf(document.content, "embed")).toEqual([embed(youtube)]);
+    // A page that shows a database among other blocks keeps its width, as in Notion.
+    expect(document.fullWidth).toBe(false);
     expect(contentOfState(document.state)).toEqual(document.content);
     expect(document.updatedAt).toEqual(past);
     expect(await Event.count({ where: { documentId: page.id } })).toBe(0);
@@ -195,6 +197,7 @@ describe("ConvertTeableEmbedsTask", () => {
     });
 
     const document = await reload(page.id);
+    expect(document.fullWidth).toBe(true);
     const [node] = nodesOf(document.content, "database");
     expect(node.attrs).toMatchObject({
       viewIds: null,

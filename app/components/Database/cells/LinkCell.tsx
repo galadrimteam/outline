@@ -69,9 +69,21 @@ export function linkedRecordPath(
     : null;
 }
 
+/** How many linked rows a page property lists before « N more… », as in Notion. */
+const PropertyListLimit = 5;
+
 function LinkRenderer({ field, value, variant, wrap }: CellRendererProps) {
   const { t } = useTranslation();
+  const [expanded, setExpanded] = React.useState(false);
   const links = linksOf(value);
+
+  const handleExpand = React.useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      setExpanded(true);
+    },
+    []
+  );
 
   if (!links.length) {
     return variant === "property" ? (
@@ -80,10 +92,15 @@ function LinkRenderer({ field, value, variant, wrap }: CellRendererProps) {
   }
 
   const iconSize = variant === "card" ? 14 : 16;
+  const isList = variant === "property";
+  const listed =
+    isList && !expanded ? links.slice(0, PropertyListLimit) : links;
+  const more = links.length - listed.length;
+  const Container = isList ? LinkList : Chips;
 
   return (
-    <Chips $variant={variant} $wrap={wrap}>
-      {links.map((link) => {
+    <Container $variant={variant} $wrap={wrap}>
+      {listed.map((link) => {
         const path = linkedRecordPath(field, link.id);
         const icon = linkIcon(link);
         const content = (
@@ -104,7 +121,12 @@ function LinkRenderer({ field, value, variant, wrap }: CellRendererProps) {
           <PlainChip key={link.id}>{content}</PlainChip>
         );
       })}
-    </Chips>
+      {more > 0 && (
+        <MoreButton type="button" onClick={handleExpand}>
+          {t("{{ count }} more…", { count: more })}
+        </MoreButton>
+      )}
+    </Container>
   );
 }
 
@@ -247,6 +269,25 @@ function isMultipleLink(field: DatabaseField): boolean {
   }
   return field.isMultipleCellValue;
 }
+
+const LinkList = styled(Chips)`
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+`;
+
+const MoreButton = styled.button`
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: ${s("textTertiary")};
+  cursor: var(--pointer);
+
+  &:hover {
+    color: ${s("textSecondary")};
+  }
+`;
 
 const chip = css`
   display: inline-flex;

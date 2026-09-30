@@ -28,6 +28,7 @@ import {
 } from "../components/Mentions";
 import type { MarkdownSerializerState } from "../lib/markdown/serializer";
 import { transformListToMentions } from "../lib/mention";
+import { pageLinkDecorations } from "../lib/pageLinks";
 import { findParentNodeClosestToPos } from "../queries/findParentNode";
 import { isInList } from "../queries/isInList";
 import { isList } from "../queries/isList";
@@ -242,6 +243,11 @@ export default class Mention extends Node {
 
   get plugins() {
     return [
+      new Plugin({
+        props: {
+          decorations: (state) => pageLinkDecorations(state.doc),
+        },
+      }),
       // Ensure mentions have unique IDs
       new Plugin({
         appendTransaction: (_transactions, _oldState, newState) => {

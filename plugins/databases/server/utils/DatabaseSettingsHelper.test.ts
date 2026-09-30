@@ -133,7 +133,12 @@ describe("DatabaseSettingsHelper", () => {
       {
         fieldMeta: { fldA: {}, fldB: {} },
         iconFieldId: "fldA",
-        pageLayout: { hiddenFieldIds: ["fldA", "fldB"], hideEmpty: true },
+        pageLayout: {
+          hiddenFieldIds: ["fldA", "fldB"],
+          hideEmpty: true,
+          fieldOrder: ["fldB", "fldA"],
+          pinnedFieldIds: ["fldA"],
+        },
       },
       "fldA"
     );
@@ -142,6 +147,8 @@ describe("DatabaseSettingsHelper", () => {
     expect(settings.iconFieldId).toBeUndefined();
     expect(settings.pageLayout?.hiddenFieldIds).toEqual(["fldB"]);
     expect(settings.pageLayout?.hideEmpty).toBe(true);
+    expect(settings.pageLayout?.fieldOrder).toEqual(["fldB"]);
+    expect(settings.pageLayout?.pinnedFieldIds).toEqual([]);
   });
 
   it("merges the page layout key by key, its tabs kept", () => {

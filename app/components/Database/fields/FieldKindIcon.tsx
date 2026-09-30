@@ -1,4 +1,5 @@
-import { EmailIcon, GlobeIcon } from "outline-icons";
+import { EmailIcon, LinkIcon } from "outline-icons";
+import Icon from "@shared/components/Icon";
 import type { DatabaseField } from "@shared/databases/types";
 import { DatabaseStatusGroup } from "@shared/databases/types";
 import { FieldTypeIcon } from "../toolbar/icons";
@@ -13,18 +14,30 @@ interface Props {
 }
 
 /**
- * The icon of a property kind: the type icon, with links, e-mails and phones told apart from
- * plain text.
+ * The icon of a property kind: the icon given to the property, else the type icon, with links,
+ * e-mails and phones told apart from plain text.
  *
  * @param props the kind or the property, and the size.
  * @returns the icon.
  */
 export function FieldKindIcon({ kind, field, size = 18 }: Props) {
+  if (field?.meta?.icon) {
+    return (
+      <Icon
+        value={field.meta.icon}
+        initial={field.name.charAt(0).toUpperCase()}
+        color="currentColor"
+        size={size}
+        fullSize
+      />
+    );
+  }
+
   const id = kind ?? (field ? fieldKindOf(field) : undefined);
 
   switch (id) {
     case "url":
-      return <GlobeIcon size={size} />;
+      return <LinkIcon size={size} />;
     case "email":
       return <EmailIcon size={size} />;
     case "phone":

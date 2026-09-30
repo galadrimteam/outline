@@ -13,7 +13,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { observer } from "mobx-react";
-import { ArrowIcon, PlusIcon } from "outline-icons";
+import { PlusIcon } from "outline-icons";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import styled from "styled-components";
@@ -267,11 +267,6 @@ const HeaderColumn = observer(function HeaderColumn_({
         <HeaderButton type="button" {...attributes} {...listeners}>
           <FieldKindIcon field={field} size={16} />
           <HeaderName>{field.name}</HeaderName>
-          {sortOrder && (
-            <SortArrow aria-hidden $desc={sortOrder === "desc"}>
-              <ArrowIcon size={14} />
-            </SortArrow>
-          )}
         </HeaderButton>
       </FieldHeaderMenu>
       {resizable && (
@@ -291,12 +286,6 @@ const HeaderName = styled.span`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-`;
-
-const SortArrow = styled.span<{ $desc: boolean }>`
-  display: inline-flex;
-  margin-left: auto;
-  transform: rotate(${(props) => (props.$desc ? "90deg" : "-90deg")});
 `;
 
 const AddCell = styled.div`

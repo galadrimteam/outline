@@ -38,6 +38,9 @@ declare module "styled-components" {
     quote: string;
     codeBackground: string;
     codeBorder: string;
+    /** galadrim: inline code, red on grey as in Notion. */
+    codeInline: string;
+    codeInlineBackground: string;
     horizontalRule: string;
     scrollbarBackground: string;
     scrollbarThumb: string;
@@ -177,6 +180,9 @@ declare module "styled-components" {
     quote: string;
     codeBackground: string;
     codeBorder: string;
+    /** galadrim: inline code, red on grey as in Notion. */
+    codeInline: string;
+    codeInlineBackground: string;
     embedBorder: string;
     horizontalRule: string;
     progressBarBackground: string;

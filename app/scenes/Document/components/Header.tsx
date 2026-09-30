@@ -193,10 +193,10 @@ function DocumentHeader({
           // and the favourite star moved to the right of the header. The
           // contents button follows the breadcrumb instead of being its child,
           // a child would put a separator after the name of the document.
-          <Flex align="center" gap={4}>
+          <BreadcrumbLine align="center" gap={4}>
             <DocumentBreadcrumb document={document} showCurrent />
             {toc}
-          </Flex>
+          </BreadcrumbLine>
         )
       }
       title={
@@ -338,7 +338,12 @@ function DocumentHeader({
   );
 }
 
+const BreadcrumbLine = styled(Flex)`
+  min-width: 0;
+`;
+
 const TocButton = styled(Button)`
+  flex-shrink: 0;
   border-radius: 4px;
 
   &&:hover:not(:disabled),

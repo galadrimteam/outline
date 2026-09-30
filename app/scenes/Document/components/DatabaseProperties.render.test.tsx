@@ -61,7 +61,11 @@ describe("DatabaseProperties", () => {
     container.remove();
   });
 
-  async function render(settings: DatabaseSettings, readOnly: boolean) {
+  async function render(
+    settings: DatabaseSettings,
+    readOnly: boolean,
+    home: string | null = null
+  ) {
     vi.mocked(client.post).mockReset();
     vi.mocked(client.post).mockImplementation(async (path) => {
       if (path === "/databaseRecords.info") {
@@ -79,7 +83,7 @@ describe("DatabaseProperties", () => {
             title: "Suivi",
             icon: null,
             collectionId: "40000000-0000-4000-8000-000000000003",
-            documentId: null,
+            documentId: home,
             url: `/db/${databaseId}`,
             settings,
             createdAt: new Date().toISOString(),
@@ -112,6 +116,7 @@ describe("DatabaseProperties", () => {
       collectionId: "40000000-0000-4000-8000-000000000003",
       databaseId,
       databaseRecordId: "rec1",
+      parentDocumentId: home ?? undefined,
     });
 
     await act(async () => {
@@ -152,5 +157,24 @@ describe("DatabaseProperties", () => {
     expect(text).not.toContain("Notes");
     expect(text).toContain("1 more properties");
     expect(text).not.toContain("Add a property");
+  });
+
+  it("follows the page order of the layout", async () => {
+    await render({ pageLayout: { fieldOrder: ["notes", "status"] } }, false);
+    const text = container.textContent ?? "";
+    expect(text.indexOf("Notes")).toBeLessThan(text.indexOf("Statut"));
+  });
+
+  it("shows only the pinned properties, the others behind « Show details »", async () => {
+    await render({ pageLayout: { pinnedFieldIds: ["notes"] } }, true);
+    const text = container.textContent ?? "";
+    expect(text).toContain("Notes");
+    expect(text).toContain("Show details");
+    expect(text).not.toContain("Statut");
+  });
+
+  it("leaves the link to the database to the breadcrumb when it leads there", async () => {
+    await render({}, false, "60000000-0000-4000-8000-000000000003");
+    expect(container.querySelector(`a[href='/db/${databaseId}']`)).toBeNull();
   });
 });

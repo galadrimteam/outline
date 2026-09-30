@@ -8,6 +8,28 @@ import { TableLayout } from "../types";
 import { HEADER_HEIGHT } from "../../constants";
 import { isBrowser } from "../../utils/browser";
 
+/**
+ * Whether any cell of a table was given a width: a table imported without widths (a Notion simple
+ * table) is drawn as wide as its content, one created or resized here keeps its widths.
+ *
+ * @param node the table node.
+ * @returns true when a cell has a width.
+ */
+export function hasColumnWidths(node: Node): boolean {
+  let found = false;
+  node.descendants((child) => {
+    if (found) {
+      return false;
+    }
+    const colwidth: unknown = child.attrs.colwidth;
+    if (Array.isArray(colwidth) && colwidth.some((width) => !!width)) {
+      found = true;
+    }
+    return child.type.spec.tableRole === "row";
+  });
+  return found;
+}
+
 export class TableView extends ProsemirrorTableView {
   public constructor(
     public node: Node,
@@ -82,6 +104,11 @@ export class TableView extends ProsemirrorTableView {
     this.dom.classList.toggle(
       EditorStyleHelper.tableFullWidth,
       node.attrs.layout === TableLayout.fullWidth
+    );
+
+    this.dom.classList.toggle(
+      EditorStyleHelper.tableFitContent,
+      node.attrs.layout !== TableLayout.fullWidth && !hasColumnWidths(node)
     );
 
     this.dom.classList.toggle(

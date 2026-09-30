@@ -24,6 +24,10 @@ import ContentEditable from "~/components/ContentEditable";
 import { useDocumentContext } from "~/components/DocumentContext";
 import { PopoverButton } from "~/components/IconPicker/components/PopoverButton";
 import useBoolean from "~/hooks/useBoolean";
+import {
+  dateMentionHighlight,
+  useDateMentionHighlight,
+} from "~/hooks/useDateMentionHighlight";
 import usePolicy from "~/hooks/usePolicy";
 import { useTranslation } from "react-i18next";
 import lazyWithRetry from "~/utils/lazyWithRetry";
@@ -91,6 +95,12 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
   const handleClick = React.useCallback(() => {
     ref.current?.focus();
   }, [ref]);
+
+  const getTitleElement = React.useCallback(
+    () => ref.current?.getElement(),
+    [ref]
+  );
+  useDateMentionHighlight(getTitleElement, title);
 
   const restoreFocus = React.useCallback(() => {
     ref.current?.focusAtEnd();
@@ -239,7 +249,13 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
   const dir = ref.current?.getComputedDirection();
   const initial = title.charAt(0).toUpperCase();
   const fallbackIcon = icon ? (
-    <Icon value={icon} initial={initial} color={color} size={pageIconSize} />
+    <Icon
+      value={icon}
+      initial={initial}
+      color={color}
+      size={pageIconSize}
+      fullSize
+    />
   ) : null;
   // galadrim: without an icon the picker is only a small "add icon" button that
   // appears just above the title on hover, where Notion shows its "Add icon",
@@ -290,7 +306,9 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
               onClose={handleClose}
               allowDelete
               borderOnHover
-            />
+            >
+              {fallbackIcon}
+            </StyledIconPicker>
           </React.Suspense>
         </IconTitleWrapper>
       ) : icon ? (
@@ -327,6 +345,11 @@ const Title = styled(ContentEditable)<TitleProps>`
 
   > span {
     outline: none;
+  }
+
+  > span::highlight(${dateMentionHighlight}) {
+    color: ${s("textTertiary")};
+    -webkit-text-fill-color: ${s("textTertiary")};
   }
 
   &::placeholder {

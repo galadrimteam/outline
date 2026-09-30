@@ -134,15 +134,16 @@ export class DatabaseSettingsHelper {
       ...(settings?.iconFieldId === fieldId ? { iconFieldId: null } : {}),
     });
     if (next.pageLayout) {
+      const layout = next.pageLayout;
+      const without = (ids: string[] | undefined) =>
+        ids?.filter((id) => id !== fieldId);
       next.pageLayout = {
-        ...next.pageLayout,
-        hiddenFieldIds: next.pageLayout.hiddenFieldIds?.filter(
-          (id) => id !== fieldId
-        ),
-        hideWhenEmptyFieldIds: next.pageLayout.hideWhenEmptyFieldIds?.filter(
-          (id) => id !== fieldId
-        ),
-        tabs: next.pageLayout.tabs?.filter((tab) => tab.fieldId !== fieldId),
+        ...layout,
+        hiddenFieldIds: without(layout.hiddenFieldIds),
+        hideWhenEmptyFieldIds: without(layout.hideWhenEmptyFieldIds),
+        fieldOrder: without(layout.fieldOrder),
+        pinnedFieldIds: without(layout.pinnedFieldIds),
+        tabs: layout.tabs?.filter((tab) => tab.fieldId !== fieldId),
       };
     }
     return next;

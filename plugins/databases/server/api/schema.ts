@@ -294,6 +294,7 @@ const zFieldMeta = z.object({
     .record(z.string().max(1000), z.enum(DatabaseStatusGroup))
     .optional(),
   endFieldId: zIdOrEmpty,
+  icon: z.string().min(1).max(100).optional(),
 });
 
 const zPageTab = z
@@ -317,6 +318,8 @@ const zSettingsPatch = z.object({
       hideWhenEmptyFieldIds: z.array(zEngineId).max(500).optional(),
       hideEmpty: z.boolean().optional(),
       tabs: z.array(zPageTab).max(20).optional(),
+      fieldOrder: z.array(zEngineId).max(500).optional(),
+      pinnedFieldIds: z.array(zEngineId).max(500).optional(),
     })
     .nullish(),
   iconFieldId: zEngineId.nullish(),
