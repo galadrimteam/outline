@@ -57,6 +57,7 @@ describe("DatabaseSettingsHelper", () => {
         },
         fieldMeta: { fldA: { endFieldId: "fldB" } },
         iconFieldId: "fldIcon",
+        subItemFieldId: "fldSub",
       },
       {
         viewOverrides: { viwA: { openPagesIn: "fullPage" }, viwB: null },
@@ -67,26 +68,53 @@ describe("DatabaseSettingsHelper", () => {
     expect(settings).toEqual({
       viewOverrides: { viwA: { openPagesIn: "fullPage" } },
       fieldMeta: { fldA: { endFieldId: "fldB" } },
+      subItemFieldId: "fldSub",
     });
+    expect(
+      DatabaseSettingsHelper.merge(settings, { subItemFieldId: null })
+    ).not.toHaveProperty("subItemFieldId");
   });
 
   it("merges a view's overrides key by key", () => {
     const settings = DatabaseSettingsHelper.mergeViewOverrides(
       { viewOverrides: { viwA: { cardSize: "small", hiddenStacks: [""] } } },
       "viwA",
-      { hiddenStacks: null, stackOrder: ["Done", "To do"] }
+      { hiddenStacks: null, stackOrder: ["Done", "To do"], subItems: "off" }
     );
 
     expect(settings.viewOverrides).toEqual({
-      viwA: { cardSize: "small", stackOrder: ["Done", "To do"] },
+      viwA: {
+        cardSize: "small",
+        stackOrder: ["Done", "To do"],
+        subItems: "off",
+      },
     });
 
     const emptied = DatabaseSettingsHelper.mergeViewOverrides(
       settings,
       "viwA",
-      { cardSize: null, stackOrder: null }
+      { cardSize: null, stackOrder: null, subItems: null }
     );
     expect(emptied.viewOverrides).toEqual({});
+  });
+
+  it("gives the engine the order and the folded groups of a view", () => {
+    const settings = {
+      viewOverrides: {
+        viwA: { stackOrder: ["S1", ""], hiddenStacks: [""] },
+        viwB: { cardSize: "small" as const },
+      },
+    };
+    expect(DatabaseSettingsHelper.groupLayout(settings, "viwA")).toEqual({
+      order: ["S1", ""],
+      hidden: [""],
+    });
+    expect(DatabaseSettingsHelper.groupLayout(settings, "viwB")).toBe(
+      undefined
+    );
+    expect(DatabaseSettingsHelper.groupLayout(settings, undefined)).toBe(
+      undefined
+    );
   });
 
   it("keeps a board's calculation and an inline load limit", () => {
@@ -139,12 +167,14 @@ describe("DatabaseSettingsHelper", () => {
           fieldOrder: ["fldB", "fldA"],
           pinnedFieldIds: ["fldA"],
         },
+        subItemFieldId: "fldA",
       },
       "fldA"
     );
 
     expect(settings.fieldMeta).toEqual({ fldB: {} });
     expect(settings.iconFieldId).toBeUndefined();
+    expect(settings.subItemFieldId).toBeUndefined();
     expect(settings.pageLayout?.hiddenFieldIds).toEqual(["fldB"]);
     expect(settings.pageLayout?.hideEmpty).toBe(true);
     expect(settings.pageLayout?.fieldOrder).toEqual(["fldB"]);

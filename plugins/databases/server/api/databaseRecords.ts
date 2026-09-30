@@ -21,6 +21,7 @@ import {
 } from "../presenters/databaseRecords";
 import { actorFor } from "../utils/actor";
 import { cellText } from "../utils/cellText";
+import { DatabaseSettingsHelper } from "../utils/DatabaseSettingsHelper";
 import { DatabaseRowIcons } from "../utils/DatabaseRowIcons";
 import { DatabaseUserMapper } from "../utils/DatabaseUserMapper";
 import {
@@ -71,6 +72,10 @@ router.post(
           can(user, "update", database) === true,
         sort,
         search,
+        groupLayout: DatabaseSettingsHelper.groupLayout(
+          database.settings,
+          viewId
+        ),
         skip: offset,
         take: limit,
       }
@@ -316,6 +321,10 @@ router.post(
       groupBy,
       filter,
       search,
+      groupLayout: DatabaseSettingsHelper.groupLayout(
+        database.settings,
+        viewId
+      ),
     });
     const headers = points.flatMap((point) =>
       point.type === "header" ? [point] : []
@@ -351,7 +360,7 @@ router.post(
   auth({ optional: true }),
   validate(T.DatabaseRecordsAggregateSchema),
   async (ctx: APIContext<T.DatabaseRecordsAggregateReq>) => {
-    const { databaseId, viewId, fieldStats, filter, search, shareId } =
+    const { databaseId, viewId, fieldStats, filter, search, byGroup, shareId } =
       ctx.input.body;
     const access = await loadDatabaseForRead(ctx, databaseId, shareId);
     const { database } = access;
@@ -362,6 +371,11 @@ router.post(
           fieldStats,
           filter,
           search,
+          byGroup,
+          groupLayout: DatabaseSettingsHelper.groupLayout(
+            database.settings,
+            viewId
+          ),
         })
       : {};
 

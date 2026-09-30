@@ -18,7 +18,7 @@ export function hidesWithFlag(view: Pick<DatabaseView, "type">): boolean {
 
 /**
  * Whether a field is shown by a view. The primary field is always shown: it
- * is the title of cards and the first column of tables.
+ * is the title of cards and a column of every table.
  *
  * @param view the view.
  * @param field the field.
@@ -36,8 +36,10 @@ export function isFieldVisible(
 }
 
 /**
- * Returns the fields in the view's order (`columnMeta.order`), the primary
- * field first, fields without an order last in their schema order.
+ * Returns the fields in the view's order (`columnMeta.order`), like Notion
+ * where the title column can sit anywhere; the primary field goes first only
+ * when the view gives it no place, and other fields without an order go last
+ * in their schema order.
  *
  * @param fields the database fields.
  * @param view the view.
@@ -46,18 +48,19 @@ export function isFieldVisible(
 export function orderedFields<
   T extends Pick<DatabaseField, "id" | "isPrimary">,
 >(fields: T[], view: Pick<DatabaseView, "columnMeta">): T[] {
-  const rank = (field: T, index: number): [number, number, number] => [
-    field.isPrimary ? 0 : 1,
-    view.columnMeta[field.id]?.order ?? Number.MAX_SAFE_INTEGER,
+  const rank = (field: T, index: number): [number, number] => [
+    view.columnMeta[field.id]?.order ??
+      (field.isPrimary ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY),
     index,
   ];
   return fields
     .map((field, index) => ({ field, key: rank(field, index) }))
-    .sort(
-      (a, b) =>
-        a.key[0] - b.key[0] || a.key[1] - b.key[1] || a.key[2] - b.key[2]
-    )
+    .sort((a, b) => compareRanks(a.key[0], b.key[0]) || a.key[1] - b.key[1])
     .map(({ field }) => field);
+}
+
+function compareRanks(a: number, b: number): number {
+  return a === b ? 0 : a < b ? -1 : 1;
 }
 
 /**
@@ -109,5 +112,24 @@ export function orderPatch(
       patch[id] = { order };
     }
   });
+  return patch;
+}
+
+/**
+ * Returns the column meta changes that make every column of a view follow
+ * the view's wrapping again, like Notion's « Wrap all columns ».
+ *
+ * @param view the view.
+ * @returns the column meta changes, by field id.
+ */
+export function wrapResetPatch(
+  view: Pick<DatabaseView, "columnMeta">
+): Record<string, Partial<DatabaseColumnMeta>> {
+  const patch: Record<string, Partial<DatabaseColumnMeta>> = {};
+  for (const [fieldId, meta] of Object.entries(view.columnMeta)) {
+    if (meta.wrap !== undefined && meta.wrap !== null) {
+      patch[fieldId] = { wrap: null };
+    }
+  }
   return patch;
 }

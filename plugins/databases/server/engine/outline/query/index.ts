@@ -2,7 +2,7 @@ import { computeBase } from "./computed/computeBase";
 import { inferFieldType } from "./computed/inferType";
 import type { OutlineQuery } from "./contract";
 import { choicesFor, convertCell } from "./convert";
-import { groupPoints } from "./groups";
+import { groupMembers, groupPoints } from "./groups";
 import { normalizeInput } from "./normalize";
 import { positionsBetween } from "./positions";
 import { selectRecords } from "./select";
@@ -14,6 +14,7 @@ export const outlineQuery: OutlineQuery = {
   computeBase,
   select: selectRecords,
   groupPoints,
+  groupMembers,
   aggregate,
   inferType: inferFieldType,
   convertCell,

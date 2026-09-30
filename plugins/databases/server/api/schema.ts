@@ -190,6 +190,7 @@ const zColumnMeta = z.object({
   visible: z.boolean().optional(),
   required: z.boolean().optional(),
   statisticFunc: zStatisticFunc.nullable().optional(),
+  wrap: z.boolean().nullable().optional(),
 });
 
 /** An id the app clears with "": dropped on creation. */
@@ -270,6 +271,7 @@ const zViewOverrides = z.object({
   openPagesIn: z.enum(["sidePeek", "centerPeek", "fullPage"]).optional(),
   defaultTemplateId: z.uuid().optional(),
   timeline: zTimelineOverrides.optional(),
+  subItems: z.enum(["nested", "flattened", "off"]).optional(),
   groupCalculation: zGroupCalculation.optional(),
   loadLimit: zLoadLimit.optional(),
 });
@@ -285,6 +287,7 @@ const zViewOverridesPatch = z.object({
   openPagesIn: z.enum(["sidePeek", "centerPeek", "fullPage"]).nullish(),
   defaultTemplateId: z.uuid().nullish(),
   timeline: zTimelineOverrides.nullish(),
+  subItems: z.enum(["nested", "flattened", "off"]).nullish(),
   groupCalculation: zGroupCalculation.nullish(),
   loadLimit: zLoadLimit.nullish(),
 });
@@ -323,6 +326,7 @@ const zSettingsPatch = z.object({
     })
     .nullish(),
   iconFieldId: zEngineId.nullish(),
+  subItemFieldId: zEngineId.nullish(),
 });
 
 const zFieldOptions = z.object({
@@ -601,6 +605,7 @@ export const DatabaseRecordsAggregateSchema = BaseSchema.extend({
       }),
     filter: zFilter.nullish(),
     search: zSearch,
+    byGroup: z.boolean().optional(),
   }),
 });
 

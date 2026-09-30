@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import styled from "styled-components";
 import { AutomationButton } from "../automations/AutomationButton";
 import { CheckboxBox } from "./CheckboxCell";
+import { NumberValue } from "./components/NumberValue";
 import { CellText, EmptyValue } from "./components/styles";
 import { cellValueToText, toArray } from "./format";
 import { useCellLocale } from "./hooks";
@@ -47,24 +48,26 @@ function ComputedRenderer({ field, value, variant, wrap }: CellRendererProps) {
     ) : null;
   }
 
+  if (field.cellValueType === "number") {
+    return (
+      <NumberValue
+        field={field}
+        value={value}
+        text={text}
+        variant={variant}
+        wrap={wrap}
+      />
+    );
+  }
+
   return (
-    <ComputedText
-      $variant={variant}
-      $wrap={wrap}
-      $numeric={field.cellValueType === "number"}
-    >
+    <CellText $variant={variant} $wrap={wrap}>
       {text}
-    </ComputedText>
+    </CellText>
   );
 }
 
 const Row = styled.span`
   display: inline-flex;
   gap: 4px;
-`;
-
-const ComputedText = styled(CellText)<{ $numeric: boolean }>`
-  font-variant-numeric: ${(props) => (props.$numeric ? "tabular-nums" : "normal")};
-  text-align: ${(props) =>
-    props.$numeric && props.$variant === "table" ? "right" : "left"};
 `;

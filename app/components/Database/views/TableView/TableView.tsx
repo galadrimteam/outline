@@ -21,9 +21,11 @@ import styled from "styled-components";
 import type {
   DatabaseCellInput,
   DatabaseFilter,
+  DatabaseRecord,
   DatabaseGroupPoint,
   DatabaseRecordPosition,
   DatabaseStatisticFunc,
+  DatabaseStatisticResult,
 } from "@shared/databases/types";
 import { s } from "@shared/styles";
 import ConfirmationDialog from "~/components/ConfirmationDialog";
@@ -33,11 +35,12 @@ import { cellValueToText } from "../../cells/format";
 import { getCell } from "../../cells/registry";
 import { orderPatch, orderedFields } from "../../toolbar/columns";
 import type { DatabaseViewProps } from "../../types";
-import { GroupAddRow, GroupHeaderRow } from "./GroupRows";
-import { GUTTER_WIDTH, moveId, rowLayout, tableColumns } from "./layout";
+import { GroupAddRow, GroupHeaderRow, PositionedLine } from "./GroupRows";
+import { GUTTER_WIDTH, moveId, tableColumns, tableRowLayout } from "./layout";
 import { moveCell, navigationKey } from "./navigation";
 import type { AddDisplayRow, GroupPathItem, RecordDisplayRow } from "./rows";
 import { buildDisplayRows, dropSide, pathChange, pathPrefill } from "./rows";
+import { hasSubItems, parentTitles, subItemsOf } from "./subItems";
 import { SelectionBar } from "./SelectionBar";
 import {
   Body,
@@ -49,8 +52,10 @@ import {
 } from "./styles";
 import { TableFooter } from "./TableFooter";
 import { TableHeader } from "./TableHeader";
+import type { RowSubItems } from "./TableRow";
 import { TableRow } from "./TableRow";
 import { useRowVirtualizer } from "./useRowVirtualizer";
+import { useSubItemRecords } from "./useSubItemRecords";
 import { useTableClipboard } from "./useTableClipboard";
 
 /** Props of the table view: the block's view props, and the hook that opens the view's filter. */
@@ -68,6 +73,17 @@ interface DropTarget {
   recordId: string;
   side: DatabaseRecordPosition;
 }
+
+/** The column menu that is open: which header line (the top one or a group's) and which column. */
+interface OpenMenu {
+  scope: string;
+  fieldId: string;
+}
+
+const TOP_HEADER = "top";
+
+/** Room between the calculations of a group and the next group. */
+const GROUP_GAP = 16;
 
 /** Width of the last column, holding the "+" that adds a property. */
 const ADD_COLUMN_WIDTH = 48;
@@ -100,15 +116,16 @@ export const TableView = observer(function TableView_({
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const [points, setPoints] = React.useState<DatabaseGroupPoint[]>();
   const [results, setResults] = React.useState<
-    Record<string, { value: number | string | null }>
+    Record<string, DatabaseStatisticResult>
   >({});
   const [selected, setSelected] = React.useState<string[]>([]);
   const [active, setActive] = React.useState<ActiveCell | null>(null);
   const [editing, setEditing] = React.useState(false);
   const [editInput, setEditInput] = React.useState<string>();
-  const [menuFieldId, setMenuFieldId] = React.useState<string | null>(null);
+  const [menu, setMenu] = React.useState<OpenMenu | null>(null);
   const [drop, setDrop] = React.useState<DropTarget | null>(null);
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
+  const [scrolled, setScrolled] = React.useState(false);
 
   React.useLayoutEffect(() => {
     editingRef.current = editing;
@@ -119,7 +136,7 @@ export const TableView = observer(function TableView_({
     () => tableColumns(fields ?? [], view, widths),
     [fields, view, widths]
   );
-  const layout = rowLayout(view.options.rowHeight);
+  const layout = tableRowLayout(view.options.rowHeight, columns);
   const template = `${GUTTER_WIDTH}px ${columns
     .map((column) => `${column.width}px`)
     .join(" ")} minmax(${ADD_COLUMN_WIDTH}px, 1fr)`;
@@ -139,6 +156,35 @@ export const TableView = observer(function TableView_({
     [database]
   );
 
+  const subItems = React.useMemo(
+    () =>
+      subItemsOf(
+        {
+          settings: database.settings,
+          fieldById: (id) => fields?.find((field) => field.id === id),
+        },
+        view
+      ),
+    [database.settings, fields, view]
+  );
+  const nested = subItems?.mode === "nested" ? subItems : undefined;
+  const [unfolded, setUnfolded] = React.useState<ReadonlySet<string>>(
+    () => new Set()
+  );
+  const childrenOf = useSubItemRecords(query, nested, unfolded);
+  const subItemRows = React.useMemo(
+    () =>
+      nested
+        ? {
+            hasChildren: (record: DatabaseRecord) =>
+              hasSubItems(record, nested),
+            expanded: unfolded,
+            childrenOf: (recordId: string) => childrenOf.get(recordId),
+          }
+        : undefined,
+    [nested, unfolded, childrenOf]
+  );
+
   const displayRows = React.useMemo(
     () =>
       buildDisplayRows({
@@ -148,8 +194,19 @@ export const TableView = observer(function TableView_({
         collapsed,
         hasMore: query.hasMore,
         canCreate,
+        perGroupLines: true,
+        subItems: subItemRows,
       }),
-    [records, grouped, points, view.group, collapsed, query.hasMore, canCreate]
+    [
+      records,
+      grouped,
+      points,
+      view.group,
+      collapsed,
+      query.hasMore,
+      canCreate,
+      subItemRows,
+    ]
   );
   const recordRows = React.useMemo(
     () =>
@@ -235,7 +292,10 @@ export const TableView = observer(function TableView_({
     let cancelled = false;
     const timeout = setTimeout(() => {
       databaseRecords
-        .aggregate(database.id, view.id, fieldStats, searchParams)
+        .aggregate(database.id, view.id, fieldStats, {
+          ...searchParams,
+          byGroup: grouped,
+        })
         .then((next) => {
           if (!cancelled) {
             setResults(next);
@@ -252,6 +312,8 @@ export const TableView = observer(function TableView_({
   }, [
     database.id,
     databaseRecords,
+    grouped,
+    groupKey,
     query.total,
     records,
     searchParams,
@@ -265,8 +327,11 @@ export const TableView = observer(function TableView_({
       if (row?.type === "group") {
         return 41;
       }
-      if (row?.type === "add") {
+      if (row?.type === "add" || row?.type === "columns") {
         return 35;
+      }
+      if (row?.type === "calculations") {
+        return 35 + GROUP_GAP;
       }
       return layout.height + 1;
     },
@@ -377,6 +442,29 @@ export const TableView = observer(function TableView_({
     (row: AddDisplayRow) => void handleCreate(row.path),
     [handleCreate]
   );
+
+  const handleToggleSubItems = React.useCallback((recordId: string) => {
+    setUnfolded((current) => {
+      const next = new Set(current);
+      if (next.has(recordId)) {
+        next.delete(recordId);
+      } else {
+        next.add(recordId);
+      }
+      return next;
+    });
+  }, []);
+
+  const rowSubItems = (row: RecordDisplayRow): RowSubItems | undefined =>
+    subItems && {
+      mode: subItems.mode,
+      level: row.level,
+      hasChildren: row.hasChildren,
+      expanded: row.expanded,
+      parentTitles:
+        subItems.mode === "flattened" ? parentTitles(row.record, subItems) : [],
+      onToggle: handleToggleSubItems,
+    };
 
   const handleToggleGroup = React.useCallback(
     (groupId: string) => {
@@ -617,7 +705,7 @@ export const TableView = observer(function TableView_({
 
   const handleKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (menuFieldId || event.nativeEvent.isComposing) {
+      if (menu || event.nativeEvent.isComposing) {
         return;
       }
       if (editing) {
@@ -692,7 +780,7 @@ export const TableView = observer(function TableView_({
       focusGrid,
       handleChange,
       handleClipboardKey,
-      menuFieldId,
+      menu,
       moveActive,
       onOpenRecord,
       readOnly,
@@ -721,6 +809,50 @@ export const TableView = observer(function TableView_({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.recordId, active?.fieldId]);
 
+  const handleScroll = React.useCallback(
+    (event: React.UIEvent<HTMLDivElement>) =>
+      setScrolled(event.currentTarget.scrollLeft > 0),
+    []
+  );
+
+  const headersInGroups = displayRows.some((row) => row.type === "columns");
+  const calculationsInGroups = displayRows.some(
+    (row) => row.type === "calculations"
+  );
+
+  const renderHeader = (scope: string) => (
+    <TableHeader
+      database={database}
+      view={view}
+      columns={columns}
+      template={template}
+      readOnly={readOnly}
+      sortOrderOf={sortOrderOf}
+      selectedCount={selectedIds.length}
+      rowCount={records.length}
+      onToggleAll={handleToggleAll}
+      menuFieldId={menu?.scope === scope ? menu.fieldId : null}
+      onMenuChange={(fieldId) => setMenu(fieldId ? { scope, fieldId } : null)}
+      onResize={handleResize}
+      onResizeEnd={handleResizeEnd}
+      onReorder={handleReorderColumn}
+      onFilter={onFilter}
+    />
+  );
+
+  const renderFooter = (
+    values: Record<string, { value: number | string | null }>
+  ) => (
+    <TableFooter
+      database={database}
+      view={view}
+      columns={columns}
+      template={template}
+      readOnly={readOnly}
+      results={values}
+    />
+  );
+
   const draggedRecord = draggingId
     ? databaseRecords.recordById(database.id, draggingId)
     : undefined;
@@ -737,7 +869,7 @@ export const TableView = observer(function TableView_({
           onClear={() => setSelected([])}
         />
       )}
-      <Scroller>
+      <Scroller data-scrolled={scrolled || undefined} onScroll={handleScroll}>
         <Grid
           ref={gridRef}
           role="grid"
@@ -748,23 +880,7 @@ export const TableView = observer(function TableView_({
           style={{ width: totalWidth }}
           onKeyDown={handleKeyDown}
         >
-          <TableHeader
-            database={database}
-            view={view}
-            columns={columns}
-            template={template}
-            readOnly={readOnly}
-            sortOrderOf={sortOrderOf}
-            selectedCount={selectedIds.length}
-            rowCount={records.length}
-            onToggleAll={handleToggleAll}
-            menuFieldId={menuFieldId}
-            onMenuChange={setMenuFieldId}
-            onResize={handleResize}
-            onResizeEnd={handleResizeEnd}
-            onReorder={handleReorderColumn}
-            onFilter={onFilter}
-          />
+          {headersInGroups ? null : renderHeader(TOP_HEADER)}
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -800,6 +916,31 @@ export const TableView = observer(function TableView_({
                     />
                   );
                 }
+                if (row.type === "columns") {
+                  return (
+                    <PositionedLine
+                      key={row.key}
+                      index={item.index}
+                      start={start}
+                      measureElement={virtualizer.measureElement}
+                    >
+                      {renderHeader(row.groupId)}
+                    </PositionedLine>
+                  );
+                }
+                if (row.type === "calculations") {
+                  return (
+                    <PositionedLine
+                      key={row.key}
+                      index={item.index}
+                      start={start}
+                      gap={GROUP_GAP}
+                      measureElement={virtualizer.measureElement}
+                    >
+                      {renderFooter(groupResults(results, row.groupId))}
+                    </PositionedLine>
+                  );
+                }
                 if (row.type === "add") {
                   return (
                     <GroupAddRow
@@ -822,11 +963,11 @@ export const TableView = observer(function TableView_({
                     template={template}
                     index={item.index}
                     start={start}
-                    wrap={layout.wrap}
                     height={layout.height}
                     autoFit={layout.autoFit}
+                    tall={layout.wrap}
                     readOnly={readOnly}
-                    draggable={draggable}
+                    draggable={draggable && row.level === 0}
                     isSelected={selectedIds.includes(row.record.id)}
                     activeFieldId={
                       active?.recordId === row.record.id
@@ -842,6 +983,7 @@ export const TableView = observer(function TableView_({
                     dropSide={
                       drop?.recordId === row.record.id ? drop.side : undefined
                     }
+                    subItems={rowSubItems(row)}
                     measureElement={virtualizer.measureElement}
                     onToggleSelected={handleToggleSelected}
                     onActivate={handleActivate}
@@ -890,14 +1032,7 @@ export const TableView = observer(function TableView_({
               </SpanningContent>
             </SpanningLine>
           )}
-          <TableFooter
-            database={database}
-            view={view}
-            columns={columns}
-            template={template}
-            readOnly={readOnly}
-            results={results}
-          />
+          {calculationsInGroups ? null : renderFooter(results)}
         </Grid>
       </Scroller>
     </Wrapper>
@@ -932,6 +1067,17 @@ function isTypedCharacter(event: React.KeyboardEvent): boolean {
   return (
     event.key.length === 1 && !event.metaKey && (!event.ctrlKey || event.altKey)
   );
+}
+
+function groupResults(
+  results: Record<string, DatabaseStatisticResult>,
+  groupId: string
+): Record<string, { value: number | string | null }> {
+  const values: Record<string, { value: number | string | null }> = {};
+  for (const [fieldId, result] of Object.entries(results)) {
+    values[fieldId] = { value: result.groups?.[groupId] ?? null };
+  }
+  return values;
 }
 
 function combineFilters(

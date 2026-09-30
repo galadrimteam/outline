@@ -62,6 +62,7 @@ import {
   viewQueryParams,
 } from "./toolbar/viewDrafts";
 import type { TableViewProps } from "./views/TableView";
+import { subItemsOf, topLevelFilter } from "./views/TableView/subItems";
 import { useActiveView } from "./useActiveView";
 import { useDatabaseTitleSync } from "./useDatabaseTitleSync";
 import { ViewTabs } from "./ViewTabs";
@@ -519,9 +520,12 @@ const LoadedView = observer(function LoadedView({
   const isMobile = useMobile();
   const [search, setSearch] = React.useState("");
 
+  const subItems = subItemsOf(database, view);
   const query = databaseRecords.query(database.id, view.id, {
     ...viewQueryParams(database, view, readOnly),
     search: search || undefined,
+    extraFilter:
+      subItems?.mode === "nested" ? topLevelFilter(subItems) : undefined,
     pageSize: viewPageSize(view, fullPage),
   });
 

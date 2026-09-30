@@ -1,6 +1,7 @@
 import type {
   DatabaseField,
   DatabaseFieldMeta,
+  DatabaseGroupLayout,
   DatabaseSettings,
   DatabaseView,
   DatabaseViewOverrides,
@@ -13,6 +14,7 @@ export interface DatabaseSettingsPatch {
   fieldMeta?: Record<string, DatabaseFieldMeta | null>;
   pageLayout?: DatabaseSettings["pageLayout"] | null;
   iconFieldId?: string | null;
+  subItemFieldId?: string | null;
 }
 
 /**
@@ -56,6 +58,25 @@ export class DatabaseSettingsHelper {
       overrides,
       layout: overrides.layout ?? view.layout,
     };
+  }
+
+  /**
+   * Returns the order and the folded groups a view gives its groups (its
+   * `stackOrder` and `hiddenStacks`), for the engine to read the view's rows.
+   *
+   * @param settings the database's settings.
+   * @param viewId the view, if any.
+   * @returns the group layout, undefined when the view gives none.
+   */
+  public static groupLayout(
+    settings: DatabaseSettings | null | undefined,
+    viewId: string | undefined
+  ): DatabaseGroupLayout | undefined {
+    const overrides = viewId ? settings?.viewOverrides?.[viewId] : undefined;
+    if (!overrides?.stackOrder?.length && !overrides?.hiddenStacks?.length) {
+      return undefined;
+    }
+    return { order: overrides.stackOrder, hidden: overrides.hiddenStacks };
   }
 
   /**
@@ -115,6 +136,13 @@ export class DatabaseSettingsHelper {
         next.iconFieldId = patch.iconFieldId;
       }
     }
+    if (patch.subItemFieldId !== undefined) {
+      if (patch.subItemFieldId === null) {
+        delete next.subItemFieldId;
+      } else {
+        next.subItemFieldId = patch.subItemFieldId;
+      }
+    }
     return next;
   }
 
@@ -132,6 +160,7 @@ export class DatabaseSettingsHelper {
     const next = this.merge(settings, {
       fieldMeta: { [fieldId]: null },
       ...(settings?.iconFieldId === fieldId ? { iconFieldId: null } : {}),
+      ...(settings?.subItemFieldId === fieldId ? { subItemFieldId: null } : {}),
     });
     if (next.pageLayout) {
       const layout = next.pageLayout;
@@ -213,6 +242,7 @@ function overrideKeys(
     "openPagesIn",
     "defaultTemplateId",
     "timeline",
+    "subItems",
     "groupCalculation",
     "loadLimit",
   ];

@@ -232,6 +232,16 @@ export interface DatabaseSort {
 
 export type DatabaseGroup = DatabaseSortItem[];
 
+/**
+ * The order and the folded groups of the first level of a view's grouping (a board's `stackOrder`
+ * and `hiddenStacks`), keyed by the choice name, "true" or "false" for a checkbox, the id of a
+ * person or a linked row, "" for the rows without a value.
+ */
+export interface DatabaseGroupLayout {
+  order?: string[];
+  hidden?: string[];
+}
+
 export type DatabaseStatisticFunc =
   | "count"
   | "empty"
@@ -254,6 +264,13 @@ export type DatabaseStatisticFunc =
   | "dateRangeOfMonths"
   | "totalAttachmentSize";
 
+/** A calculation of a view (a footer of a table): its value over all the rows, and in each group when asked. */
+export interface DatabaseStatisticResult {
+  value: number | string | null;
+  /** The value in each group of the view, keyed by the ids of the group headers. */
+  groups?: Record<string, number | string | null>;
+}
+
 export interface DatabaseColumnMeta {
   order: number;
   width?: number;
@@ -263,6 +280,8 @@ export interface DatabaseColumnMeta {
   visible?: boolean;
   required?: boolean;
   statisticFunc?: DatabaseStatisticFunc | null;
+  /** Wraps the column's text on several lines (Notion's « Wrap column »); unset follows the view's row height. */
+  wrap?: boolean | null;
 }
 
 /** Options stored by the engine, per view type. */
@@ -289,6 +308,9 @@ export type DatabaseCardSize = "small" | "medium" | "large";
 export type DatabaseOpenPagesIn = "sidePeek" | "centerPeek" | "fullPage";
 
 export type DatabaseTimelineZoom = "week" | "month" | "quarter" | "year";
+
+/** How a table shows the sub-items of its rows: under their parent, folded (Notion's default), as rows of their own, or not at all. */
+export type DatabaseSubItemsMode = "nested" | "flattened" | "off";
 
 /** What a board column header shows after the group's name, Notion's calculation of a grouped view. */
 export interface DatabaseGroupCalculation {
@@ -318,6 +340,8 @@ export interface DatabaseViewOverrides {
   loadLimit?: number;
   /** Outline template document used by "New" in this view. */
   defaultTemplateId?: string | null;
+  /** How a table shows sub-items when the database has some; nested when unset. */
+  subItems?: DatabaseSubItemsMode;
   timeline?: {
     startFieldId?: string;
     endFieldId?: string;
@@ -496,6 +520,11 @@ export interface DatabaseSettings {
   };
   /** The field holding a row's emoji (the migration writes one called « Icon »). */
   iconFieldId?: string;
+  /**
+   * The relation of the table to itself listing a row's sub-items (Notion's « Sub-items »); its
+   * symmetric field holds each row's parent.
+   */
+  subItemFieldId?: string;
 }
 
 /** Websocket event sent to the readers of a database when its data changes. */

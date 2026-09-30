@@ -12,8 +12,11 @@ import type {
 } from "@shared/databases/types";
 import { borderRadius, s } from "@shared/styles";
 import type Database from "~/models/Database";
-import { getCell } from "../../cells/registry";
-import { groupPrefill, groupRecords } from "../../toolbar/grouping";
+import {
+  groupPrefill,
+  groupRecords,
+  viewGroupLayout,
+} from "../../toolbar/grouping";
 import type { RecordGroup } from "../../toolbar/grouping";
 import type { DatabaseViewProps } from "../../types";
 import {
@@ -25,6 +28,8 @@ import {
   visibleCardFields,
 } from "./cards";
 import { CommentCount } from "../../comments/CommentCount";
+import { GroupLabel } from "../GroupLabel";
+import { SubItemCount } from "../SubItemCount";
 
 /**
  * Notion-like gallery: cards with a cover image (the view's cover property),
@@ -92,18 +97,21 @@ export const GalleryView = observer(function GalleryView({
   return (
     <Wrapper>
       {groupField
-        ? groupRecords(query.records, groupField, groupLevel?.order).map(
-            (group) => (
-              <GallerySection
-                key={group.key}
-                database={database}
-                field={groupField}
-                group={group}
-              >
-                {renderCards(group.records, prefillFor(groupField, group))}
-              </GallerySection>
-            )
-          )
+        ? groupRecords(
+            query.records,
+            groupField,
+            groupLevel?.order,
+            viewGroupLayout(view.overrides)
+          ).map((group) => (
+            <GallerySection
+              key={group.key}
+              database={database}
+              field={groupField}
+              group={group}
+            >
+              {renderCards(group.records, prefillFor(groupField, group))}
+            </GallerySection>
+          ))
         : renderCards(query.records)}
       {!query.records.length && !canCreate && (
         <Empty>{t("No pages to show")}</Empty>
@@ -136,7 +144,7 @@ interface SectionProps {
 }
 
 /**
- * A collapsible group of a grouped view: its value, its count, its content.
+ * A collapsible group of a grouped view: its title, its count (on hover), its content.
  *
  * @param props the group and its content.
  * @returns the section.
@@ -147,10 +155,8 @@ export const GallerySection = observer(function GallerySection({
   group,
   children,
 }: SectionProps) {
-  const { t } = useTranslation();
   const [collapsed, setCollapsed] = React.useState(false);
   const contentId = React.useId();
-  const { Renderer } = getCell(field.type);
 
   return (
     <Section>
@@ -164,16 +170,7 @@ export const GallerySection = observer(function GallerySection({
           <CollapsedIcon size={18} />
         </Chevron>
         <SectionValue>
-          {group.value === undefined ? (
-            <NoValue>{t("No {{ name }}", { name: field.name })}</NoValue>
-          ) : (
-            <Renderer
-              field={field}
-              value={group.value}
-              database={database}
-              variant="card"
-            />
-          )}
+          <GroupLabel database={database} field={field} value={group.value} />
         </SectionValue>
         <SectionCount>{group.records.length}</SectionCount>
       </SectionHeader>
@@ -235,6 +232,7 @@ const GalleryCard = observer(function GalleryCard({
           fields={fields}
           showNames={showNames}
         />
+        <SubItemCount database={database} record={record} />
         <CommentCount
           databaseId={database.id}
           recordId={record.id}
@@ -388,13 +386,16 @@ const SectionValue = styled.span`
   font-weight: 500;
 `;
 
-const NoValue = styled.span`
-  color: ${s("textSecondary")};
-`;
-
 const SectionCount = styled.span`
   color: ${s("textTertiary")};
   font-size: 13px;
+  opacity: 0;
+  transition: opacity 100ms ease;
+
+  ${SectionHeader}:hover &,
+  ${SectionHeader}:focus-visible & {
+    opacity: 1;
+  }
 `;
 
 const Empty = styled.p`

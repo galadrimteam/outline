@@ -36,6 +36,22 @@ export interface RecordDisplayRow {
   key: string;
   record: DatabaseRecord;
   path: GroupPathItem[];
+  /** How deep the row is nested under its parents: 0 for a row of the table itself. */
+  level: number;
+  /** Whether the row has sub-items to unfold. */
+  hasChildren: boolean;
+  /** Whether its sub-items are shown under it. */
+  expanded: boolean;
+}
+
+/** The sub-items a nested table shows under their parent. */
+export interface SubItemRows {
+  /** Whether a row has sub-items. */
+  hasChildren: (record: DatabaseRecord) => boolean;
+  /** The rows whose sub-items are shown. */
+  expanded: ReadonlySet<string>;
+  /** The loaded sub-items of an unfolded row. */
+  childrenOf: (recordId: string) => DatabaseRecord[] | undefined;
 }
 
 /** The "+ New" line closing a group. */
@@ -45,7 +61,26 @@ export interface AddDisplayRow {
   path: GroupPathItem[];
 }
 
-export type DisplayRow = GroupDisplayRow | RecordDisplayRow | AddDisplayRow;
+/** The column headers repeated at the top of a group, as Notion draws grouped tables. */
+export interface ColumnsDisplayRow {
+  type: "columns";
+  key: string;
+  groupId: string;
+}
+
+/** The calculations of one group, under its rows. */
+export interface CalculationsDisplayRow {
+  type: "calculations";
+  key: string;
+  groupId: string;
+}
+
+export type DisplayRow =
+  | GroupDisplayRow
+  | RecordDisplayRow
+  | AddDisplayRow
+  | ColumnsDisplayRow
+  | CalculationsDisplayRow;
 
 interface BuildParams {
   /** Loaded rows, in view order (the engine sorts them by group first). */
@@ -60,12 +95,19 @@ interface BuildParams {
   hasMore?: boolean;
   /** Whether groups end with a "+ New" line. */
   canCreate?: boolean;
+  /** Whether each group of the last level has its own column headers and calculations. */
+  perGroupLines?: boolean;
+  /** Sub-items nested under their parent. */
+  subItems?: SubItemRows;
 }
 
 /**
  * The lines of a table: rows, preceded by group headers when the view is grouped. The engine
  * returns rows sorted by group and tells how many rows each group holds, so rows are handed out
- * to groups in order; folded groups skip theirs. Lines stop where loaded rows stop.
+ * to groups in order; folded groups skip theirs. With `perGroupLines`, each open group of the
+ * last level repeats the column headers above its rows and ends with its calculations, like
+ * Notion. With `subItems`, an unfolded row is followed by its sub-items, and theirs. Lines stop
+ * where loaded rows stop.
  *
  * @param params rows, group points and folding.
  * @returns the lines to draw.
@@ -77,21 +119,24 @@ export function buildDisplayRows({
   collapsed = {},
   hasMore = false,
   canCreate = false,
+  perGroupLines = false,
+  subItems,
 }: BuildParams): DisplayRow[] {
   if (!group?.length || !points?.length) {
-    return records.map((record) => ({
-      type: "record",
-      key: record.id,
-      record,
-      path: [],
-    }));
+    const rows: DisplayRow[] = [];
+    for (const record of records) {
+      pushRecord(rows, record, [], subItems);
+    }
+    return rows;
   }
 
   const counts = groupCounts(points);
   const rows: DisplayRow[] = [];
   const path: GroupPathItem[] = [];
+  const lastDepth = group.length - 1;
   let hiddenBelow: number | null = null;
   let cursor = 0;
+  let openGroupId: string | null = null;
 
   for (let index = 0; index < points.length; index++) {
     const point = points[index];
@@ -121,6 +166,13 @@ export function buildDisplayRows({
       });
       if (isCollapsed) {
         hiddenBelow = point.depth;
+      } else if (perGroupLines && point.depth >= lastDepth) {
+        openGroupId = point.id;
+        rows.push({
+          type: "columns",
+          key: `columns:${point.id}`,
+          groupId: point.id,
+        });
       }
       continue;
     }
@@ -130,16 +182,25 @@ export function buildDisplayRows({
     if (hiddenBelow === null) {
       const groupPath = [...path];
       for (const record of slice) {
-        rows.push({ type: "record", key: record.id, record, path: groupPath });
+        pushRecord(rows, record, groupPath, subItems);
       }
-      if (canCreate && slice.length === point.count) {
+      const complete = slice.length === point.count;
+      if (canCreate && complete) {
         rows.push({
           type: "add",
           key: `add:${groupPath.map((item) => JSON.stringify(item.value)).join("/")}`,
           path: groupPath,
         });
       }
+      if (openGroupId && complete) {
+        rows.push({
+          type: "calculations",
+          key: `calculations:${openGroupId}`,
+          groupId: openGroupId,
+        });
+      }
     }
+    openGroupId = null;
     if (cursor > records.length && hasMore) {
       break;
     }
@@ -210,6 +271,35 @@ export function dropSide(
   rect: { top: number; height: number }
 ): DatabaseRecordPosition {
   return pointerY < rect.top + rect.height / 2 ? "before" : "after";
+}
+
+function pushRecord(
+  rows: DisplayRow[],
+  record: DatabaseRecord,
+  path: GroupPathItem[],
+  subItems: SubItemRows | undefined,
+  parents: string[] = []
+) {
+  const hasChildren = !!subItems?.hasChildren(record);
+  const expanded =
+    hasChildren &&
+    !!subItems?.expanded.has(record.id) &&
+    !parents.includes(record.id);
+  rows.push({
+    type: "record",
+    key: [...parents, record.id].join(">"),
+    record,
+    path,
+    level: parents.length,
+    hasChildren,
+    expanded,
+  });
+  if (!expanded) {
+    return;
+  }
+  for (const child of subItems?.childrenOf(record.id) ?? []) {
+    pushRecord(rows, child, path, subItems, [...parents, record.id]);
+  }
 }
 
 function groupInput(

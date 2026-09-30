@@ -2,6 +2,7 @@ import { uniq } from "es-toolkit/compat";
 import type {
   DatabaseCellValue,
   DatabaseField,
+  DatabaseGroupLayout,
   DatabaseGroupPoint,
   DatabaseRecord,
   DatabaseRecordOrder,
@@ -66,7 +67,12 @@ import {
 import type { OutlineStore } from "./store/OutlineStore";
 import type { ReadState } from "./TableReader";
 import { TableReader } from "./TableReader";
-import type { EngineFieldRow, EngineRecordRow, TableSnapshot } from "./types";
+import type {
+  EngineFieldRow,
+  EngineRecordRow,
+  EngineViewRow,
+  TableSnapshot,
+} from "./types";
 import type { EngineUserDirectory } from "./users";
 import { engineUserId } from "./users";
 import {
@@ -163,15 +169,17 @@ export class OutlineEngine implements DatabaseEngine {
     query: DatabaseRecordQuery
   ): Promise<DatabaseRecordPage> {
     const state = await this.reader.read(ref);
+    const view = query.viewId ? viewOf(state.table, query.viewId) : undefined;
     const selected = this.options.query.select(
       state.table,
       state.computed,
       {
-        view: query.viewId ? viewOf(state.table, query.viewId) : undefined,
+        view,
         filter: query.filter,
         replaceFilter: query.replaceFilter,
         sort: query.sort,
         search: query.search,
+        groupLayout: layoutFor(view, query.groupLayout),
       },
       this.context(actor)
     );
@@ -340,16 +348,24 @@ export class OutlineEngine implements DatabaseEngine {
     if (!group?.length) {
       return [];
     }
+    const groupLayout = query.groupBy
+      ? undefined
+      : layoutFor(view, query.groupLayout);
     const selected = this.options.query.select(
       state.table,
       state.computed,
-      { view: { ...view, group }, filter: query.filter, search: query.search },
+      {
+        view: { ...view, group },
+        filter: query.filter,
+        search: query.search,
+        groupLayout,
+      },
       this.context(actor)
     );
     return this.presenter.groupPoints(
       state,
       group,
-      this.options.query.groupPoints(state.table, selected, group)
+      this.options.query.groupPoints(state.table, selected, group, groupLayout)
     );
   }
 
@@ -359,21 +375,39 @@ export class OutlineEngine implements DatabaseEngine {
     query: DatabaseAggregateQuery
   ): Promise<Record<string, DatabaseAggregateValue>> {
     const state = await this.reader.read(ref);
+    const view = viewOf(state.table, query.viewId);
+    const groupLayout = layoutFor(view, query.groupLayout);
     const selected = this.options.query.select(
       state.table,
       state.computed,
-      {
-        view: viewOf(state.table, query.viewId),
-        filter: query.filter,
-        search: query.search,
-      },
+      { view, filter: query.filter, search: query.search, groupLayout },
       this.context(actor)
     );
-    return this.options.query.aggregate(
+    const totals: Record<string, DatabaseAggregateValue> =
+      this.options.query.aggregate(state.table, selected, query.fieldStats);
+    if (!query.byGroup || !view.group?.length) {
+      return totals;
+    }
+    const members = this.options.query.groupMembers(
       state.table,
       selected,
-      query.fieldStats
+      view.group,
+      groupLayout
     );
+    for (const [groupId, records] of members) {
+      const values = this.options.query.aggregate(
+        state.table,
+        records,
+        query.fieldStats
+      );
+      for (const [fieldId, result] of Object.entries(values)) {
+        const total = totals[fieldId];
+        if (total) {
+          total.groups = { ...total.groups, [groupId]: result.value };
+        }
+      }
+    }
+    return totals;
   }
 
   async linkCandidates(
@@ -918,6 +952,14 @@ function viewOf(table: TableSnapshot, viewId: string) {
     throw NotFoundError("View not found");
   }
   return view;
+}
+
+/** A board orders and folds its columns itself: the group layout is for the other layouts. */
+function layoutFor(
+  view: EngineViewRow | undefined,
+  layout: DatabaseGroupLayout | undefined
+): DatabaseGroupLayout | undefined {
+  return view && view.type !== "kanban" ? layout : undefined;
 }
 
 function existingRecord(

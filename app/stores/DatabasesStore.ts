@@ -54,7 +54,10 @@ export interface DatabaseCreateParams {
 export interface DatabaseUpdateParams {
   title?: string;
   icon?: string | null;
-  settings?: Partial<DatabaseSettings>;
+  /** Keys to change; a null `subItemFieldId` turns sub-items off. */
+  settings?: Partial<Omit<DatabaseSettings, "subItemFieldId">> & {
+    subItemFieldId?: string | null;
+  };
 }
 
 export interface DatabaseListParams extends PaginationParams {

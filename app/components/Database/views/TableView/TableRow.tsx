@@ -13,7 +13,19 @@ import { DragHandleIcon } from "../../toolbar/icons";
 import type { TableColumn } from "./layout";
 import { frozenEdge } from "./layout";
 import { Gutter, GutterControl, RowLine } from "./styles";
+import { ParentLabels, SubItemToggle } from "./SubItemControls";
 import { TableCell } from "./TableCell";
+
+/** How a row shows its place among sub-items. */
+export interface RowSubItems {
+  /** Nested: the level and the toggle of the row; flattened: the titles of its parents. */
+  mode: "nested" | "flattened";
+  level: number;
+  hasChildren: boolean;
+  expanded: boolean;
+  parentTitles: string[];
+  onToggle: (recordId: string) => void;
+}
 
 interface Props {
   database: Database;
@@ -22,10 +34,11 @@ interface Props {
   template: string;
   index: number;
   start: number;
-  wrap: boolean;
   /** Row height; the minimum height when rows fit their content. */
   height: number;
   autoFit: boolean;
+  /** Whether rows can be taller than a line of text. */
+  tall: boolean;
   readOnly: boolean;
   /** Whether rows can be dragged to a new place (no sort on the view). */
   draggable: boolean;
@@ -36,6 +49,8 @@ interface Props {
   /** What the reader typed on the active cell to start editing it. */
   editInput?: string;
   dropSide?: DatabaseRecordPosition;
+  /** Its sub-items, when the table shows some. */
+  subItems?: RowSubItems;
   measureElement: (element: Element | null) => void;
   onToggleSelected: (recordId: string, event: React.MouseEvent) => void;
   onActivate: (recordId: string, fieldId: string, edit: boolean) => void;
@@ -66,9 +81,9 @@ export const TableRow = observer(function TableRow_({
   template,
   index,
   start,
-  wrap,
   height,
   autoFit,
+  tall,
   readOnly,
   draggable,
   isSelected,
@@ -76,6 +91,7 @@ export const TableRow = observer(function TableRow_({
   isEditing,
   editInput,
   dropSide,
+  subItems,
   measureElement,
   onToggleSelected,
   onActivate,
@@ -91,6 +107,19 @@ export const TableRow = observer(function TableRow_({
   });
   const { setNodeRef: setDropRef } = useDroppable({ id: record.id });
   const scrollMarginLeft = frozenEdge(columns);
+  const leading =
+    subItems?.mode === "nested" ? (
+      <SubItemToggle
+        level={subItems.level}
+        hasChildren={subItems.hasChildren}
+        expanded={subItems.expanded}
+        onToggle={() => subItems.onToggle(record.id)}
+      />
+    ) : undefined;
+  const trailing =
+    subItems?.mode === "flattened" ? (
+      <ParentLabels titles={subItems.parentTitles} />
+    ) : undefined;
 
   const setRef = React.useCallback(
     (element: HTMLDivElement | null) => {
@@ -151,7 +180,10 @@ export const TableRow = observer(function TableRow_({
             activeFieldId === column.field.id ? editInput : undefined
           }
           scrollMarginLeft={scrollMarginLeft}
-          wrap={wrap}
+          wrap={column.wrap}
+          alignTop={tall}
+          leading={column.field.isPrimary ? leading : undefined}
+          trailing={column.field.isPrimary ? trailing : undefined}
           readOnly={readOnly}
           onActivate={onActivate}
           onChange={onChange}
