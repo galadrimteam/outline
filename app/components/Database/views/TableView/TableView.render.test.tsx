@@ -14,6 +14,7 @@ import { light } from "@shared/styles/theme";
 import { ActionContextProvider } from "~/hooks/useActionContext";
 import stores from "~/stores";
 import { client } from "~/utils/ApiClient";
+import { rowCommentCounts } from "../../comments/rowCommentCounts";
 import { makeField, makeView } from "./testFixtures";
 import { TableView } from ".";
 
@@ -61,6 +62,7 @@ describe("TableView", () => {
   let container: HTMLDivElement;
   let root: Root;
   let calls: { path: string; body: Record<string, unknown> }[];
+  let commentCounts: Record<string, number>;
 
   beforeEach(() => {
     // @ts-expect-error the flag React reads to allow act() outside of its own test utilities.
@@ -75,6 +77,7 @@ describe("TableView", () => {
     Element.prototype.scrollIntoView = vi.fn();
     globalThis.CSS ??= { escape: (value: string) => value } as typeof CSS;
     calls = [];
+    commentCounts = {};
     vi.mocked(client.post).mockReset();
     vi.mocked(client.post).mockImplementation(async (path, body) => {
       calls.push({ path, body: (body ?? {}) as Record<string, unknown> });
@@ -85,6 +88,8 @@ describe("TableView", () => {
           return { data: { estimate: { value: 5 } } };
         case "/databaseRecords.update":
           return { data: records[0] };
+        case "/databaseRecords.commentCounts":
+          return { data: commentCounts };
         default:
           return {
             data: records,
@@ -339,6 +344,20 @@ describe("TableView", () => {
       expect.objectContaining({ recordId: "rec1", fields: { estimate: 4 } }),
       expect.objectContaining({ recordId: "rec2", fields: { estimate: 5.5 } }),
     ]);
+  });
+
+  it("shows the open comments of a row's page after its title", async () => {
+    rowCommentCounts.invalidate(databaseId);
+    commentCounts = { rec1: 5 };
+    await render(makeView({ id: "viwTable11" }));
+    await wait(80);
+
+    const notes = container.querySelectorAll("[role='note']");
+    expect(notes).toHaveLength(1);
+    expect(notes[0].closest("[data-cell]")?.getAttribute("data-cell")).toBe(
+      "rec1:name"
+    );
+    expect(notes[0].textContent).toBe("5");
   });
 
   it("draws groups with their counts and the calculations", async () => {

@@ -2,12 +2,14 @@ import { observer } from "mobx-react";
 import { SidebarIcon } from "outline-icons";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
+import styled from "styled-components";
 import type {
   DatabaseCellInput,
   DatabaseRecord,
 } from "@shared/databases/types";
 import type Database from "~/models/Database";
 import { getCell } from "../../cells/registry";
+import { CommentCount } from "../../comments/CommentCount";
 import type { TableColumn } from "./layout";
 import { Cell, OpenButton, RowIcon } from "./styles";
 
@@ -137,6 +139,13 @@ export const TableCell = observer(function TableCell_({
       )}
       {content}
       {field.isPrimary && !isEditing && (
+        <TitleCommentCount
+          databaseId={database.id}
+          recordId={record.id}
+          documentId={record.documentId}
+        />
+      )}
+      {field.isPrimary && !isEditing && (
         <OpenButton
           type="button"
           data-open-button
@@ -150,3 +159,8 @@ export const TableCell = observer(function TableCell_({
     </Cell>
   );
 });
+
+const TitleCommentCount = styled(CommentCount)`
+  flex-shrink: 0;
+  margin-left: 6px;
+`;
