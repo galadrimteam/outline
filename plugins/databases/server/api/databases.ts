@@ -1,8 +1,10 @@
 import Router from "koa-router";
 import { Op } from "sequelize";
 import { UserRole } from "@shared/types";
+import { toError } from "@shared/utils/error";
 import { databaseRowsLinker } from "@server/commands/databaseRowDocumentCreator";
 import { NotFoundError, ValidationError } from "@server/errors";
+import Logger from "@server/logging/Logger";
 import auth from "@server/middlewares/authentication";
 import { rateLimiter } from "@server/middlewares/rateLimiter";
 import { transaction } from "@server/middlewares/transaction";
@@ -13,6 +15,7 @@ import { presentDatabase, presentPolicies } from "@server/presenters";
 import { QueryHelper } from "@server/storage/QueryHelper";
 import type { APIContext } from "@server/types";
 import { databaseCreator } from "../commands/databaseCreator";
+import { removeRowPropertyTables } from "../commands/rowPropertyTables";
 import { engineFor, refFor } from "../engine";
 import { engineOfTable } from "../utils/tableEngine";
 import env from "../env";
@@ -20,6 +23,7 @@ import { ConvertTeableEmbedsTask } from "../tasks/ConvertTeableEmbedsTask";
 import { MoveDatabaseEngineTask } from "../tasks/MoveDatabaseEngineTask";
 import { presentDatabaseForUser } from "../presenters/database";
 import { presentDatabaseSchema } from "../presenters/databaseSchema";
+import { actorFor } from "../utils/actor";
 import { DatabaseSettingsHelper } from "../utils/DatabaseSettingsHelper";
 import { loadDatabaseForRead } from "../utils/shareAccess";
 import {
@@ -287,6 +291,24 @@ router.post(
 
     const database = await loadDatabase(user, id, "update", { transaction });
     const linked = await databaseRowsLinker(ctx.context, { database, pairs });
+    // The properties panel now shows what the migration had written as a table in each page.
+    const { fields } = await engineFor(database).getSchema(
+      actorFor(user),
+      refFor(database)
+    );
+    transaction.afterCommit(async () => {
+      await removeRowPropertyTables(
+        user,
+        database,
+        pairs.map((pair) => pair.documentId),
+        fields.map((field) => field.name)
+      ).catch((error) =>
+        Logger.warn("Could not remove the property tables of row pages", {
+          databaseId: database.id,
+          error: toError(error).message,
+        })
+      );
+    });
 
     ctx.body = { data: { linked } };
   }
