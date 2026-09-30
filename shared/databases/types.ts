@@ -349,6 +349,10 @@ export interface DatabaseLinkValue {
   /** The linked record id. */
   id: string;
   title?: string;
+  /** The icon of the linked row's page, filled by the server. */
+  icon?: string | null;
+  /** The colour of that icon. */
+  iconColor?: string | null;
 }
 
 export interface DatabaseAttachmentValue {
@@ -397,6 +401,10 @@ export interface DatabaseRecord {
   lastModifiedBy?: string;
   /** The Outline document of this row, when it has been opened once. */
   documentId?: string | null;
+  /** The icon of that document, filled by the server. */
+  icon?: string | null;
+  /** The colour of that icon. */
+  iconColor?: string | null;
 }
 
 export interface DatabaseGroupHeader {
