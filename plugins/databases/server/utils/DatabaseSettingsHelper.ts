@@ -209,6 +209,8 @@ function overrideKeys(
     "openPagesIn",
     "defaultTemplateId",
     "timeline",
+    "groupCalculation",
+    "loadLimit",
   ];
   return keys.filter((key) => key in overrides);
 }

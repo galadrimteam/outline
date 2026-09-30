@@ -24,8 +24,10 @@ import type Database from "~/models/Database";
 import type { RecordQuery } from "~/stores/DatabaseRecordsStore";
 import type { BoardColumn as BoardColumnModel } from "../../boardModel";
 import { EMPTY_STACK } from "../../boardModel";
+import type { DatabaseToneColors } from "../../colors";
 import { toneColors } from "../../colors";
 import { SortableCard, StaticCard } from "./BoardCard";
+import { ColumnCalculationValue } from "./ColumnCalculationValue";
 import { NewCardForm } from "./NewCardForm";
 
 /** Drag data of a column header. */
@@ -86,10 +88,12 @@ export function useColumnSortable(columnKey: string, readOnly: boolean) {
 }
 
 interface HeaderProps {
+  database: Database;
+  view: DatabaseView;
   field: DatabaseField;
   column: BoardColumnModel;
-  /** The number of cards, undefined until loaded. */
-  count: number | undefined;
+  /** The cards of the column, for its calculation. */
+  query: RecordQuery;
   readOnly: boolean;
   /** The drag handle of the column. */
   sortable: Sortable;
@@ -99,13 +103,16 @@ interface HeaderProps {
 }
 
 /**
- * A column header: the option as a coloured chip, the count, and on hover the
- * group menu and « + ». Dragging it reorders the columns.
+ * A column header: the option as a coloured chip, the view's calculation in
+ * the option's colour, and on hover the group menu and « + ». Dragging it
+ * reorders the columns.
  */
 export const ColumnHeader = observer(function ColumnHeader({
+  database,
+  view,
   field,
   column,
-  count,
+  query,
   readOnly,
   sortable,
   onHide,
@@ -142,7 +149,9 @@ export const ColumnHeader = observer(function ColumnHeader({
         <Dot style={{ background: tone.dot }} />
         <ChipLabel>{name}</ChipLabel>
       </Chip>
-      <Count>{count ?? ""}</Count>
+      <Count style={{ color: tone.dot }}>
+        <ColumnCalculationValue database={database} view={view} query={query} />
+      </Count>
       {!readOnly && (
         <HeaderActions
           onPointerDown={stopPropagation}
@@ -177,6 +186,8 @@ interface CardListProps {
   /** Cards only shown here, see `BoardLane.copies`. */
   copyIds?: string[];
   cardFields: DatabaseField[];
+  /** The colours of the column's option. */
+  tone: DatabaseToneColors;
   readOnly: boolean;
   adding: "top" | "bottom" | null;
   onAdding: (at: "top" | "bottom" | null) => void;
@@ -187,7 +198,8 @@ interface CardListProps {
 }
 
 /**
- * The cards of a column, or of a column within a lane, with « + New ».
+ * The cards of a column, or of a column within a lane, with « + New page »
+ * outlined in the colour of the column's option, as in Notion.
  */
 export const CardList = observer(function CardList({
   database,
@@ -196,6 +208,7 @@ export const CardList = observer(function CardList({
   cardIds,
   copyIds,
   cardFields,
+  tone,
   readOnly,
   adding,
   onAdding,
@@ -255,10 +268,13 @@ export const CardList = observer(function CardList({
         <NewCardForm onSubmit={handleSubmitBottom} onClose={handleClose} />
       ) : (
         !readOnly && (
-          <ColumnButton onClick={handleAddBottom}>
+          <NewPageButton
+            onClick={handleAddBottom}
+            style={{ color: tone.dot, borderColor: tone.border }}
+          >
             <PlusIcon size={18} />
-            {t("New")}
-          </ColumnButton>
+            {t("New page")}
+          </NewPageButton>
         )
       )}
     </Cards>
@@ -330,9 +346,11 @@ export const BoardColumn = observer(function BoardColumn({
       })}
     >
       <ColumnHeader
+        database={database}
+        view={view}
         field={field}
         column={column}
-        count={query.isLoaded ? query.total : undefined}
+        query={query}
         readOnly={readOnly}
         sortable={sortable}
         onHide={onHide}
@@ -344,6 +362,7 @@ export const BoardColumn = observer(function BoardColumn({
         container={column.key}
         cardIds={cardIds}
         cardFields={cardFields}
+        tone={tone}
         readOnly={readOnly}
         adding={adding}
         onAdding={setAdding}
@@ -359,6 +378,7 @@ export const BoardColumn = observer(function BoardColumn({
  * The header of a column on a board with sub-groups, alone in the top row.
  */
 export const LaneColumnHeader = observer(function LaneColumnHeader({
+  database,
   view,
   field,
   column,
@@ -367,7 +387,7 @@ export const LaneColumnHeader = observer(function LaneColumnHeader({
   onHide,
 }: Pick<
   ColumnProps,
-  "view" | "field" | "column" | "query" | "readOnly" | "onHide"
+  "database" | "view" | "field" | "column" | "query" | "readOnly" | "onHide"
 >) {
   const theme = useTheme();
   const tone = toneColors(column.color, theme);
@@ -385,9 +405,11 @@ export const LaneColumnHeader = observer(function LaneColumnHeader({
       $isDragging={sortable.isDragging}
     >
       <ColumnHeader
+        database={database}
+        view={view}
         field={field}
         column={column}
-        count={query.isLoaded ? query.total : undefined}
+        query={query}
         readOnly={readOnly}
         sortable={sortable}
         onHide={onHide}
@@ -448,6 +470,7 @@ export const LaneCell = observer(function LaneCell({
         cardIds={cardIds}
         copyIds={copyIds}
         cardFields={cardFields}
+        tone={tone}
         readOnly={readOnly}
         adding={adding}
         onAdding={setAdding}
@@ -706,6 +729,35 @@ const ColumnButton = styled.button`
 
   &:disabled {
     cursor: default;
+  }
+`;
+
+const NewPageButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  width: 100%;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid;
+  border-radius: 10px;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: var(--pointer);
+  transition: background 100ms ease-in-out;
+
+  svg {
+    fill: currentColor;
+  }
+
+  &:${hover} {
+    background: ${(props) =>
+      props.theme.isDark
+        ? "rgba(255, 255, 255, 0.04)"
+        : "rgba(55, 53, 47, 0.03)"};
   }
 `;
 

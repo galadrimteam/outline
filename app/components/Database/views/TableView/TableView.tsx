@@ -885,7 +885,7 @@ export const TableView = observer(function TableView_({
               <SpanningContent>
                 <NewButton type="button" onClick={() => void handleCreate()}>
                   <PlusIcon size={18} />
-                  {t("New")}
+                  {t("New page")}
                 </NewButton>
               </SpanningContent>
             </SpanningLine>

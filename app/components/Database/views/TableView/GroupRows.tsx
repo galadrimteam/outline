@@ -96,7 +96,7 @@ interface AddProps extends PositionProps {
 }
 
 /**
- * The "+ New" line closing a group, creating a row in it.
+ * The « + New page » line closing a group, creating a row in it.
  *
  * @param props the group path and its position.
  * @returns the line.
@@ -121,7 +121,7 @@ export function GroupAddRow({
       <SpanningContent>
         <NewButton type="button" onClick={() => onCreate(row)}>
           <PlusIcon size={18} />
-          {t("New")}
+          {t("New page")}
         </NewButton>
       </SpanningContent>
     </GroupLine>

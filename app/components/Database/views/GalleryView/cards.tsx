@@ -14,8 +14,10 @@ import type Database from "~/models/Database";
 import { cellTitle } from "../../boardModel";
 import { toneColors } from "../../colors";
 import { attachmentsOf, isImageAttachment } from "../../cells/AttachmentCell";
+import { compactPills } from "../../cells/components/ChoicePill";
 import { isEmptyCellValue } from "../../cells/format";
 import { getCell } from "../../cells/registry";
+import { RowIcon } from "../../RowIcon";
 import { cardFields } from "../../toolbar/columns";
 
 /**
@@ -31,22 +33,6 @@ export function recordTitle(
 ): string {
   const primary = database.primaryField;
   return primary ? cellTitle(record.fields[primary.id]) : "";
-}
-
-/**
- * Returns the emoji of a row, when the database keeps one in a field.
- *
- * @param database the database.
- * @param record the row.
- * @returns the emoji, or undefined.
- */
-export function recordIcon(
-  database: Database,
-  record: DatabaseRecord
-): string | undefined {
-  const fieldId = database.settings?.iconFieldId;
-  const value = fieldId ? record.fields[fieldId] : undefined;
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 /**
@@ -83,24 +69,23 @@ export function visibleCardFields(
 }
 
 /**
- * Returns the background of a card when the view colours cards: by the option
- * of a select property (`options.colorConfig.fieldId`) or with one colour.
+ * Returns the colour name of a row when the view colours its rows: the colour
+ * of its option of a select property (`options.colorConfig.fieldId`, Notion's
+ * conditional colour matching a property's value), or one colour for all.
  *
  * @param database the database.
  * @param view the view.
  * @param record the row.
- * @param theme the current theme.
- * @returns the colour, or undefined for the default card background.
+ * @returns the engine colour name, or undefined when the row is not coloured.
  */
-export function recordColor(
-  database: Database,
+export function recordColorName(
+  database: Pick<Database, "fieldById">,
   view: Pick<DatabaseView, "options">,
-  record: DatabaseRecord,
-  theme: Pick<DefaultTheme, "isDark">
+  record: DatabaseRecord
 ): string | undefined {
   const config = view.options.colorConfig;
   if (config?.type === "custom" && config.color) {
-    return toneColors(config.color, theme).background;
+    return config.color;
   }
   if (config?.type !== "field" || !config.fieldId) {
     return undefined;
@@ -108,17 +93,61 @@ export function recordColor(
   const field = database.fieldById(config.fieldId);
   const value = record.fields[config.fieldId];
   const name = Array.isArray(value) ? value[0] : value;
-  const choice = field?.options.choices?.find((c) => c.name === name);
-  return choice ? toneColors(choice.color, theme).background : undefined;
+  return field?.options.choices?.find((c) => c.name === name)?.color;
+}
+
+/**
+ * Returns the colour of a calendar or timeline item when the view colours its
+ * rows, see `recordColorName`.
+ *
+ * @param database the database.
+ * @param view the view.
+ * @param record the row.
+ * @param theme the current theme.
+ * @returns the colour, or undefined for the default background.
+ */
+export function recordColor(
+  database: Pick<Database, "fieldById">,
+  view: Pick<DatabaseView, "options">,
+  record: DatabaseRecord,
+  theme: Pick<DefaultTheme, "isDark">
+): string | undefined {
+  const name = recordColorName(database, view, record);
+  return name ? toneColors(name, theme).background : undefined;
+}
+
+/**
+ * Returns the background of a board or gallery card when the view colours its
+ * rows, see `recordColorName`.
+ *
+ * @param database the database.
+ * @param view the view.
+ * @param record the row.
+ * @param theme the current theme.
+ * @returns the colour, or undefined for the default card background.
+ */
+export function recordCardColor(
+  database: Pick<Database, "fieldById">,
+  view: Pick<DatabaseView, "options">,
+  record: DatabaseRecord,
+  theme: Pick<DefaultTheme, "isDark">
+): string | undefined {
+  const name = recordColorName(database, view, record);
+  return name ? toneColors(name, theme).card : undefined;
 }
 
 interface TitleProps {
   database: Database;
   record: DatabaseRecord;
+  /** Size of the row's icon, in px. */
+  iconSize?: number;
+  /** False when the row's icon is drawn apart. */
+  showIcon?: boolean;
 }
 
 /**
- * The title of a card or a row, with its emoji; « Untitled » when empty.
+ * The title of a card or a row, after the icon of its page; « Untitled » when
+ * empty.
  *
  * @param props the database and the row.
  * @returns the title.
@@ -126,16 +155,48 @@ interface TitleProps {
 export const RecordTitle = observer(function RecordTitle({
   database,
   record,
+  iconSize = 14,
+  showIcon = true,
 }: TitleProps) {
   const { t } = useTranslation();
   const title = recordTitle(database, record);
-  const icon = recordIcon(database, record);
 
   return (
     <>
-      {icon && <Emoji aria-hidden>{icon}</Emoji>}
+      {showIcon && (
+        <TitleIcon database={database} record={record} size={iconSize} />
+      )}
       {title ? <span>{title}</span> : <Untitled>{t("Untitled")}</Untitled>}
     </>
+  );
+});
+
+interface HeadingProps {
+  database: Database;
+  record: DatabaseRecord;
+  className?: string;
+}
+
+/**
+ * The title of a board or gallery card after the icon of its page, wrapped
+ * on as many lines as it needs, in Notion's card type.
+ *
+ * @param props the database and the row.
+ * @returns the heading.
+ */
+export const CardHeading = observer(function CardHeading({
+  database,
+  record,
+  className,
+}: HeadingProps) {
+  const { t } = useTranslation();
+  const title = recordTitle(database, record);
+
+  return (
+    <Heading className={className} $empty={!title}>
+      <HeadingIcon database={database} record={record} size={18} />
+      <span>{title || t("Untitled")}</span>
+    </Heading>
   );
 });
 
@@ -234,12 +295,29 @@ function isInteractiveTarget(target: EventTarget, container: EventTarget) {
   return false;
 }
 
-const Emoji = styled.span`
+const TitleIcon = styled(RowIcon)`
   margin-inline-end: 6px;
+  vertical-align: text-bottom;
 `;
 
 const Untitled = styled.span`
   color: ${s("placeholder")};
+`;
+
+const Heading = styled.div<{ $empty: boolean }>`
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  color: ${(props) => (props.$empty ? props.theme.placeholder : props.theme.text)};
+`;
+
+const HeadingIcon = styled(RowIcon)`
+  margin-top: 2px;
 `;
 
 const Properties = styled.div<{ $inline?: boolean }>`
@@ -253,9 +331,9 @@ const Properties = styled.div<{ $inline?: boolean }>`
 const Property = styled.div<{ $inline?: boolean }>`
   min-width: 0;
   max-width: ${(props) => (props.$inline ? "220px" : "none")};
-  font-size: 13px;
+  font-size: ${(props) => (props.$inline ? 13 : 12)}px;
   color: ${s("textSecondary")};
-  ${(props) => props.$inline && ellipsis()}
+  ${(props) => (props.$inline ? ellipsis() : compactPills)}
 `;
 
 const PropertyName = styled.div`

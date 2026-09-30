@@ -43,6 +43,7 @@ import type { FilterRequest } from "./DatabaseBlockContext";
 import { DatabaseBlockContext } from "./DatabaseBlockContext";
 import { DatabaseHeader } from "./DatabaseHeader";
 import { DatabasePicker } from "./DatabasePicker";
+import { viewPageSize } from "./loadLimit";
 import { pendingDatabases } from "./pendingDatabases";
 import { NewRecordMenu } from "./templates/NewRecordMenu";
 import { openDatabaseAutomations } from "./automations/openDatabaseAutomations";
@@ -497,6 +498,7 @@ const LoadedView = observer(function LoadedView({
   const query = databaseRecords.query(database.id, view.id, {
     ...viewQueryParams(database, view, readOnly),
     search: search || undefined,
+    pageSize: viewPageSize(view, fullPage),
   });
 
   React.useEffect(() => {

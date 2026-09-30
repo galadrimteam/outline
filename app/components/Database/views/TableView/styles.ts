@@ -180,6 +180,8 @@ export const Cell = styled.div<{
   $active?: boolean;
   $wrap?: boolean;
   $editable?: boolean;
+  /** The title cell, a little heavier as in Notion. */
+  $primary?: boolean;
   /** Room kept on the left when the cell is scrolled into view, under the frozen columns. */
   $scrollMarginLeft?: number;
 }>`
@@ -192,6 +194,7 @@ export const Cell = styled.div<{
   padding: ${(props) => (props.$wrap ? "7px 8px" : "0 8px")};
   overflow: hidden;
   cursor: ${(props) => (props.$editable ? "text" : "default")};
+  font-weight: ${(props) => (props.$primary ? 500 : "inherit")};
   ${cellLine}
   ${frozen}
 
@@ -201,13 +204,6 @@ export const Cell = styled.div<{
       box-shadow: inset 0 0 0 2px ${transparentize(0.3, props.theme.accent)};
       border-radius: 2px;
     `}
-`;
-
-/** The emoji of a row, before its title. */
-export const RowIcon = styled.span`
-  flex-shrink: 0;
-  margin-right: 6px;
-  font-family: ${s("fontFamilyEmoji")};
 `;
 
 /** The "Open" button of the title cell. */

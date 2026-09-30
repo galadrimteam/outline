@@ -2,12 +2,14 @@ import { CloseIcon, DocumentIcon } from "outline-icons";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import styled from "styled-components";
+import styled, { css } from "styled-components";
 import type { DatabaseField, DatabaseLinkValue } from "@shared/databases/types";
 import { s } from "@shared/styles";
 import NudeButton from "~/components/NudeButton";
 import useStores from "~/hooks/useStores";
 import { databaseRowPath } from "~/utils/routeHelpers";
+import { IconGlyph } from "../RowIcon";
+import { linkIcon } from "../rowIcons";
 import { EditorPopover } from "./components/EditorPopover";
 import {
   Chips,
@@ -77,13 +79,20 @@ function LinkRenderer({ field, value, variant, wrap }: CellRendererProps) {
     ) : null;
   }
 
+  const iconSize = variant === "card" ? 14 : 16;
+
   return (
     <Chips $variant={variant} $wrap={wrap}>
       {links.map((link) => {
         const path = linkedRecordPath(field, link.id);
+        const icon = linkIcon(link);
         const content = (
           <>
-            <DocumentIcon size={16} />
+            {icon ? (
+              <IconGlyph icon={icon} size={iconSize} />
+            ) : (
+              <DocumentIcon size={iconSize} />
+            )}
             <ChipTitle>{link.title || t("Untitled")}</ChipTitle>
           </>
         );
@@ -239,39 +248,38 @@ function isMultipleLink(field: DatabaseField): boolean {
   return field.isMultipleCellValue;
 }
 
-const PlainChip = styled.span`
+const chip = css`
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
   max-width: 100%;
   flex-shrink: 0;
-  color: ${s("text")};
+  font-weight: 500;
 
-  svg {
+  > svg {
     flex-shrink: 0;
-    fill: ${s("textSecondary")};
+    fill: ${s("textTertiary")};
   }
 `;
 
-const LinkChip = styled(Link)`
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-  max-width: 100%;
-  flex-shrink: 0;
+const PlainChip = styled.span`
+  ${chip}
   color: ${s("text")};
-  text-decoration: underline;
-  text-decoration-color: ${s("divider")};
-  text-underline-offset: 2px;
+`;
 
-  svg {
-    flex-shrink: 0;
-    fill: ${s("textSecondary")};
+/* `&&` outranks the editor's rule colouring every link of a document. */
+const LinkChip = styled(Link)`
+  ${chip}
+
+  && {
+    color: ${s("text")};
+    text-decoration: underline;
+    text-decoration-color: ${s("divider")};
+    text-underline-offset: 2px;
   }
 
-  &:hover {
+  &&:hover {
     text-decoration-color: ${s("textSecondary")};
   }
 `;
