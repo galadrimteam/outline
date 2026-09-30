@@ -75,7 +75,8 @@ export class DatabaseSettingsHelper {
 
   /**
    * Merges a patch into settings. Top-level keys are replaced; entries of
-   * `viewOverrides` and `fieldMeta` are replaced one by one, null removes one.
+   * `viewOverrides` and `fieldMeta` are replaced one by one, null removes one;
+   * keys of `pageLayout` are replaced one by one, a null `pageLayout` removes it.
    *
    * @param settings the current settings.
    * @param patch the changes.
@@ -104,7 +105,7 @@ export class DatabaseSettingsHelper {
       if (patch.pageLayout === null) {
         delete next.pageLayout;
       } else {
-        next.pageLayout = patch.pageLayout;
+        next.pageLayout = { ...next.pageLayout, ...patch.pageLayout };
       }
     }
     if (patch.iconFieldId !== undefined) {
@@ -141,6 +142,7 @@ export class DatabaseSettingsHelper {
         hideWhenEmptyFieldIds: next.pageLayout.hideWhenEmptyFieldIds?.filter(
           (id) => id !== fieldId
         ),
+        tabs: next.pageLayout.tabs?.filter((tab) => tab.fieldId !== fieldId),
       };
     }
     return next;

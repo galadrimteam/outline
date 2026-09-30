@@ -448,6 +448,71 @@ describe("#databases.update", () => {
     });
   });
 
+  it("keeps the tabs of row pages", async () => {
+    const user = await buildUser();
+    const collection = await buildCollection({
+      teamId: user.teamId,
+      userId: user.id,
+    });
+    const database = await buildDatabase({
+      teamId: user.teamId,
+      collectionId: collection.id,
+      settings: { pageLayout: { hiddenFieldIds: ["fldNotes"] } },
+    });
+    const tabs = [
+      { id: "8a7e1c2d-0000-4000-8000-000000000001", kind: "content" },
+      {
+        id: "8a7e1c2d-0000-4000-8000-000000000002",
+        kind: "relation",
+        name: "Suivi Kanban MGE",
+        fieldId: "fldTasks",
+        visibleFieldIds: ["fldStatus", "fldOwner"],
+      },
+    ];
+
+    const res = await server.post("/api/databases.update", user, {
+      body: { id: database.id, settings: { pageLayout: { tabs } } },
+    });
+    const body = await res.json();
+
+    expect(res.status).toEqual(200);
+    expect(body.data.settings.pageLayout).toEqual({
+      hiddenFieldIds: ["fldNotes"],
+      tabs,
+    });
+
+    const hidden = await server.post("/api/databases.update", user, {
+      body: {
+        id: database.id,
+        settings: { pageLayout: { hiddenFieldIds: [], hideEmpty: true } },
+      },
+    });
+    expect((await hidden.json()).data.settings.pageLayout.tabs).toEqual(tabs);
+    const reloaded = await Database.findByPk(database.id);
+    expect(reloaded?.settings.pageLayout?.tabs).toEqual(tabs);
+  });
+
+  it("refuses a relation tab without its field", async () => {
+    const user = await buildUser();
+    const collection = await buildCollection({
+      teamId: user.teamId,
+      userId: user.id,
+    });
+    const database = await buildDatabase({
+      teamId: user.teamId,
+      collectionId: collection.id,
+    });
+
+    const res = await server.post("/api/databases.update", user, {
+      body: {
+        id: database.id,
+        settings: { pageLayout: { tabs: [{ id: "tab", kind: "relation" }] } },
+      },
+    });
+
+    expect(res.status).toEqual(400);
+  });
+
   it("forbids a viewer", async () => {
     const owner = await buildUser();
     const collection = await buildCollection({
