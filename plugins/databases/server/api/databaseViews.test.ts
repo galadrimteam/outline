@@ -112,6 +112,48 @@ describe("#databaseViews.update", () => {
     expect(body.data.filter).toEqual(filter);
     expect(body.data.overrides).toEqual({ cardSize: "large" });
   });
+
+  it("gives a view its own icon, and takes it back", async () => {
+    const database = await buildDatabase({
+      teamId: user.teamId,
+      collectionId: collection.id,
+    });
+
+    const set = await server.post("/api/databaseViews.update", user, {
+      body: {
+        databaseId: database.id,
+        viewId: "viwBoard",
+        overrides: { icon: "map" },
+      },
+    });
+    expect(set.status).toEqual(200);
+    expect((await set.json()).data.overrides).toEqual({ icon: "map" });
+
+    const cleared = await server.post("/api/databaseViews.update", user, {
+      body: {
+        databaseId: database.id,
+        viewId: "viwBoard",
+        overrides: { icon: null },
+      },
+    });
+    expect((await cleared.json()).data.overrides).toEqual({});
+  });
+
+  it("refuses an icon that is not an emoji, an icon name or a custom emoji", async () => {
+    const database = await buildDatabase({
+      teamId: user.teamId,
+      collectionId: collection.id,
+    });
+
+    const res = await server.post("/api/databaseViews.update", user, {
+      body: {
+        databaseId: database.id,
+        viewId: "viwBoard",
+        overrides: { icon: "<img src=x>" },
+      },
+    });
+    expect(res.status).toEqual(400);
+  });
 });
 
 describe("#databaseViews.update clearing ids", () => {

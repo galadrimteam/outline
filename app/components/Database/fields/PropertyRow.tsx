@@ -18,6 +18,8 @@ interface Props {
   field: DatabaseField;
   record: DatabaseRecord;
   readOnly: boolean;
+  /** Puts the name above the value, as Notion draws the pinned properties of a page. */
+  stacked?: boolean;
   onChange: (fieldId: string, value: DatabaseCellInput) => void;
   onChangeFields: (fields: Record<string, DatabaseCellInput>) => void;
 }
@@ -34,6 +36,7 @@ export const PropertyRow = observer(function PropertyRow_({
   field,
   record,
   readOnly,
+  stacked = false,
   onChange,
   onChangeFields,
 }: Props) {
@@ -72,15 +75,21 @@ export const PropertyRow = observer(function PropertyRow_({
   );
 
   const name = (
-    <NameButton type="button" disabled={readOnly} aria-label={field.name}>
+    <NameButton
+      type="button"
+      disabled={readOnly}
+      aria-label={field.name}
+      title={field.description ? undefined : field.name}
+      $stacked={stacked}
+    >
       <FieldKindIcon field={field} size={16} />
       <Name>{field.name}</Name>
     </NameButton>
   );
 
   return (
-    <Line>
-      <NameCell>
+    <Line $stacked={stacked}>
+      <NameCell $stacked={stacked}>
         {readOnly ? (
           field.description ? (
             <Tooltip content={field.description} placement="left">
@@ -134,30 +143,36 @@ export const PropertyRow = observer(function PropertyRow_({
   );
 });
 
-const Line = styled.div`
+const Line = styled.div<{ $stacked: boolean }>`
   display: flex;
-  align-items: flex-start;
+  flex-direction: ${(props) => (props.$stacked ? "column" : "row")};
+  align-items: ${(props) => (props.$stacked ? "stretch" : "flex-start")};
   min-height: 34px;
+  margin-bottom: ${(props) => (props.$stacked ? "12px" : "0")};
   font-size: 14px;
 `;
 
-const NameCell = styled.div`
-  flex: 0 0 160px;
-  width: 160px;
+const NameCell = styled.div<{ $stacked: boolean }>`
+  flex: ${(props) => (props.$stacked ? "0 0 auto" : "0 0 160px")};
+  width: ${(props) => (props.$stacked ? "auto" : "160px")};
   min-width: 0;
 `;
 
-const NameButton = styled.button`
-  display: flex;
+const NameButton = styled.button<{ $stacked: boolean }>`
+  display: ${(props) => (props.$stacked ? "inline-flex" : "flex")};
+  font-size: ${(props) => (props.$stacked ? "13px" : "inherit")};
+  font-weight: ${(props) => (props.$stacked ? 500 : "inherit")};
+  min-height: ${(props) => (props.$stacked ? "26px" : "34px")};
   align-items: center;
   gap: 6px;
-  width: 100%;
-  min-height: 34px;
+  width: ${(props) => (props.$stacked ? "auto" : "100%")};
+  max-width: 100%;
   padding: 0 6px;
   border: 0;
   border-radius: 4px;
   background: none;
-  font: inherit;
+  font-family: inherit;
+  line-height: inherit;
   color: ${s("textSecondary")};
   text-align: left;
   cursor: var(--pointer);

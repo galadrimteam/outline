@@ -11,6 +11,7 @@ import {
   isoToCalendarDay,
   numberInputValue,
   parseNumberInput,
+  shortUrl,
   toArray,
   zonedPartsToISO,
 } from "./format";
@@ -260,5 +261,31 @@ describe("cellValueToText", () => {
         "2026-01-02T00:00:00.000Z"
       )
     ).toBe("2026-01-02");
+  });
+});
+
+describe("shortUrl", () => {
+  it("cuts a long URL in the middle like Notion's page properties", () => {
+    expect(
+      shortUrl(
+        "https://www.figma.com/design/lRvEEsNv45YUtjMuOqTnFl/Maquettes---Mission-Grande-Ecole?node-id=4479-16561&m=dev"
+      )
+    ).toEqual({ host: "figma.com", rest: "/des…&m=dev" });
+  });
+
+  it("keeps a short path whole and drops a bare slash", () => {
+    expect(shortUrl("https://galadrim.fr/")).toEqual({
+      host: "galadrim.fr",
+      rest: "",
+    });
+    expect(shortUrl("http://example.com/a/b")).toEqual({
+      host: "example.com",
+      rest: "/a/b",
+    });
+  });
+
+  it("gives nothing for what is not an http(s) URL", () => {
+    expect(shortUrl("mailto:someone@example.com")).toBeUndefined();
+    expect(shortUrl("not a url")).toBeUndefined();
   });
 });

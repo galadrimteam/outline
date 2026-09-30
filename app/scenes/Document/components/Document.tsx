@@ -33,6 +33,7 @@ import { documentHistoryPath, documentEditPath } from "~/utils/routeHelpers";
 import { useDocumentSave } from "../hooks/useDocumentSave";
 import Container from "./Container";
 import Contents from "./Contents";
+import ContentsRail from "./ContentsRail";
 import Editor from "./Editor";
 import Header from "./Header";
 import Notices from "./Notices";
@@ -448,13 +449,15 @@ function DocumentScene({
                   </>
                 )}
               </MeasuredContainer>
-              {showContents && (
+              {showContents ? (
                 <ContentsContainer
                   docFullWidth={document.fullWidth}
                   position={tocPos}
                 >
                   <Contents />
                 </ContentsContainer>
+              ) : (
+                <ContentsRail />
               )}
             </React.Suspense>
           </Main>

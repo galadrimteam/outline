@@ -20,6 +20,7 @@ import usePolicy from "~/hooks/usePolicy";
 import useStores from "~/hooks/useStores";
 import TeamMenu from "~/menus/TeamMenu";
 import * as Scenes from "~/routes/scenes";
+import { retryTransient } from "~/utils/retryTransient";
 import { homePath } from "~/utils/routeHelpers";
 import TeamLogo from "../TeamLogo";
 import Tooltip from "../Tooltip";
@@ -66,14 +67,18 @@ function AppSidebar() {
   }, [commandBar, isMobile, ui]);
 
   useEffect(() => {
-    void collections.fetchAll();
+    // galadrim: a load that fails while the server is busy or restarting is
+    // made again, else the sidebar and the breadcrumb stay empty until reload.
+    void retryTransient(() => collections.fetchAll()).catch(() => undefined);
     // galadrim: fills the "Récents" section and the command bar's list of
     // recently viewed documents. Nothing else loads them on the web, so a
     // session that starts on a document link would otherwise show neither.
-    void documents.fetchRecentlyViewed({ limit: recentDocumentCount });
+    void retryTransient(() =>
+      documents.fetchRecentlyViewed({ limit: recentDocumentCount })
+    ).catch(() => undefined);
 
     if (!user.isViewer) {
-      void documents.fetchDrafts();
+      void retryTransient(() => documents.fetchDrafts()).catch(() => undefined);
     }
   }, [documents, collections, user.isViewer]);
 

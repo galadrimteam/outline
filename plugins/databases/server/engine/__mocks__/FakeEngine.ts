@@ -65,6 +65,9 @@ export class FakeEngine implements DatabaseEngine {
 
   public records = new Map<string, DatabaseRecord>();
 
+  /** The value heading the one group `groupPoints` returns. */
+  public groupValue: DatabaseCellValue = "To do";
+
   public engineUsers = new Map<string, string>();
 
   public nextBaseId = "bseCreated";
@@ -200,7 +203,7 @@ export class FakeEngine implements DatabaseEngine {
         type: "header",
         id: "grp1",
         depth: 0,
-        value: "To do",
+        value: this.groupValue,
         isCollapsed: false,
       },
       { type: "row", count: this.records.size },

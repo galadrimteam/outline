@@ -21,6 +21,8 @@ import {
 } from "../presenters/databaseRecords";
 import { actorFor } from "../utils/actor";
 import { cellText } from "../utils/cellText";
+import { DatabaseSettingsHelper } from "../utils/DatabaseSettingsHelper";
+import { DatabaseRowIcons } from "../utils/DatabaseRowIcons";
 import { DatabaseUserMapper } from "../utils/DatabaseUserMapper";
 import {
   loadDatabaseForRead,
@@ -70,6 +72,10 @@ router.post(
           can(user, "update", database) === true,
         sort,
         search,
+        groupLayout: DatabaseSettingsHelper.groupLayout(
+          database.settings,
+          viewId
+        ),
         skip: offset,
         take: limit,
       }
@@ -79,7 +85,7 @@ router.post(
       pagination: { offset, limit, total: page.total },
       data: redactRecordsForShare(
         access,
-        await presentDatabaseRecords(database, page.records)
+        await presentDatabaseRecords(database, page.records, access.actor)
       ),
     };
   }
@@ -102,7 +108,7 @@ router.post(
     );
 
     const [presented] = redactRecordsForShare(access, [
-      await presentDatabaseRecord(database, record),
+      await presentDatabaseRecord(database, record, access.actor),
     ]);
     ctx.body = { data: presented };
   }
@@ -118,8 +124,9 @@ router.post(
     const { databaseId, fields, order, origin } = ctx.input.body;
     const database = await loadDatabase(user, databaseId, "update");
     const engine = engineFor(database, { origin });
+    const actor = actorFor(user);
 
-    const record = await engine.createRecord(actorFor(user), refFor(database), {
+    const record = await engine.createRecord(actor, refFor(database), {
       fields: await DatabaseUserMapper.resolveInputs(
         engine,
         database.teamId,
@@ -128,7 +135,7 @@ router.post(
       order,
     });
 
-    ctx.body = { data: await presentDatabaseRecord(database, record) };
+    ctx.body = { data: await presentDatabaseRecord(database, record, actor) };
   }
 );
 
@@ -142,9 +149,10 @@ router.post(
     const { databaseId, recordId, fields, order, origin } = ctx.input.body;
     const database = await loadDatabase(user, databaseId, "update");
     const engine = engineFor(database, { origin });
+    const actor = actorFor(user);
 
     const record = await engine.updateRecord(
-      actorFor(user),
+      actor,
       refFor(database),
       recordId,
       {
@@ -157,7 +165,7 @@ router.post(
       }
     );
 
-    ctx.body = { data: await presentDatabaseRecord(database, record) };
+    ctx.body = { data: await presentDatabaseRecord(database, record, actor) };
   }
 );
 
@@ -179,8 +187,9 @@ router.post(
     } = ctx.input.body;
     const database = await loadDatabase(user, databaseId, "update");
     const engine = engineFor(database, { origin });
+    const actor = actorFor(user);
 
-    const records = await engine.moveRecords(actorFor(user), refFor(database), {
+    const records = await engine.moveRecords(actor, refFor(database), {
       viewId,
       recordIds,
       anchorId,
@@ -194,7 +203,9 @@ router.post(
         : undefined,
     });
 
-    ctx.body = { data: await presentDatabaseRecords(database, records) };
+    ctx.body = {
+      data: await presentDatabaseRecords(database, records, actor),
+    };
   }
 );
 
@@ -227,15 +238,16 @@ router.post(
     const user = authenticatedUser(ctx);
     const { databaseId, recordId, order, origin } = ctx.input.body;
     const database = await loadDatabase(user, databaseId, "update");
+    const actor = actorFor(user);
 
     const record = await engineFor(database, { origin }).duplicateRecord(
-      actorFor(user),
+      actor,
       refFor(database),
       recordId,
       order
     );
 
-    ctx.body = { data: await presentDatabaseRecord(database, record) };
+    ctx.body = { data: await presentDatabaseRecord(database, record, actor) };
   }
 );
 
@@ -303,19 +315,40 @@ router.post(
     const access = await loadDatabaseForRead(ctx, databaseId, shareId);
     const { database } = access;
 
-    const points = await engineFor(database).groupPoints(
-      access.actor,
-      refFor(database),
-      { viewId, groupBy, filter, search }
+    const engine = engineFor(database);
+    const points = await engine.groupPoints(access.actor, refFor(database), {
+      viewId,
+      groupBy,
+      filter,
+      search,
+      groupLayout: DatabaseSettingsHelper.groupLayout(
+        database.settings,
+        viewId
+      ),
+    });
+    const headers = points.flatMap((point) =>
+      point.type === "header" ? [point] : []
     );
-    await DatabaseUserMapper.enrichValues(
-      database.teamId,
-      points.flatMap((point) =>
-        point.type === "header"
-          ? DatabaseUserMapper.userValuesIn(point.value)
-          : []
-      )
-    );
+    await Promise.all([
+      DatabaseUserMapper.enrichValues(
+        database.teamId,
+        headers.flatMap((header) =>
+          DatabaseUserMapper.userValuesIn(header.value)
+        )
+      ),
+      headers.some((header) => DatabaseRowIcons.mayBeLink(header.value))
+        ? engine
+            .getSchema(access.actor, refFor(database))
+            .then(({ fields, views }) =>
+              DatabaseRowIcons.enrichGroupHeaders(
+                database.teamId,
+                fields,
+                groupBy ?? views.find((view) => view.id === viewId)?.group,
+                headers
+              )
+            )
+        : undefined,
+    ]);
 
     ctx.body = { data: redactGroupPointsForShare(access, points) };
   }
@@ -327,7 +360,7 @@ router.post(
   auth({ optional: true }),
   validate(T.DatabaseRecordsAggregateSchema),
   async (ctx: APIContext<T.DatabaseRecordsAggregateReq>) => {
-    const { databaseId, viewId, fieldStats, filter, search, shareId } =
+    const { databaseId, viewId, fieldStats, filter, search, byGroup, shareId } =
       ctx.input.body;
     const access = await loadDatabaseForRead(ctx, databaseId, shareId);
     const { database } = access;
@@ -338,6 +371,11 @@ router.post(
           fieldStats,
           filter,
           search,
+          byGroup,
+          groupLayout: DatabaseSettingsHelper.groupLayout(
+            database.settings,
+            viewId
+          ),
         })
       : {};
 
@@ -412,9 +450,10 @@ router.post(
       throw ValidationError("A file is required");
     }
     const database = await loadDatabase(user, databaseId, "update");
+    const actor = actorFor(user);
 
     const record = await engineFor(database, { origin }).uploadAttachment(
-      actorFor(user),
+      actor,
       refFor(database),
       {
         recordId,
@@ -425,7 +464,7 @@ router.post(
       }
     );
 
-    ctx.body = { data: await presentDatabaseRecord(database, record) };
+    ctx.body = { data: await presentDatabaseRecord(database, record, actor) };
   }
 );
 

@@ -1,24 +1,34 @@
 import Router from "koa-router";
 import { Op } from "sequelize";
 import { UserRole } from "@shared/types";
+import { toError } from "@shared/utils/error";
 import { databaseRowsLinker } from "@server/commands/databaseRowDocumentCreator";
 import { NotFoundError, ValidationError } from "@server/errors";
+import Logger from "@server/logging/Logger";
 import auth from "@server/middlewares/authentication";
 import { rateLimiter } from "@server/middlewares/rateLimiter";
 import { transaction } from "@server/middlewares/transaction";
 import validate from "@server/middlewares/validate";
-import { Collection, Database, Document } from "@server/models";
+import {
+  Collection,
+  Database,
+  DatabaseAutomation,
+  Document,
+} from "@server/models";
 import { authorize, can } from "@server/policies";
 import { presentDatabase, presentPolicies } from "@server/presenters";
 import { QueryHelper } from "@server/storage/QueryHelper";
 import type { APIContext } from "@server/types";
 import { databaseCreator } from "../commands/databaseCreator";
+import { removeRowPropertyTables } from "../commands/rowPropertyTables";
 import { engineFor, refFor } from "../engine";
+import { engineOfTable } from "../utils/tableEngine";
 import env from "../env";
 import { ConvertTeableEmbedsTask } from "../tasks/ConvertTeableEmbedsTask";
 import { MoveDatabaseEngineTask } from "../tasks/MoveDatabaseEngineTask";
 import { presentDatabaseForUser } from "../presenters/database";
 import { presentDatabaseSchema } from "../presenters/databaseSchema";
+import { actorFor } from "../utils/actor";
 import { DatabaseSettingsHelper } from "../utils/DatabaseSettingsHelper";
 import { loadDatabaseForRead } from "../utils/shareAccess";
 import {
@@ -46,11 +56,19 @@ router.post(
       refFor(database)
     );
 
+    // Editors see Notion's ⚡ in the toolbar while automations are on.
+    const automationCount =
+      user && !access.shareId && can(user, "update", database)
+        ? await DatabaseAutomation.count({
+            where: { databaseId: database.id, enabled: true },
+          })
+        : undefined;
+
     ctx.body = {
       data: {
         database:
           user && !access.shareId
-            ? presentDatabaseForUser(user, database)
+            ? { ...presentDatabaseForUser(user, database), automationCount }
             : presentDatabase(database),
         ...(await presentDatabaseSchema(database, schema)),
       },
@@ -161,7 +179,10 @@ router.post(
     const { transaction } = ctx.state;
     const { collectionId, documentId, externalBaseId, externalTableId, title } =
       ctx.input.body;
-    requireTeable();
+    const engineName = await engineOfTable(user.teamId, externalTableId);
+    if (engineName === "teable") {
+      requireTeable();
+    }
 
     const collection = await Collection.findByPk(collectionId, {
       userId: user.id,
@@ -180,7 +201,7 @@ router.post(
     }
 
     const ref = { externalBaseId, externalTableId };
-    const engine = engineFor({ engine: "teable" });
+    const engine = engineFor({ engine: engineName, teamId: user.teamId });
     const info = await engine.describeTable("system", ref);
 
     const [database] = await Database.findOrCreate({
@@ -190,7 +211,7 @@ router.post(
         collectionId,
         documentId: documentId ?? null,
         title: title || info.name,
-        engine: "teable",
+        engine: engineName,
         externalBaseId,
         externalTableId,
         settings: {},
@@ -283,6 +304,24 @@ router.post(
 
     const database = await loadDatabase(user, id, "update", { transaction });
     const linked = await databaseRowsLinker(ctx.context, { database, pairs });
+    // The properties panel now shows what the migration had written as a table in each page.
+    const { fields } = await engineFor(database).getSchema(
+      actorFor(user),
+      refFor(database)
+    );
+    transaction.afterCommit(async () => {
+      await removeRowPropertyTables(
+        user,
+        database,
+        pairs.map((pair) => pair.documentId),
+        fields.map((field) => field.name)
+      ).catch((error) =>
+        Logger.warn("Could not remove the property tables of row pages", {
+          databaseId: database.id,
+          error: toError(error).message,
+        })
+      );
+    });
 
     ctx.body = { data: { linked } };
   }
@@ -296,7 +335,6 @@ router.post(
   async (ctx: APIContext<T.DatabasesConvertEmbedsReq>) => {
     const { user } = ctx.state.auth;
     const { documentId, collectionId, dryRun } = ctx.input.body;
-    requireTeable();
 
     if (documentId) {
       const document = await Document.findByPk(documentId, {

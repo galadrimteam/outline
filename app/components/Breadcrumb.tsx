@@ -87,7 +87,7 @@ function Breadcrumb(
   );
 
   return (
-    <Flex justify="flex-start" align="center" ref={ref}>
+    <Line justify="flex-start" align="center" ref={ref}>
       {topLevelActions.map((action, index) => (
         <React.Fragment key={action.type === "menu" ? "menu" : `item-${index}`}>
           {toBreadcrumb(action, index)}
@@ -97,9 +97,13 @@ function Breadcrumb(
         </React.Fragment>
       ))}
       {children}
-    </Flex>
+    </Line>
   );
 }
+
+const Line = styled(Flex)`
+  min-width: 0;
+`;
 
 const Slash = styled(GoToIcon)`
   flex-shrink: 0;

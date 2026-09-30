@@ -14,7 +14,7 @@ import type Database from "~/models/Database";
 import type { RecordQuery } from "~/stores/DatabaseRecordsStore";
 import type { BoardColumn, BoardLane } from "../../boardModel";
 import { containerKey } from "../../boardModel";
-import { getCell } from "../../cells/registry";
+import { GroupLabel } from "../GroupLabel";
 import {
   LaneCell,
   LaneColumnHeader,
@@ -93,6 +93,7 @@ export const BoardLanes = observer(function BoardLanes({
             return query ? (
               <LaneColumnHeader
                 key={column.key}
+                database={database}
                 view={view}
                 field={field}
                 column={column}
@@ -168,7 +169,6 @@ const LaneTitle = observer(function LaneTitle({
   onToggle: (key: string) => void;
 }) {
   const { t } = useTranslation();
-  const { Renderer } = getCell(subField.type);
   const handleClick = React.useCallback(
     () => onToggle(lane.key),
     [onToggle, lane.key]
@@ -184,16 +184,11 @@ const LaneTitle = observer(function LaneTitle({
       >
         {isFolded ? <CollapsedIcon size={18} /> : <ExpandedIcon size={18} />}
       </Toggle>
-      {lane.key === "" ? (
-        <Empty>{t("No {{ name }}", { name: subField.name })}</Empty>
-      ) : (
-        <Renderer
-          field={subField}
-          value={lane.value}
-          database={database}
-          variant="card"
-        />
-      )}
+      <GroupLabel
+        database={database}
+        field={subField}
+        value={lane.key === "" ? null : lane.value}
+      />
       <Count>{lane.count}</Count>
     </Title>
   );
@@ -247,13 +242,15 @@ const Toggle = styled.button`
   }
 `;
 
-const Empty = styled.span`
-  color: ${s("textSecondary")};
-`;
-
 const Count = styled.span`
   color: ${s("textTertiary")};
   font-variant-numeric: tabular-nums;
+  opacity: 0;
+  transition: opacity 100ms ease;
+
+  ${Title}:hover & {
+    opacity: 1;
+  }
 `;
 
 const Footer = styled.div`

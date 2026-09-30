@@ -18,6 +18,8 @@ export interface SortLevel {
   order: DatabaseSortOrder;
   /** Empty cells after the others whatever the order, as Notion sorts; else first when ascending, as Teable. */
   emptiesLast?: boolean;
+  /** A place given by hand (the order of a view's groups), deciding before the values, whatever the direction. */
+  rank?: (cell: DatabaseCellValue | undefined) => number;
 }
 
 /** What a record is ordered by on one level; null for an empty cell. */
@@ -121,30 +123,82 @@ export function sortRecords(
 ): ComputedRecord[] {
   const keyed = records.map((record) => ({
     record,
-    keys: levels.map((level) =>
-      sortValue(level.field, record.cells[level.field.id])
-    ),
+    keys: levelKeys(levels, record),
     manual: viewId
       ? (record.row.orders?.[viewId] ?? record.row.autoNumber)
       : record.row.autoNumber,
   }));
   keyed.sort((a, b) => {
-    for (let index = 0; index < levels.length; index++) {
-      const result = compareSortValues(
-        a.keys[index],
-        b.keys[index],
-        levels[index].order,
-        levels[index].emptiesLast
-      );
-      if (result) {
-        return result;
-      }
+    const result = compareLevelKeys(levels, a.keys, b.keys);
+    if (result) {
+      return result;
     }
     return (
       a.manual - b.manual || a.record.row.autoNumber - b.record.row.autoNumber
     );
   });
   return keyed.map((item) => item.record);
+}
+
+/** What a record is ordered by on each level: its rank by hand, then its value. */
+export interface LevelKey {
+  rank: number;
+  value: SortValue;
+}
+
+/**
+ * Returns what a record is ordered by on each level.
+ *
+ * @param levels the levels.
+ * @param record the record.
+ * @returns one key per level.
+ */
+export function levelKeys(
+  levels: SortLevel[],
+  record: ComputedRecord
+): LevelKey[] {
+  return levels.map((level) => {
+    const cell = record.cells[level.field.id];
+    return {
+      rank: level.rank?.(cell) ?? 0,
+      value: sortValue(level.field, cell),
+    };
+  });
+}
+
+/**
+ * Compares the keys of two records level by level.
+ *
+ * @param levels the levels.
+ * @param a the keys of a record.
+ * @param b the keys of another record.
+ * @returns a negative number when a comes first, positive when b does, 0 for a tie.
+ */
+export function compareLevelKeys(
+  levels: SortLevel[],
+  a: LevelKey[],
+  b: LevelKey[]
+): number {
+  for (let index = 0; index < levels.length; index++) {
+    const rank = compareRanks(a[index].rank, b[index].rank);
+    if (rank) {
+      return rank;
+    }
+    const result = compareSortValues(
+      a[index].value,
+      b[index].value,
+      levels[index].order,
+      levels[index].emptiesLast
+    );
+    if (result) {
+      return result;
+    }
+  }
+  return 0;
+}
+
+function compareRanks(a: number, b: number): number {
+  return a === b ? 0 : a < b ? -1 : 1;
 }
 
 function elementKey(field: QueryField): (item: CellItem) => SortValue {

@@ -1,4 +1,6 @@
 import FormData from "form-data";
+import type { DatabaseField } from "@shared/databases/types";
+import { DatabaseFieldType } from "@shared/databases/types";
 import { Document } from "@server/models";
 import {
   buildCollection,
@@ -34,6 +36,37 @@ beforeEach(async () => {
 afterEach(() => {
   setEngineFactory();
 });
+
+function linkField(id: string, foreignTableId: string): DatabaseField {
+  return {
+    id,
+    name: id,
+    type: DatabaseFieldType.Link,
+    options: { foreignTableId },
+    isPrimary: false,
+    isComputed: false,
+    isLookup: false,
+    cellValueType: "string",
+    isMultipleCellValue: true,
+  };
+}
+
+async function rowPage(
+  of: Database,
+  recordId: string,
+  look: { icon: string; color?: string }
+) {
+  const page = await buildDocument({
+    teamId: of.teamId,
+    userId: user.id,
+    collectionId: of.collectionId,
+  });
+  await Document.update(
+    { databaseId: of.id, databaseRecordId: recordId, ...look },
+    { where: { id: page.id } }
+  );
+  return page;
+}
 
 describe("#databaseRecords.list", () => {
   it("reads the table of the database, whatever the client sends", async () => {
@@ -94,6 +127,45 @@ describe("#databaseRecords.list", () => {
     expect(body.data[0].fields.fldPerson.outlineUserId).toEqual(user.id);
     expect(body.data[1].documentId).toBeNull();
     expect(body.data[1].fields.fldPerson[0].outlineUserId).toBeNull();
+  });
+
+  it("gives rows the icon of their page, relations the icon of the linked row's page", async () => {
+    const other = await buildDatabase({
+      teamId: user.teamId,
+      collectionId: collection.id,
+    });
+    engine.fields.push(linkField("fldUser", other.externalTableId));
+    await rowPage(database, "rec1", { icon: "🚀" });
+    await rowPage(other, "recProf", { icon: "crown", color: "#FF0000" });
+    engine.addRecord("rec1", {
+      fldUser: [
+        { id: "recProf", title: "Prof" },
+        { id: "recGhost", title: "Ghost" },
+      ],
+    });
+    engine.addRecord("rec2", {});
+
+    const res = await server.post("/api/databaseRecords.list", user, {
+      body: { databaseId: database.id, viewId: "viwGrid" },
+    });
+    const body = await res.json();
+
+    expect(body.data[0]).toMatchObject({ icon: "🚀", iconColor: null });
+    expect(body.data[0].fields.fldUser).toEqual([
+      { id: "recProf", title: "Prof", icon: "crown", iconColor: "#FF0000" },
+      { id: "recGhost", title: "Ghost", icon: null, iconColor: null },
+    ]);
+    expect(body.data[1]).toMatchObject({ icon: null, documentId: null });
+  });
+
+  it("reads no schema when no cell holds a relation", async () => {
+    engine.addRecord("rec1", { fldName: "First" });
+
+    await server.post("/api/databaseRecords.list", user, {
+      body: { databaseId: database.id, viewId: "viwGrid" },
+    });
+
+    expect(engine.callsTo("getSchema")).toHaveLength(0);
   });
 
   it("lets an editor replace the view's filter", async () => {
@@ -362,6 +434,70 @@ describe("#databaseRecords reads", () => {
     const historyBody = await history.json();
     expect(historyBody.data).toEqual([]);
     expect(historyBody.pagination).toEqual({ nextCursor: null });
+  });
+
+  it("reads a view's rows with the order and the folded groups it keeps", async () => {
+    await database.update({
+      settings: {
+        ...database.settings,
+        viewOverrides: {
+          viwGrid: { stackOrder: ["S1", ""], hiddenStacks: [""] },
+        },
+      },
+    });
+    await server.post("/api/databaseRecords.list", user, {
+      body: { databaseId: database.id, viewId: "viwGrid" },
+    });
+    await server.post("/api/databaseRecords.groups", user, {
+      body: { databaseId: database.id, viewId: "viwGrid" },
+    });
+    const layout = { order: ["S1", ""], hidden: [""] };
+    expect(engine.callsTo("listRecords")[0].args[0]).toMatchObject({
+      groupLayout: layout,
+    });
+    expect(engine.callsTo("groupPoints")[0].args[0]).toMatchObject({
+      groupLayout: layout,
+    });
+  });
+
+  it("asks the engine for the calculations of each group", async () => {
+    await server.post("/api/databaseRecords.aggregate", user, {
+      body: {
+        databaseId: database.id,
+        viewId: "viwGrid",
+        fieldStats: { fldName: "filled" },
+        byGroup: true,
+      },
+    });
+    expect(engine.callsTo("aggregate")[0].args[0]).toMatchObject({
+      viewId: "viwGrid",
+      byGroup: true,
+    });
+  });
+});
+
+describe("#databaseRecords.groups", () => {
+  it("gives a relation heading a group the icon of the linked row's page", async () => {
+    const other = await buildDatabase({
+      teamId: user.teamId,
+      collectionId: collection.id,
+    });
+    engine.fields.push(linkField("fldEpic", other.externalTableId));
+    await rowPage(other, "recQcm", { icon: "💯" });
+    engine.groupValue = [{ id: "recQcm", title: "QCM" }];
+
+    const res = await server.post("/api/databaseRecords.groups", user, {
+      body: {
+        databaseId: database.id,
+        viewId: "viwGrid",
+        groupBy: [{ fieldId: "fldEpic", order: "asc" }],
+      },
+    });
+    const body = await res.json();
+
+    expect(body.data[0].value).toEqual([
+      { id: "recQcm", title: "QCM", icon: "💯", iconColor: null },
+    ]);
   });
 });
 

@@ -1,6 +1,7 @@
 import type {
   DatabaseCellValue,
   DatabaseGroup,
+  DatabaseGroupLayout,
   DatabaseGroupPoint,
 } from "@shared/databases/types";
 import type { TableSnapshot } from "../types";
@@ -22,8 +23,9 @@ import {
   isUserOrLinkType,
 } from "./fields";
 import { roundNumber } from "./formula/functions/numeric";
+import { groupLevels } from "./groupLayout";
 import type { SortLevel } from "./sort";
-import { compareSortValues, sortLevels, sortValue } from "./sort";
+import { compareLevelKeys, levelKeys } from "./sort";
 import type { TimeUnit } from "./time/calendar";
 import { startOf } from "./time/calendar";
 
@@ -35,19 +37,22 @@ import { startOf } from "./time/calendar";
  * group of the last level is followed by the count of its rows. Values are
  * grouped as shown: numbers at the field's precision, dates by day (by
  * minute when a time is shown, by month or year for such formats), lists as
- * a whole. Header ids are stable hashes of the values of the path.
+ * a whole; the first level follows the order the view gives its groups.
+ * Header ids are stable hashes of the values of the path.
  *
  * @param table the table.
  * @param records the selected records.
  * @param group the grouping levels.
+ * @param layout the order of the view's groups.
  * @returns the group points.
  */
 export function groupPoints(
   table: TableSnapshot,
   records: ComputedRecord[],
-  group: DatabaseGroup
+  group: DatabaseGroup,
+  layout?: DatabaseGroupLayout
 ): DatabaseGroupPoint[] {
-  const levels = sortLevels(group, fieldsById(table.fields));
+  const levels = groupLevels(group, fieldsById(table.fields), layout);
   if (!levels.length || !records.length) {
     return [];
   }
@@ -83,6 +88,44 @@ export function groupPoints(
   }
   points.push({ type: "row", count });
   return points;
+}
+
+/**
+ * Returns the records of each group, at every level, keyed by the header ids
+ * `groupPoints` gives the same records.
+ *
+ * @param table the table.
+ * @param records the selected records.
+ * @param group the grouping levels.
+ * @param layout the order of the view's groups.
+ * @returns the records of each group, in their order.
+ */
+export function groupMembers(
+  table: TableSnapshot,
+  records: ComputedRecord[],
+  group: DatabaseGroup,
+  layout?: DatabaseGroupLayout
+): Map<string, ComputedRecord[]> {
+  const levels = groupLevels(group, fieldsById(table.fields), layout);
+  const members = new Map<string, ComputedRecord[]>();
+  if (!levels.length) {
+    return members;
+  }
+  for (const record of orderByGroups(records, levels)) {
+    const keys = levels.map((level) =>
+      JSON.stringify(groupValue(level.field, record.cells[level.field.id]))
+    );
+    levels.forEach((level, depth) => {
+      const id = groupId(level.field.id, keys.slice(0, depth + 1));
+      const list = members.get(id);
+      if (list) {
+        list.push(record);
+      } else {
+        members.set(id, [record]);
+      }
+    });
+  }
+  return members;
 }
 
 /**
@@ -157,23 +200,12 @@ function orderByGroups(
   const keyed = records.map((record, position) => ({
     record,
     position,
-    keys: levels.map((level) =>
-      sortValue(level.field, record.cells[level.field.id])
-    ),
+    keys: levelKeys(levels, record),
   }));
-  keyed.sort((a, b) => {
-    for (let index = 0; index < levels.length; index++) {
-      const result = compareSortValues(
-        a.keys[index],
-        b.keys[index],
-        levels[index].order
-      );
-      if (result) {
-        return result;
-      }
-    }
-    return a.position - b.position;
-  });
+  keyed.sort(
+    (a, b) =>
+      compareLevelKeys(levels, a.keys, b.keys) || a.position - b.position
+  );
   return keyed.map((item) => item.record);
 }
 

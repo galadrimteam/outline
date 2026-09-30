@@ -8,6 +8,7 @@ import type {
 } from "./contract";
 import { fieldsById } from "./fields";
 import { andFilters, compileFilter } from "./filters/filter";
+import { groupLevels, withoutHiddenGroups } from "./groupLayout";
 import { compileSearch } from "./search";
 import { sortLevels, sortRecords } from "./sort";
 import { safeTimeZone } from "./time/zone";
@@ -18,7 +19,9 @@ import { safeTimeZone } from "./time/zone";
  * search, then the order — the view's grouping first so that grouped rows
  * stay together (as Teable puts its group-by before any sort), then the
  * selection's sort, the view's sort (unless sorted by hand, with no
- * selection sort), the view's manual order, and creation.
+ * selection sort), the view's manual order, and creation. The first level of
+ * grouping follows the order of the view's groups, and the records of the
+ * groups it folds away are left out.
  *
  * @param table the table.
  * @param base the computed base holding it.
@@ -44,15 +47,19 @@ export function selectRecords(
   );
   const search = compileSearch(selection.search, table.fields);
 
-  const records = base
+  const matching = base
     .records(table.table.id)
     .filter(
       (record) =>
         (!filter || filter(record.cells)) && (!search || search(record.cells))
     );
+  const grouping = groupLevels(view?.group, fields, selection.groupLayout);
+  const records = grouping.length
+    ? withoutHiddenGroups(matching, grouping[0].field, selection.groupLayout)
+    : matching;
 
   const levels = [
-    ...sortLevels(view?.group, fields),
+    ...grouping,
     ...sortLevels(mergeSorts(selection.sort?.sortObjs, view?.sort), fields, {
       emptiesLast: true,
     }),

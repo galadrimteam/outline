@@ -1,7 +1,8 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import styled from "styled-components";
-import { CellText, EmptyValue, InlineInput } from "./components/styles";
+import { NumberValue } from "./components/NumberValue";
+import { EmptyValue, InlineInput } from "./components/styles";
 import { isWritable } from "./editable";
 import { cellValueToText, numberInputValue, parseNumberInput } from "./format";
 import { moveCaretToEnd, useCellLocale, useCommitOnUnmount } from "./hooks";
@@ -11,7 +12,7 @@ import type {
   CellRendererProps,
 } from "./types";
 
-/** Numbers, formatted as decimal, percent or currency with the field's precision. */
+/** Numbers, formatted as decimal, percent or currency with the field's precision, as a ring or a bar when asked. */
 export const numberCell: CellDefinition = {
   Renderer: NumberRenderer,
   Editor: NumberEditor,
@@ -31,9 +32,13 @@ function NumberRenderer({ field, value, variant, wrap }: CellRendererProps) {
   }
 
   return (
-    <NumberText $variant={variant} $wrap={wrap}>
-      {text}
-    </NumberText>
+    <NumberValue
+      field={field}
+      value={value}
+      text={text}
+      variant={variant}
+      wrap={wrap}
+    />
   );
 }
 
@@ -88,11 +93,6 @@ function NumberEditor({
     />
   );
 }
-
-const NumberText = styled(CellText)`
-  font-variant-numeric: tabular-nums;
-  text-align: ${(props) => (props.$variant === "table" ? "right" : "left")};
-`;
 
 const NumberInput = styled(InlineInput)`
   font-variant-numeric: tabular-nums;

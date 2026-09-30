@@ -58,6 +58,60 @@ describe("buildDisplayRows", () => {
     ]);
   });
 
+  it("repeats the column headers and the calculations in every open group", () => {
+    const rows = buildDisplayRows({
+      records,
+      points,
+      group,
+      canCreate: true,
+      perGroupLines: true,
+      collapsed: { gB: true },
+    });
+    expect(rows.map((row) => row.key)).toEqual([
+      "group:gA",
+      "columns:gA",
+      "r1",
+      "r2",
+      'add:"A"',
+      "calculations:gA",
+      "group:gB",
+    ]);
+  });
+
+  it("closes a group with its calculations only once its rows are loaded", () => {
+    const rows = buildDisplayRows({
+      records: records.slice(0, 1),
+      points,
+      group,
+      hasMore: true,
+      perGroupLines: true,
+    });
+    expect(rows.map((row) => row.type)).toEqual(["group", "columns", "record"]);
+  });
+
+  it("repeats the lines in the groups of the last level only", () => {
+    const nested: DatabaseGroupPoint[] = [
+      { type: "header", id: "g1", depth: 0, value: "A", isCollapsed: false },
+      { type: "header", id: "g1a", depth: 1, value: "x", isCollapsed: false },
+      { type: "row", count: 3 },
+    ];
+    const rows = buildDisplayRows({
+      records,
+      points: nested,
+      group: [...group, { fieldId: "other", order: "asc" }],
+      perGroupLines: true,
+    });
+    expect(rows.map((row) => row.key)).toEqual([
+      "group:g1",
+      "group:g1a",
+      "columns:g1a",
+      "r1",
+      "r2",
+      "r3",
+      "calculations:g1a",
+    ]);
+  });
+
   it("skips the rows of folded groups", () => {
     const rows = buildDisplayRows({
       records,
@@ -101,6 +155,83 @@ describe("buildDisplayRows", () => {
       collapsed: { g1: true },
     });
     expect(folded.map((row) => row.key)).toEqual(["group:g1"]);
+  });
+});
+
+describe("sub-items", () => {
+  const parent = (id: string, children: string[]): DatabaseRecord => ({
+    id,
+    fields: { children: children.map((child) => ({ id: child })) },
+  });
+  const tree: Record<string, DatabaseRecord[]> = {
+    p1: [parent("c1", ["g1"]), parent("c2", [])],
+    c1: [parent("g1", ["p1"])],
+    g1: [parent("p1", ["c1"])],
+  };
+  const subItems = (expanded: string[]) => ({
+    hasChildren: (record: DatabaseRecord) =>
+      Array.isArray(record.fields.children) &&
+      record.fields.children.length > 0,
+    expanded: new Set(expanded),
+    childrenOf: (recordId: string) => tree[recordId],
+  });
+
+  it("nests the sub-items of unfolded rows, level by level", () => {
+    const rows = buildDisplayRows({
+      records: [parent("p1", ["c1", "c2"]), parent("p2", [])],
+      subItems: subItems(["p1", "c1"]),
+    });
+    expect(
+      rows.map((row) =>
+        row.type === "record"
+          ? `${row.key}:${row.level}:${row.hasChildren}:${row.expanded}`
+          : row.key
+      )
+    ).toEqual([
+      "p1:0:true:true",
+      "p1>c1:1:true:true",
+      "p1>c1>g1:2:true:false",
+      "p1>c2:1:false:false",
+      "p2:0:false:false",
+    ]);
+  });
+
+  it("does not unfold a row inside itself", () => {
+    const rows = buildDisplayRows({
+      records: [parent("p1", ["c1"])],
+      subItems: subItems(["p1", "c1", "g1"]),
+    });
+    expect(rows.map((row) => row.key)).toEqual([
+      "p1",
+      "p1>c1",
+      "p1>c1>g1",
+      "p1>c1>g1>p1",
+      "p1>c2",
+    ]);
+    const cycle = rows[3];
+    expect(cycle.type === "record" && cycle.expanded).toBe(false);
+  });
+
+  it("nests inside groups too", () => {
+    const rows = buildDisplayRows({
+      records: [
+        { id: "p1", fields: { status: "A", children: [{ id: "c2" }] } },
+        record("r2", "A"),
+        record("r3", "B"),
+      ],
+      points,
+      group,
+      subItems: subItems(["p1"]),
+    });
+    expect(rows.map((row) => row.key)).toEqual([
+      "group:gA",
+      "p1",
+      "p1>c1",
+      "p1>c2",
+      "r2",
+      "group:gB",
+      "r3",
+    ]);
   });
 });
 

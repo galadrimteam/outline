@@ -298,6 +298,44 @@ describe.each(stores)("OutlineEngine on %s", (_name, makeStore) => {
       ]);
     });
 
+    it("computes the calculations of each group of a grouped view", async () => {
+      const { ref, name, status } = await boardTable();
+      for (const state of ["To do", "Done", "To do"]) {
+        await engine.createRecord(ada, ref, {
+          fields: { [name]: state, [status]: state },
+        });
+      }
+      const grid = await engine.createView(ada, ref, {
+        name: "Grid",
+        type: "grid",
+      });
+      await engine.updateView(ada, ref, grid.id, {
+        group: [{ fieldId: status, order: "asc" }],
+      });
+      const points = await engine.groupPoints(ada, ref, { viewId: grid.id });
+      const headerIds: Record<string, string> = Object.fromEntries(
+        points.flatMap((point) =>
+          point.type === "header" ? [[String(point.value), point.id]] : []
+        )
+      );
+
+      const flat = await engine.aggregate(ada, ref, {
+        viewId: grid.id,
+        fieldStats: { [name]: "count" },
+      });
+      expect(flat[name]).toEqual({ value: 3 });
+
+      const grouped = await engine.aggregate(ada, ref, {
+        viewId: grid.id,
+        fieldStats: { [name]: "count" },
+        byGroup: true,
+      });
+      expect(grouped[name]).toEqual({
+        value: 3,
+        groups: { [headerIds["To do"]]: 2, [headerIds.Done]: 1 },
+      });
+    });
+
     it("keeps a record's history, newest first, with its author", async () => {
       const { ref, name } = await boardTable();
       const record = await engine.createRecord(ada, ref, {

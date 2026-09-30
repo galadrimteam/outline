@@ -49,6 +49,10 @@ export class Database extends Model {
   @observable.ref
   settings: DatabaseSettings;
 
+  /** The automations turned on, known to the people who may edit the database. */
+  @observable
+  automationCount: number | undefined;
+
   /** The columns, undefined until the schema has been fetched. */
   @observable.ref
   fields: DatabaseField[];

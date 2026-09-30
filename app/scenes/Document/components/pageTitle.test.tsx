@@ -43,6 +43,16 @@ describe("pageTitleMarginTop", () => {
     expect(iconTop).toBe(140);
   });
 
+  it("puts the title of a database page without icon where Notion puts it", () => {
+    expect(pageContentTop + pageTitleMarginTop(false, false, true)).toBe(79);
+    expect(pageTitleMarginTop(true, false, true)).toBe(
+      pageTitleMarginTop(true)
+    );
+    expect(pageTitleMarginTop(false, true, true)).toBe(
+      pageTitleMarginTop(false, true)
+    );
+  });
+
   it("always leaves room for the icon and its gap on mobile", () => {
     expect(pageTitleMarginTop(true, true)).toBeGreaterThanOrEqual(
       pageIconSize + pageIconGap
@@ -59,7 +69,7 @@ describe("pageTitleMarginTop", () => {
 describe("pageTitleStyles", () => {
   // Same shape as the title of a document: upstream margins first, in the rule
   // and in a media query, then the shared styles.
-  const Title = styled.div<{ $containsIcon: boolean }>`
+  const Title = styled.div<{ $containsIcon: boolean; $databasePage?: boolean }>`
     margin-top: 8vh;
     font-weight: 600;
 
@@ -94,6 +104,17 @@ describe("pageTitleStyles", () => {
     // Declared after the tablet media query, which also applies on paper.
     expect(css.lastIndexOf("@mediaprint")).toBeGreaterThan(
       css.lastIndexOf("margin-top:198px")
+    );
+  });
+
+  it("draws the title of a database page smaller and closer to its tabs", () => {
+    const css = cssOf(<Title $containsIcon={false} $databasePage />);
+
+    expect(css).toContain("font-size:32px");
+    expect(css).toContain("margin-top:19px");
+    expect(css).toContain("margin-bottom:8px");
+    expect(cssOf(<Title $containsIcon $databasePage />)).toContain(
+      "font-size:40px"
     );
   });
 

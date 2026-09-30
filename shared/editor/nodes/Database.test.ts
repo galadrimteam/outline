@@ -66,19 +66,21 @@ describe("Database node", () => {
         databaseId,
         viewIds: [viewId, "viwOther"],
         fullPage: true,
+        hideTitle: true,
         legacyHref,
         title: "Roadmap",
       });
       const markdown = serializer.serialize(doc).trim();
 
       expect(markdown).toContain(
-        `[Roadmap](/db/${databaseId}?views=${viewId},viwOther&full=1&from=`
+        `[Roadmap](/db/${databaseId}?views=${viewId},viwOther&full=1&notitle=1&from=`
       );
       expect(markdown).not.toContain("(old)");
 
       const restored = findNodes(parseToJSON(markdown), "database")[0];
       expect(restored.attrs?.viewIds).toEqual([viewId, "viwOther"]);
       expect(restored.attrs?.fullPage).toBe(true);
+      expect(restored.attrs?.hideTitle).toBe(true);
       expect(restored.attrs?.legacyHref).toBe(legacyHref);
       expect(restored.attrs?.title).toBe("Roadmap");
     });
@@ -91,6 +93,7 @@ describe("Database node", () => {
 
       expect(restored.attrs?.viewIds).toBeNull();
       expect(restored.attrs?.fullPage).toBe(false);
+      expect(restored.attrs?.hideTitle).toBe(false);
       expect(restored.attrs?.legacyHref).toBeNull();
     });
 
@@ -150,6 +153,7 @@ describe("Database node", () => {
         databaseId,
         viewIds: [viewId],
         fullPage: true,
+        hideTitle: true,
         legacyHref: "https://teable.example.com/framed?u=/base/bse1/tbl1",
         title: "Roadmap",
       };

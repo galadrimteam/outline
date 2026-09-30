@@ -7,6 +7,11 @@ type Props = {
   emoji: string;
   /** The size of the emoji, 24px is default to match standard icons */
   size?: number;
+  /**
+   * galadrim: draws the emoji across the whole box, like the icon of a Notion
+   * page, instead of at the size that lines it up with standard icons.
+   */
+  fullSize?: boolean;
   className?: string;
 };
 
@@ -14,10 +19,19 @@ type Props = {
  * EmojiIcon is a component that renders an emoji in the size of a standard icon
  * in a way that can be used wherever an Icon would be.
  */
-export default function EmojiIcon({ size = 24, emoji, ...rest }: Props) {
+export default function EmojiIcon({
+  size = 24,
+  emoji,
+  fullSize,
+  ...rest
+}: Props) {
   return (
     <Span $size={size} {...rest}>
-      <SVG size={size} emoji={isUUID(emoji) ? "�" : emoji} />
+      <SVG
+        size={size}
+        scale={fullSize ? 1 : 0.7}
+        emoji={isUUID(emoji) ? "�" : emoji}
+      />
     </Span>
   );
 }
@@ -29,19 +43,28 @@ const Span = styled.span<{ $size: number }>`
   height: ${(props) => props.$size}px;
 `;
 
-const SVG = ({ size, emoji }: { size: number; emoji: string }) => (
+const SVG = ({
+  size,
+  scale,
+  emoji,
+}: {
+  size: number;
+  scale: number;
+  emoji: string;
+}) => (
   <svg
     width={size}
     height={size}
     xmlns="http://www.w3.org/2000/svg"
     aria-hidden="true"
+    overflow="visible"
   >
     <text
       x="50%"
       y="55%"
       dominantBaseline="middle"
       textAnchor="middle"
-      fontSize={size * 0.7}
+      fontSize={size * scale}
     >
       {emoji}
     </text>

@@ -5,17 +5,12 @@ import {
   CaseSensitiveIcon,
   CheckboxIcon,
   ClockIcon,
-  DoneIcon,
+  GroupIcon,
   HashtagIcon,
-  LinkIcon,
-  MathIcon,
-  ProfileIcon,
   SearchIcon,
   StarredIcon,
   TargetIcon,
-  UserIcon,
   BulletedListIcon,
-  DisclosureIcon,
 } from "outline-icons";
 import type { DatabaseField } from "@shared/databases/types";
 import { DatabaseFieldType } from "@shared/databases/types";
@@ -113,32 +108,94 @@ export function FieldTypeIcon({
       return <CheckboxIcon checked size={size} />;
     case DatabaseFieldType.SingleSelect:
       return field.meta?.statusGroups ? (
-        <DoneIcon size={size} />
+        <StatusTypeIcon size={size} />
       ) : (
-        <DisclosureIcon size={size} />
+        <SelectTypeIcon size={size} />
       );
     case DatabaseFieldType.MultipleSelect:
       return <BulletedListIcon size={size} />;
     case DatabaseFieldType.Date:
       return <CalendarIcon size={size} />;
     case DatabaseFieldType.User:
-      return <UserIcon size={size} />;
+      return <GroupIcon size={size} />;
     case DatabaseFieldType.CreatedBy:
     case DatabaseFieldType.LastModifiedBy:
-      return <ProfileIcon size={size} />;
+      return <PersonTypeIcon size={size} />;
     case DatabaseFieldType.Attachment:
       return <AttachmentIcon size={size} />;
     case DatabaseFieldType.Link:
-      return <LinkIcon size={size} />;
+      return <RelationTypeIcon size={size} />;
     case DatabaseFieldType.Rollup:
     case DatabaseFieldType.ConditionalRollup:
       return <SearchIcon size={size} />;
     case DatabaseFieldType.Formula:
-      return <MathIcon size={size} />;
+      return <FormulaTypeIcon size={size} />;
     case DatabaseFieldType.CreatedTime:
     case DatabaseFieldType.LastModifiedTime:
       return <ClockIcon size={size} />;
     case DatabaseFieldType.Button:
       return <TargetIcon size={size} />;
   }
+}
+
+// galadrim: the pictograms Notion gives these property types, drawn on the
+// 24 px grid of outline-icons.
+
+function SelectTypeIcon({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 5a7 7 0 1 1 0 14 7 7 0 0 1 0-14Zm0 1.6a5.4 5.4 0 1 0 0 10.8 5.4 5.4 0 0 0 0-10.8Z" />
+      <path d="M8.9 10.6h6.2L12 14.2Z" />
+    </svg>
+  );
+}
+
+function StatusTypeIcon({ size = 24 }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+    >
+      <path
+        fill="none"
+        d="M12 5v2.6M12 16.4V19M5 12h2.6M16.4 12H19M7.05 7.05l1.84 1.84M15.11 15.11l1.84 1.84M7.05 16.95l1.84-1.84M15.11 8.89l1.84-1.84"
+      />
+    </svg>
+  );
+}
+
+function RelationTypeIcon({ size = 24 }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path fill="none" d="M7.5 16.5 16 8M9.5 7.5H16.5V14.5" />
+    </svg>
+  );
+}
+
+function FormulaTypeIcon({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M7 5.5h10v1.8H9.9l4.1 4.7-4.1 4.7H17v1.8H7v-1.6l4.6-4.9L7 7.1Z" />
+    </svg>
+  );
+}
+
+function PersonTypeIcon({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 5a7 7 0 1 1 0 14 7 7 0 0 1 0-14Zm0 1.6a5.4 5.4 0 0 0-4.1 8.9c.9-1.2 2.3-1.9 4.1-1.9s3.2.7 4.1 1.9A5.4 5.4 0 0 0 12 6.6Zm0 1.6a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6Z" />
+    </svg>
+  );
 }

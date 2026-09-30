@@ -1,7 +1,7 @@
 import type { DatabaseGroupPoint } from "@shared/databases/types";
 import { DatabaseFieldType } from "@shared/databases/types";
 import { computeBase } from "./computed/computeBase";
-import { groupPoints, groupValue } from "./groups";
+import { groupMembers, groupPoints, groupValue } from "./groups";
 import { selectRecords } from "./select";
 import {
   PARIS,
@@ -154,6 +154,82 @@ describe("groupPoints", () => {
         { fieldId: "gone", order: "asc" },
       ])
     ).toEqual([]);
+  });
+});
+
+describe("group layout", () => {
+  const group = [{ fieldId: "status", order: "asc" as const }];
+  const layout = { order: ["Doing", "", "Todo"], hidden: ["Todo"] };
+
+  it("orders the groups as the view says and leaves the folded ones out", () => {
+    const records = selectRecords(
+      table,
+      base,
+      { view: makeView({ id: "v", group }), groupLayout: layout },
+      context
+    );
+    expect(records.map((record) => record.row.id)).toEqual([
+      "rec1",
+      "rec3",
+      "rec5",
+      "rec4",
+    ]);
+    expect(shape(groupPoints(table, records, group, layout))).toEqual([
+      '0:"Doing"',
+      3,
+      "0:null",
+      1,
+    ]);
+    const members = groupMembers(table, records, group, layout);
+    expect(Array.from(members.values()).map((list) => list.length)).toEqual([
+      3, 1,
+    ]);
+  });
+
+  it("puts the groups the view does not list after the others", () => {
+    const records = selectRecords(
+      table,
+      base,
+      {
+        view: makeView({ id: "v", group }),
+        groupLayout: { order: ["Todo"] },
+      },
+      context
+    );
+    expect(
+      shape(groupPoints(table, records, group, { order: ["Todo"] }))
+    ).toEqual(['0:"Todo"', 1, "0:null", 1, '0:"Doing"', 3]);
+  });
+});
+
+describe("groupMembers", () => {
+  it("gives the records of every group under the ids of the headers", () => {
+    const group = [
+      { fieldId: "status", order: "desc" as const },
+      { fieldId: "owner", order: "asc" as const },
+    ];
+    const records = selectRecords(
+      table,
+      base,
+      { view: makeView({ id: "v", group }) },
+      context
+    );
+    const members = groupMembers(table, records, group);
+    const ids = (value: string) =>
+      (members.get(value) ?? []).map((record) => record.row.id);
+    const headers = groupPoints(table, records, group).flatMap((point) =>
+      point.type === "header" ? [point] : []
+    );
+    expect(headers.map((header) => ids(header.id))).toEqual([
+      ["rec1", "rec3", "rec5"],
+      ["rec1", "rec3"],
+      ["rec5"],
+      ["rec2"],
+      ["rec2"],
+      ["rec4"],
+      ["rec4"],
+    ]);
+    expect(members.size).toBe(headers.length);
   });
 });
 

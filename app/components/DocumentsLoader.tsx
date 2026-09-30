@@ -1,6 +1,7 @@
 import { observer } from "mobx-react";
 import * as React from "react";
 import type Collection from "~/models/Collection";
+import { retryTransient } from "~/utils/retryTransient";
 
 type Props = {
   enabled: boolean;
@@ -11,7 +12,11 @@ type Props = {
 function DocumentsLoader({ collection, enabled, children }: Props) {
   React.useEffect(() => {
     if (enabled) {
-      void collection.fetchDocuments();
+      // galadrim: a tree that failed to load while the server was busy would
+      // otherwise show its placeholder until the page is reloaded.
+      void retryTransient(() => collection.fetchDocuments()).catch(
+        () => undefined
+      );
     }
   }, [collection, enabled]);
 

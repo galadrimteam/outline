@@ -2,12 +2,14 @@ import { CloseIcon, DocumentIcon } from "outline-icons";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import styled from "styled-components";
+import styled, { css } from "styled-components";
 import type { DatabaseField, DatabaseLinkValue } from "@shared/databases/types";
 import { s } from "@shared/styles";
 import NudeButton from "~/components/NudeButton";
 import useStores from "~/hooks/useStores";
 import { databaseRowPath } from "~/utils/routeHelpers";
+import { IconGlyph } from "../RowIcon";
+import { linkIcon } from "../rowIcons";
 import { EditorPopover } from "./components/EditorPopover";
 import {
   Chips,
@@ -67,9 +69,21 @@ export function linkedRecordPath(
     : null;
 }
 
+/** How many linked rows a page property lists before « N more… », as in Notion. */
+const PropertyListLimit = 5;
+
 function LinkRenderer({ field, value, variant, wrap }: CellRendererProps) {
   const { t } = useTranslation();
+  const [expanded, setExpanded] = React.useState(false);
   const links = linksOf(value);
+
+  const handleExpand = React.useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      setExpanded(true);
+    },
+    []
+  );
 
   if (!links.length) {
     return variant === "property" ? (
@@ -77,13 +91,25 @@ function LinkRenderer({ field, value, variant, wrap }: CellRendererProps) {
     ) : null;
   }
 
+  const iconSize = variant === "card" ? 14 : 16;
+  const isList = variant === "property";
+  const listed =
+    isList && !expanded ? links.slice(0, PropertyListLimit) : links;
+  const more = links.length - listed.length;
+  const Container = isList ? LinkList : Chips;
+
   return (
-    <Chips $variant={variant} $wrap={wrap}>
-      {links.map((link) => {
+    <Container $variant={variant} $wrap={wrap}>
+      {listed.map((link) => {
         const path = linkedRecordPath(field, link.id);
+        const icon = linkIcon(link);
         const content = (
           <>
-            <DocumentIcon size={16} />
+            {icon ? (
+              <IconGlyph icon={icon} size={iconSize} />
+            ) : (
+              <DocumentIcon size={iconSize} />
+            )}
             <ChipTitle>{link.title || t("Untitled")}</ChipTitle>
           </>
         );
@@ -95,7 +121,12 @@ function LinkRenderer({ field, value, variant, wrap }: CellRendererProps) {
           <PlainChip key={link.id}>{content}</PlainChip>
         );
       })}
-    </Chips>
+      {more > 0 && (
+        <MoreButton type="button" onClick={handleExpand}>
+          {t("{{ count }} more…", { count: more })}
+        </MoreButton>
+      )}
+    </Container>
   );
 }
 
@@ -239,39 +270,57 @@ function isMultipleLink(field: DatabaseField): boolean {
   return field.isMultipleCellValue;
 }
 
-const PlainChip = styled.span`
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-  max-width: 100%;
-  flex-shrink: 0;
-  color: ${s("text")};
+const LinkList = styled(Chips)`
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+`;
 
-  svg {
-    flex-shrink: 0;
-    fill: ${s("textSecondary")};
+const MoreButton = styled.button`
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: ${s("textTertiary")};
+  cursor: var(--pointer);
+
+  &:hover {
+    color: ${s("textSecondary")};
   }
 `;
 
-const LinkChip = styled(Link)`
+const chip = css`
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
   max-width: 100%;
   flex-shrink: 0;
-  color: ${s("text")};
-  text-decoration: underline;
-  text-decoration-color: ${s("divider")};
-  text-underline-offset: 2px;
+  font-weight: 500;
 
-  svg {
+  > svg {
     flex-shrink: 0;
-    fill: ${s("textSecondary")};
+    fill: ${s("textTertiary")};
+  }
+`;
+
+const PlainChip = styled.span`
+  ${chip}
+  color: ${s("text")};
+`;
+
+/* `&&` outranks the editor's rule colouring every link of a document. */
+const LinkChip = styled(Link)`
+  ${chip}
+
+  && {
+    color: ${s("text")};
+    text-decoration: underline;
+    text-decoration-color: ${s("divider")};
+    text-underline-offset: 2px;
   }
 
-  &:hover {
+  &&:hover {
     text-decoration-color: ${s("textSecondary")};
   }
 `;

@@ -21,6 +21,7 @@ import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import styled, { css } from "styled-components";
+import { colorPalette } from "@shared/constants";
 import type { DatabaseView } from "@shared/databases/types";
 import { DatabaseLayout } from "@shared/databases/types";
 import { s } from "@shared/styles";
@@ -35,11 +36,13 @@ import { createAction } from "~/actions";
 import { useMenuAction } from "~/hooks/useMenuAction";
 import useStores from "~/hooks/useStores";
 import type Database from "~/models/Database";
+import lazyWithRetry from "~/utils/lazyWithRetry";
 import { LayoutIcon } from "./LayoutIcon";
 import { newViewSettings } from "./newViewDefaults";
 import { PanelAction } from "./toolbar/components";
 import { useIsWrapped } from "./useIsWrapped";
 import { useTabStripMetrics } from "./useTabStripMetrics";
+import { ViewIcon } from "./ViewIcon";
 import { splitTabs, stripMinimum } from "./viewTabsOverflow";
 
 interface Props {
@@ -53,7 +56,14 @@ interface Props {
   onViewCreated?: (view: DatabaseView) => void;
   /** Controls shown at the right of the tabs: toolbar, search, « New ». */
   actions?: React.ReactNode;
+  /**
+   * Drawn in place of the tabs, eg the name of a database that has a single
+   * view: Notion shows no tab then. « + » stays after it.
+   */
+  lead?: React.ReactNode;
 }
+
+const IconPicker = lazyWithRetry(() => import("~/components/IconPicker"));
 
 /** The layouts offered for a new view, in Notion's order. */
 export const creatableLayouts = [
@@ -108,6 +118,7 @@ export const ViewTabs = observer(function ViewTabs({
   onSelect,
   onViewCreated,
   actions,
+  lead,
 }: Props) {
   const { t } = useTranslation();
   const { databases, dialogs } = useStores();
@@ -196,6 +207,18 @@ export const ViewTabs = observer(function ViewTabs({
     [databases, database.id, t]
   );
 
+  const handleChangeIcon = React.useCallback(
+    (view: DatabaseView, icon: string | null) => {
+      if (icon === (view.overrides.icon ?? null)) {
+        return;
+      }
+      databases
+        .updateView(database.id, view.id, { overrides: { icon } })
+        .catch(() => toast.error(t("Couldn’t change the icon")));
+    },
+    [databases, database.id, t]
+  );
+
   const handleDuplicate = React.useCallback(
     async (view: DatabaseView) => {
       setMenuViewId(undefined);
@@ -270,66 +293,72 @@ export const ViewTabs = observer(function ViewTabs({
         id: `view-${view.id}`,
         name: view.name || t("Untitled"),
         section: "Database",
-        icon: <LayoutIcon layout={view.layout} />,
+        icon: <ViewIcon view={view} />,
         perform: () => onSelect(view.id),
       })
     )
   );
 
   return (
-    <Bar ref={barRef} $isWrapped={isWrapped}>
+    <Bar ref={barRef} data-database-chrome>
       <Strip
         ref={stripRef}
-        $isWrapped={isWrapped}
         style={{ minWidth: `min(100%, ${minStripWidth}px)` }}
       >
-        <Measure ref={measureRef} aria-hidden>
-          {views.map((view) => (
-            <Tab key={view.id} as="span" $isActive={false}>
-              <TabFace view={view} />
-            </Tab>
-          ))}
-          <MoreButton as="span">
-            {t("{{ count }} more", { count: views.length })}
-          </MoreButton>
-        </Measure>
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          modifiers={[restrictToHorizontalAxis]}
-          onDragEnd={handleDragEnd}
-        >
-          <Tabs role="tablist" aria-label={t("Views")}>
-            <SortableContext
-              items={shownViews.map((view) => view.id)}
-              strategy={horizontalListSortingStrategy}
-            >
-              {shownViews.map((view) => (
-                <ViewTab
-                  key={view.id}
-                  view={view}
-                  isActive={view.id === activeViewId}
-                  readOnly={readOnly}
-                  isMenuOpen={menuViewId === view.id}
-                  isRenaming={renamingViewId === view.id}
-                  canDelete={views.length > 1}
-                  onSelect={onSelect}
-                  onOpenMenu={setMenuViewId}
-                  onStartRename={setRenamingViewId}
-                  onRename={handleRename}
-                  onDuplicate={handleDuplicate}
-                  onDelete={handleDelete}
-                />
+        {lead ? (
+          <Lead>{lead}</Lead>
+        ) : (
+          <>
+            <Measure ref={measureRef} aria-hidden>
+              {views.map((view) => (
+                <Tab key={view.id} as="span" $isActive={false}>
+                  <TabFace view={view} />
+                </Tab>
               ))}
-            </SortableContext>
-          </Tabs>
-        </DndContext>
-        {hiddenViews.length > 0 && (
-          <DropdownMenu action={moreAction} ariaLabel={t("More views")}>
-            <MoreButton type="button">
-              {t("{{ count }} more", { count: hiddenViews.length })}
-            </MoreButton>
-          </DropdownMenu>
+              <MoreButton as="span">
+                {t("{{ count }} more…", { count: views.length })}
+              </MoreButton>
+            </Measure>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              modifiers={[restrictToHorizontalAxis]}
+              onDragEnd={handleDragEnd}
+            >
+              <Tabs role="tablist" aria-label={t("Views")}>
+                <SortableContext
+                  items={shownViews.map((view) => view.id)}
+                  strategy={horizontalListSortingStrategy}
+                >
+                  {shownViews.map((view) => (
+                    <ViewTab
+                      key={view.id}
+                      view={view}
+                      isActive={view.id === activeViewId}
+                      readOnly={readOnly}
+                      isMenuOpen={menuViewId === view.id}
+                      isRenaming={renamingViewId === view.id}
+                      canDelete={views.length > 1}
+                      onSelect={onSelect}
+                      onOpenMenu={setMenuViewId}
+                      onStartRename={setRenamingViewId}
+                      onRename={handleRename}
+                      onChangeIcon={handleChangeIcon}
+                      onDuplicate={handleDuplicate}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </SortableContext>
+              </Tabs>
+            </DndContext>
+            {hiddenViews.length > 0 && (
+              <DropdownMenu action={moreAction} ariaLabel={t("More views")}>
+                <MoreButton type="button">
+                  {t("{{ count }} more…", { count: hiddenViews.length })}
+                </MoreButton>
+              </DropdownMenu>
+            )}
+          </>
         )}
         {!readOnly && (
           <DropdownMenu action={addAction} ariaLabel={t("Add a view")}>
@@ -352,7 +381,7 @@ function TabFace({ view }: { view: DatabaseView }) {
   const { t } = useTranslation();
   return (
     <>
-      <LayoutIcon layout={view.layout} size={18} />
+      <ViewIcon view={view} size={18} />
       <TabLabel>{view.name || t("Untitled")}</TabLabel>
     </>
   );
@@ -369,6 +398,7 @@ interface ViewTabProps {
   onOpenMenu: (viewId: string | undefined) => void;
   onStartRename: (viewId: string | undefined) => void;
   onRename: (view: DatabaseView, name: string) => void;
+  onChangeIcon: (view: DatabaseView, icon: string | null) => void;
   onDuplicate: (view: DatabaseView) => void;
   onDelete: (view: DatabaseView) => void;
 }
@@ -384,6 +414,7 @@ const ViewTab = observer(function ViewTab({
   onOpenMenu,
   onStartRename,
   onRename,
+  onChangeIcon,
   onDuplicate,
   onDelete,
 }: ViewTabProps) {
@@ -434,6 +465,11 @@ const ViewTab = observer(function ViewTab({
     onStartRename(view.id);
   }, [onOpenMenu, onStartRename, view.id]);
 
+  const handleIconChange = React.useCallback(
+    (icon: string | null) => onChangeIcon(view, icon),
+    [onChangeIcon, view]
+  );
+
   return (
     <Popover open={isMenuOpen} onOpenChange={handleOpenChange}>
       <PopoverAnchor asChild>
@@ -468,6 +504,20 @@ const ViewTab = observer(function ViewTab({
         aria-label={t("View options")}
       >
         <MenuList>
+          <React.Suspense fallback={null}>
+            <ViewIconPicker
+              icon={view.overrides.icon ?? null}
+              color={colorPalette[0]}
+              initial={view.name.charAt(0)}
+              size={18}
+              popoverPosition="right"
+              allowDelete
+              onChange={handleIconChange}
+            >
+              <ViewIcon view={view} size={18} />
+              {t("Change icon")}
+            </ViewIconPicker>
+          </React.Suspense>
           <PanelAction type="button" onClick={handleRenameClick}>
             <EditIcon size={18} />
             {t("Rename")}
@@ -526,30 +576,29 @@ function RenameInput({
   );
 }
 
-const TAB_GAP = 2;
+const TAB_GAP = 4;
 const ADD_WIDTH = 28;
 
-// The toolbar wraps under the tabs when both do not fit, and the divider then
-// stays under the tabs, where the active tab draws its underline.
-const Bar = styled.div<{ $isWrapped: boolean }>`
+// Like Notion, no rule under the tabs; the toolbar wraps under them when both
+// do not fit. The block may fade the tabs and the toolbar in on hover through
+// --database-tabs-opacity and --database-actions-opacity.
+const Bar = styled.div`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   column-gap: 8px;
   min-width: 0;
-  border-bottom: 1px solid
-    ${(props) => (props.$isWrapped ? "transparent" : props.theme.divider)};
+  opacity: var(--database-tabs-opacity, 1);
+  transition: opacity 100ms ease-in-out;
 `;
 
-const Strip = styled.div<{ $isWrapped: boolean }>`
+const Strip = styled.div`
   position: relative;
   display: flex;
   align-items: center;
   gap: ${TAB_GAP}px;
   flex: 1 1 0;
-  border-bottom: 1px solid
-    ${(props) => (props.$isWrapped ? props.theme.divider : "transparent")};
-  margin-bottom: -1px;
+  min-height: 36px;
 `;
 
 const Measure = styled.div`
@@ -567,6 +616,11 @@ const Measure = styled.div`
   > * {
     flex-shrink: 0;
   }
+`;
+
+const Lead = styled.div`
+  flex: 1 1 auto;
+  min-width: 0;
 `;
 
 // Clips rather than scrolls: the tabs that do not fit are listed under « N more ».
@@ -590,15 +644,17 @@ const TabWrapper = styled.div<{ $isDragging: boolean }>`
     `}
 `;
 
+// The active tab is a grey pill, as in Notion.
 const Tab = styled.button<{ $isActive: boolean }>`
   position: relative;
   display: flex;
   align-items: center;
-  gap: 4px;
-  height: 36px;
-  padding: 0 8px;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
   border: 0;
-  background: none;
+  border-radius: 14px;
+  background: ${(props) => (props.$isActive ? pillBackground(props.theme.isDark) : "none")};
   color: ${(props) =>
     props.$isActive ? props.theme.text : props.theme.textTertiary};
   font: inherit;
@@ -607,39 +663,20 @@ const Tab = styled.button<{ $isActive: boolean }>`
   white-space: nowrap;
   cursor: var(--pointer);
   user-select: none;
+  transition: background 100ms ease-in-out;
 
-  &::before {
-    content: "";
-    position: absolute;
-    inset: 4px 0;
-    border-radius: 6px;
-    transition: background 100ms ease-in-out;
-  }
-
-  &:hover::before {
-    background: ${s("listItemHoverBackground")};
-  }
-
-  &::after {
-    content: "";
-    position: absolute;
-    left: 4px;
-    right: 4px;
-    bottom: -1px;
-    height: 2px;
-    border-radius: 1px;
-    background: ${(props) => (props.$isActive ? props.theme.text : "transparent")};
+  &:hover {
+    background: ${(props) => pillBackground(props.theme.isDark)};
   }
 
   &:focus-visible {
     outline: 2px solid ${s("accent")};
-    outline-offset: -4px;
-    border-radius: 6px;
+    outline-offset: -2px;
   }
 
   svg,
   span {
-    position: relative;
+    flex-shrink: 0;
   }
 `;
 
@@ -686,6 +723,8 @@ const MoreButton = styled.button`
   }
 `;
 
+// Shown while the tabs are hovered, like Notion's « + »; its room stays
+// reserved so that tabs do not move under the pointer.
 const AddButton = styled.button`
   display: flex;
   flex-shrink: 0;
@@ -699,6 +738,18 @@ const AddButton = styled.button`
   background: none;
   color: ${s("textTertiary")};
   cursor: var(--pointer);
+  opacity: 0;
+  transition: opacity 100ms ease-in-out;
+
+  ${Strip}:hover &,
+  &:focus-visible,
+  &[data-state="open"] {
+    opacity: 1;
+  }
+
+  @media (hover: none) {
+    opacity: 1;
+  }
 
   &:hover,
   &[data-state="open"] {
@@ -717,7 +768,36 @@ const Actions = styled.div<{ $isWrapped: boolean }>`
   max-width: 100%;
   margin-left: auto;
   padding: ${(props) => (props.$isWrapped ? "6px 0 2px" : "4px 0")};
+  opacity: var(--database-actions-opacity, 1);
+  transition: opacity 100ms ease-in-out;
 `;
+
+const ViewIconPicker = styled(IconPicker)`
+  && {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+    width: 100%;
+    height: auto;
+    min-height: 30px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    color: ${s("textSecondary")};
+    font-size: 14px;
+  }
+
+  &&:hover,
+  &&[aria-expanded="true"] {
+    background: ${s("listItemHoverBackground")};
+    color: ${s("text")};
+    box-shadow: none;
+  }
+`;
+
+function pillBackground(isDark: boolean) {
+  return isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(55, 53, 47, 0.06)";
+}
 
 const MenuList = styled.div`
   display: flex;

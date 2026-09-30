@@ -437,6 +437,44 @@ export function hrefForText(
   }
 }
 
+const UrlHead = 4;
+const UrlTail = 6;
+
+/** A URL as Notion shows it on a page: its host, then the rest cut in the middle. */
+export interface ShortUrl {
+  host: string;
+  rest: string;
+}
+
+/**
+ * Shortens a URL the way Notion's page properties do (« figma.com/des…&m=dev »): no scheme nor
+ * « www. », and a path, query and fragment longer than a few characters cut in the middle.
+ *
+ * @param href the URL.
+ * @returns the host and the rest, or undefined when the text is not an http(s) URL.
+ */
+export function shortUrl(href: string): ShortUrl | undefined {
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    return undefined;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return undefined;
+  }
+  const host = url.host.replace(/^www\./, "");
+  const full = `${url.pathname}${url.search}${url.hash}`;
+  const rest = full === "/" ? "" : full;
+  return {
+    host,
+    rest:
+      rest.length > UrlHead + UrlTail + 1
+        ? `${rest.slice(0, UrlHead)}…${rest.slice(-UrlTail)}`
+        : rest,
+  };
+}
+
 /**
  * Whether values of a field are dates (date fields, created/modified times, date formulas).
  *

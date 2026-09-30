@@ -20,6 +20,11 @@ export type Props = {
   size?: number;
   /** The initial to display if the icon is a letter icon */
   initial: string;
+  /**
+   * galadrim: draws an emoji or a custom emoji across the whole box, like the
+   * icon of a Notion page, instead of at the size of a standard icon.
+   */
+  fullSize?: boolean;
   /** Optional additional class name */
   className?: string;
   /**
@@ -35,6 +40,7 @@ const Icon = ({
   size = 24,
   initial,
   forceColor,
+  fullSize,
   className,
 }: Props) => {
   const iconType = determineIconType(icon);
@@ -63,12 +69,19 @@ const Icon = ({
     if (iconType === IconType.Custom) {
       return (
         <Span size={size} className={className}>
-          <CustomEmoji value={icon} size={size - size / 4} />
+          <CustomEmoji value={icon} size={fullSize ? size : size - size / 4} />
         </Span>
       );
     }
 
-    return <EmojiIcon emoji={icon} size={size} className={className} />;
+    return (
+      <EmojiIcon
+        emoji={icon}
+        size={size}
+        fullSize={fullSize}
+        className={className}
+      />
+    );
   } catch (_err) {
     // Ignore
   }

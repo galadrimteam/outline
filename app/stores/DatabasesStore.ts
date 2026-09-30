@@ -54,7 +54,10 @@ export interface DatabaseCreateParams {
 export interface DatabaseUpdateParams {
   title?: string;
   icon?: string | null;
-  settings?: Partial<DatabaseSettings>;
+  /** Keys to change; a null `subItemFieldId` turns sub-items off. */
+  settings?: Partial<Omit<DatabaseSettings, "subItemFieldId">> & {
+    subItemFieldId?: string | null;
+  };
 }
 
 export interface DatabaseListParams extends PaginationParams {
@@ -89,7 +92,10 @@ export interface DatabaseViewUpdateParams {
   group?: DatabaseGroup | null;
   columnMeta?: Record<string, Partial<DatabaseColumnMeta>>;
   options?: Partial<DatabaseViewOptions>;
-  overrides?: Partial<DatabaseViewOverrides>;
+  /** Overrides to change; null removes one. */
+  overrides?: {
+    [K in keyof DatabaseViewOverrides]?: DatabaseViewOverrides[K] | null;
+  };
   isLocked?: boolean;
 }
 
@@ -157,7 +163,7 @@ export function mergeViewPatch(
     isLocked: patch.isLocked ?? view.isLocked,
     columnMeta,
     options: { ...view.options, ...patch.options },
-    overrides: { ...view.overrides, ...patch.overrides },
+    overrides: mergeOverrides(view.overrides, patch.overrides),
   };
 }
 
@@ -603,3 +609,18 @@ export { DatabasesStore };
 /** The database routes that write: their change events echo the origin. */
 const writeMethod =
   /\.(create|createFromTemplate|update|convert|move|reorder|duplicate|delete|upload)$/;
+
+function mergeOverrides(
+  current: DatabaseViewOverrides,
+  patch: DatabaseViewUpdateParams["overrides"] = {}
+): DatabaseViewOverrides {
+  const next: DatabaseViewOverrides = { ...current };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null) {
+      Reflect.deleteProperty(next, key);
+    } else if (value !== undefined) {
+      Object.assign(next, { [key]: value });
+    }
+  }
+  return next;
+}

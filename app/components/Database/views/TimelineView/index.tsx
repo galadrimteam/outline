@@ -1,6 +1,12 @@
 import { addDays, differenceInCalendarDays, format } from "date-fns";
 import { observer } from "mobx-react";
-import { CollapsedIcon, PlusIcon, TableIcon } from "outline-icons";
+import {
+  BackIcon,
+  CollapsedIcon,
+  NextIcon,
+  PlusIcon,
+  TableIcon,
+} from "outline-icons";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -13,19 +19,23 @@ import type {
   DatabaseView,
 } from "@shared/databases/types";
 import { borderRadius, ellipsis, s } from "@shared/styles";
+import { Popover, PopoverTrigger } from "~/components/primitives/Popover";
+import Tooltip from "~/components/Tooltip";
 import useStores from "~/hooks/useStores";
 import type Database from "~/models/Database";
 import { isLinkItem, toArray } from "../../cells/format";
 import { getCell } from "../../cells/registry";
+import { MenuItem, MenuLabel, MenuPanel } from "../../fields/components";
 import { CompactSelect } from "../../toolbar/components";
 import type { RecordGroup } from "../../toolbar/grouping";
-import { groupRecords } from "../../toolbar/grouping";
+import { groupRecords, viewGroupLayout } from "../../toolbar/grouping";
 import { useViewUpdate } from "../../toolbar/useViewUpdate";
 import type { DatabaseViewProps } from "../../types";
 import type { DaySpan } from "../CalendarView/calendarModel";
 import { defaultDateField } from "../../newViewDefaults";
 import { recordSpan } from "../CalendarView/calendarModel";
 import { useDateLocale } from "../CalendarView/useDateLocale";
+import { GroupLabel } from "../GroupLabel";
 import {
   openableProps,
   recordColor,
@@ -40,6 +50,8 @@ import {
   dependencyPath,
   dragSpan,
   PX_PER_DAY,
+  STEP_DAYS,
+  showsTimelineTable,
   spanFields,
   timelineRange,
   timelineScale,
@@ -66,10 +78,10 @@ type TimelineRow =
 /**
  * Notion-like timeline: one bar per row from its start to its end date, on a
  * week, month, quarter or year scale, with the rows' table on the left
- * (toggleable), today's line, grouping (by a relation too) and dependency
- * arrows when the view names a self relation. Bars are dragged to move and
- * stretched by their edges to change dates; undated rows are dated by a click
- * on their line.
+ * (folded unless the view shows it), today marked in the header, previous and
+ * next buttons, grouping (by a relation too) and dependency arrows when the
+ * view names a self relation. Bars are dragged to move and stretched by their
+ * edges to change dates; rows without a date wait under « No date ».
  *
  * @param props the database, the view, its rows and the callbacks.
  * @returns the timeline.
@@ -96,8 +108,9 @@ export const TimelineView = observer(function TimelineView({
     settings.zoom ?? "month"
   );
   const [showTable, setShowTable] = React.useState(
-    settings.showTable !== false
+    showsTimelineTable(settings)
   );
+  const [focus, setFocus] = React.useState<{ day: Date; request: number }>();
   const [collapsed, setCollapsed] = React.useState<Set<string>>(new Set());
   const [preview, setPreview] = React.useState<{ id: string; span: DaySpan }>();
   const scrollerRef = React.useRef<HTMLDivElement>(null);
@@ -109,8 +122,8 @@ export const TimelineView = observer(function TimelineView({
     }
   }, [settings.zoom]);
   React.useEffect(() => {
-    setShowTable(settings.showTable !== false);
-  }, [settings.showTable]);
+    setShowTable(showsTimelineTable(settings));
+  }, [settings]);
 
   const startField = timelineStartField(database, view);
   const endField = timelineEndField(database, view, startField);
@@ -157,8 +170,14 @@ export const TimelineView = observer(function TimelineView({
     return new Date(now.getFullYear(), now.getMonth(), now.getDate());
   }, []);
   const range = React.useMemo(
-    () => timelineRange(Array.from(spans.values()), today, zoom),
-    [spans, today, zoom]
+    () =>
+      timelineRange(
+        Array.from(spans.values()),
+        today,
+        zoom,
+        focus ? [focus.day] : []
+      ),
+    [spans, today, zoom, focus]
   );
   const scale = React.useMemo(
     () => timelineScale(range.start, range.days, zoom, locale),
@@ -171,38 +190,97 @@ export const TimelineView = observer(function TimelineView({
   const groupField = groupLevel
     ? database.fieldById(groupLevel.fieldId)
     : undefined;
+  const undated = React.useMemo(
+    () => query.records.filter((record) => !spans.has(record.id)),
+    [query.records, spans]
+  );
   const rows = React.useMemo<TimelineRow[]>(() => {
+    const dated = (record: DatabaseRecord) => spans.has(record.id);
     if (!groupField) {
-      return query.records.map((record) => ({
+      return query.records.filter(dated).map((record) => ({
         type: "record",
         key: record.id,
         record,
       }));
     }
-    return groupRecords(query.records, groupField, groupLevel?.order).flatMap(
-      (group): TimelineRow[] => [
-        { type: "group", key: `group:${group.key}`, group },
-        ...(collapsed.has(group.key)
-          ? []
-          : group.records.map((record) => ({
-              type: "record" as const,
-              key: `${group.key}:${record.id}`,
-              record,
-            }))),
-      ]
-    );
-  }, [query.records, groupField, groupLevel?.order, collapsed]);
+    return groupRecords(
+      query.records,
+      groupField,
+      groupLevel?.order,
+      viewGroupLayout(view.overrides)
+    ).flatMap((group): TimelineRow[] => [
+      { type: "group", key: `group:${group.key}`, group },
+      ...(collapsed.has(group.key)
+        ? []
+        : group.records.filter(dated).map((record) => ({
+            type: "record" as const,
+            key: `${group.key}:${record.id}`,
+            record,
+          }))),
+    ]);
+  }, [
+    query.records,
+    spans,
+    groupField,
+    groupLevel?.order,
+    view.overrides,
+    collapsed,
+  ]);
 
-  const scrollToToday = React.useCallback(() => {
-    const scroller = scrollerRef.current;
-    if (!scroller) {
-      return;
+  const visibleWidth = React.useCallback(
+    (scroller: HTMLDivElement) => scroller.clientWidth - tableWidth,
+    [tableWidth]
+  );
+
+  const centerOn = React.useCallback(
+    (day: Date) => {
+      const scroller = scrollerRef.current;
+      if (!scroller) {
+        return;
+      }
+      scroller.scrollLeft = Math.max(
+        0,
+        dayToX(day, range.start, px) + px / 2 - visibleWidth(scroller) / 2
+      );
+    },
+    [range.start, px, visibleWidth]
+  );
+
+  const scrollToToday = React.useCallback(
+    () =>
+      setFocus((current) => ({
+        day: today,
+        request: (current?.request ?? 0) + 1,
+      })),
+    [today]
+  );
+
+  const handleStep = React.useCallback(
+    (direction: 1 | -1) => {
+      const scroller = scrollerRef.current;
+      if (!scroller) {
+        return;
+      }
+      const center = xToDay(
+        scroller.scrollLeft + visibleWidth(scroller) / 2,
+        range.start,
+        px
+      );
+      setFocus((current) => ({
+        day: addDays(center, direction * STEP_DAYS[zoom]),
+        request: (current?.request ?? 0) + 1,
+      }));
+    },
+    [range.start, px, visibleWidth, zoom]
+  );
+
+  const centered = React.useRef<number>();
+  React.useLayoutEffect(() => {
+    if (focus && centered.current !== focus.request) {
+      centered.current = focus.request;
+      centerOn(focus.day);
     }
-    scroller.scrollLeft = Math.max(
-      0,
-      todayX - (scroller.clientWidth - tableWidth) / 3
-    );
-  }, [todayX, tableWidth]);
+  }, [focus, centerOn]);
 
   const scrolledOnce = React.useRef(false);
 
@@ -373,18 +451,24 @@ export const TimelineView = observer(function TimelineView({
   return (
     <Wrapper aria-busy={query.isLoading}>
       <Controls>
-        <ControlButton
-          type="button"
-          aria-pressed={showTable}
-          onClick={handleToggleTable}
-        >
-          <TableIcon size={18} />
-          {showTable ? t("Hide table") : t("Show table")}
-        </ControlButton>
+        <Tooltip content={showTable ? t("Hide table") : t("Show table")}>
+          <IconButton
+            type="button"
+            aria-pressed={showTable}
+            aria-label={showTable ? t("Hide table") : t("Show table")}
+            onClick={handleToggleTable}
+          >
+            <TableIcon size={18} />
+          </IconButton>
+        </Tooltip>
+        {undated.length > 0 && (
+          <UndatedRows
+            database={database}
+            records={undated}
+            onOpen={onOpenRecord}
+          />
+        )}
         <Spacer />
-        <ControlButton type="button" onClick={scrollToToday}>
-          {t("Today")}
-        </ControlButton>
         <CompactSelect
           ariaLabel={t("Zoom")}
           value={zoom}
@@ -392,6 +476,27 @@ export const TimelineView = observer(function TimelineView({
           borderless
           onChange={handleZoom}
         />
+        <Tooltip content={t("Previous")}>
+          <IconButton
+            type="button"
+            aria-label={t("Previous")}
+            onClick={() => handleStep(-1)}
+          >
+            <BackIcon size={18} />
+          </IconButton>
+        </Tooltip>
+        <ControlButton type="button" onClick={scrollToToday}>
+          {t("Today")}
+        </ControlButton>
+        <Tooltip content={t("Next")}>
+          <IconButton
+            type="button"
+            aria-label={t("Next")}
+            onClick={() => handleStep(1)}
+          >
+            <NextIcon size={18} />
+          </IconButton>
+        </Tooltip>
       </Controls>
       <Scroller ref={scrollerRef}>
         <Canvas style={{ width: tableWidth + timelineWidth }}>
@@ -421,15 +526,13 @@ export const TimelineView = observer(function TimelineView({
                 <BottomUnit
                   key={unit.key}
                   style={{ left: unit.left, width: unit.width }}
-                  $today={
-                    zoom !== "year" &&
-                    zoom !== "quarter" &&
-                    unit.left === todayX
-                  }
                 >
                   {unit.label}
                 </BottomUnit>
               ))}
+              <TodayMarker style={{ left: todayX + px / 2 }}>
+                {format(today, "d", { locale })}
+              </TodayMarker>
             </Scale>
           </HeaderRow>
           <Body style={{ height: Math.max(rows.length + 1, 3) * ROW_HEIGHT }}>
@@ -527,7 +630,7 @@ export const TimelineView = observer(function TimelineView({
                   onClick={handleCreate}
                 >
                   <PlusIcon size={18} />
-                  {t("New")}
+                  {t("New page")}
                 </NewRow>
               </Row>
             )}
@@ -555,11 +658,9 @@ const GroupRow = observer(function GroupRow({
   width,
   onToggle,
 }: GroupRowProps) {
-  const { t } = useTranslation();
   if (!field) {
     return null;
   }
-  const { Renderer } = getCell(field.type);
 
   return (
     <GroupLine style={{ height: ROW_HEIGHT, width }}>
@@ -572,20 +673,65 @@ const GroupRow = observer(function GroupRow({
           <CollapsedIcon size={18} />
         </Chevron>
         <GroupValue>
-          {group.value === undefined ? (
-            t("No {{ name }}", { name: field.name })
-          ) : (
-            <Renderer
-              field={field}
-              value={group.value}
-              database={database}
-              variant="card"
-            />
-          )}
+          <GroupLabel database={database} field={field} value={group.value} />
         </GroupValue>
         <GroupCount>{group.records.length}</GroupCount>
       </GroupButton>
     </GroupLine>
+  );
+});
+
+interface UndatedRowsProps {
+  database: Database;
+  records: DatabaseRecord[];
+  onOpen: (recordId: string) => void;
+}
+
+/**
+ * Notion's « No date (n) »: the rows without a date, kept off the timeline and
+ * listed in a menu that opens them.
+ *
+ * @param props the rows and how to open one.
+ * @returns the button and its menu.
+ */
+const UndatedRows = observer(function UndatedRows({
+  database,
+  records,
+  onOpen,
+}: UndatedRowsProps) {
+  const { t } = useTranslation();
+  const [open, setOpen] = React.useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger>
+        <ControlButton type="button">
+          {t("No date ({{ count }})", { count: records.length })}
+        </ControlButton>
+      </PopoverTrigger>
+      <MenuPanel
+        aria-label={t("Rows without a date")}
+        side="bottom"
+        align="start"
+        width={280}
+        shrink
+      >
+        {records.map((record) => (
+          <MenuItem
+            key={record.id}
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              onOpen(record.id);
+            }}
+          >
+            <MenuLabel>
+              <RecordTitle database={database} record={record} />
+            </MenuLabel>
+          </MenuItem>
+        ))}
+      </MenuPanel>
+    </Popover>
   );
 });
 
@@ -940,6 +1086,28 @@ const Spacer = styled.div`
   flex: 1;
 `;
 
+const IconButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  ${borderRadius(6)}
+  background: none;
+  color: ${s("textTertiary")};
+  cursor: var(--pointer);
+
+  &:hover,
+  &:focus-visible,
+  &[aria-pressed="true"] {
+    background: ${s("listItemHoverBackground")};
+    color: ${s("text")};
+    outline: none;
+  }
+`;
+
 const ControlButton = styled.button`
   display: inline-flex;
   align-items: center;
@@ -1029,7 +1197,6 @@ const TopUnit = styled.div`
   color: ${s("textSecondary")};
   font-size: 12px;
   font-weight: 500;
-  text-transform: capitalize;
 
   span {
     position: sticky;
@@ -1040,19 +1207,34 @@ const TopUnit = styled.div`
   }
 `;
 
-const BottomUnit = styled.div<{ $today: boolean }>`
+const BottomUnit = styled.div`
   position: absolute;
   top: 26px;
   height: 26px;
   line-height: 26px;
-  color: ${(props) =>
-    props.$today ? props.theme.brand.red : props.theme.textTertiary};
+  color: ${s("textTertiary")};
   font-size: 11px;
-  font-weight: ${(props) => (props.$today ? 600 : 400)};
   text-align: center;
-  text-transform: capitalize;
   white-space: nowrap;
   overflow: hidden;
+`;
+
+const TodayMarker = styled.div`
+  position: absolute;
+  top: 29px;
+  z-index: 1;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  transform: translateX(-50%);
+  ${borderRadius(10)}
+  background: ${(props) => props.theme.brand.red};
+  color: ${s("white")};
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+  pointer-events: none;
 `;
 
 const Body = styled.div`
@@ -1281,6 +1463,13 @@ const GroupValue = styled.span`
 const GroupCount = styled.span`
   color: ${s("textTertiary")};
   font-size: 13px;
+  opacity: 0;
+  transition: opacity 100ms ease;
+
+  ${GroupButton}:hover &,
+  ${GroupButton}:focus-visible & {
+    opacity: 1;
+  }
 `;
 
 const NewRow = styled.button`

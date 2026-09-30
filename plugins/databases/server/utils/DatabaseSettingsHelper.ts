@@ -1,6 +1,7 @@
 import type {
   DatabaseField,
   DatabaseFieldMeta,
+  DatabaseGroupLayout,
   DatabaseSettings,
   DatabaseView,
   DatabaseViewOverrides,
@@ -13,6 +14,7 @@ export interface DatabaseSettingsPatch {
   fieldMeta?: Record<string, DatabaseFieldMeta | null>;
   pageLayout?: DatabaseSettings["pageLayout"] | null;
   iconFieldId?: string | null;
+  subItemFieldId?: string | null;
 }
 
 /**
@@ -59,6 +61,25 @@ export class DatabaseSettingsHelper {
   }
 
   /**
+   * Returns the order and the folded groups a view gives its groups (its
+   * `stackOrder` and `hiddenStacks`), for the engine to read the view's rows.
+   *
+   * @param settings the database's settings.
+   * @param viewId the view, if any.
+   * @returns the group layout, undefined when the view gives none.
+   */
+  public static groupLayout(
+    settings: DatabaseSettings | null | undefined,
+    viewId: string | undefined
+  ): DatabaseGroupLayout | undefined {
+    const overrides = viewId ? settings?.viewOverrides?.[viewId] : undefined;
+    if (!overrides?.stackOrder?.length && !overrides?.hiddenStacks?.length) {
+      return undefined;
+    }
+    return { order: overrides.stackOrder, hidden: overrides.hiddenStacks };
+  }
+
+  /**
    * Applies Outline's metadata to one field.
    *
    * @param field the engine field.
@@ -75,7 +96,8 @@ export class DatabaseSettingsHelper {
 
   /**
    * Merges a patch into settings. Top-level keys are replaced; entries of
-   * `viewOverrides` and `fieldMeta` are replaced one by one, null removes one.
+   * `viewOverrides` and `fieldMeta` are replaced one by one, null removes one;
+   * keys of `pageLayout` are replaced one by one, a null `pageLayout` removes it.
    *
    * @param settings the current settings.
    * @param patch the changes.
@@ -104,7 +126,7 @@ export class DatabaseSettingsHelper {
       if (patch.pageLayout === null) {
         delete next.pageLayout;
       } else {
-        next.pageLayout = patch.pageLayout;
+        next.pageLayout = { ...next.pageLayout, ...patch.pageLayout };
       }
     }
     if (patch.iconFieldId !== undefined) {
@@ -112,6 +134,13 @@ export class DatabaseSettingsHelper {
         delete next.iconFieldId;
       } else {
         next.iconFieldId = patch.iconFieldId;
+      }
+    }
+    if (patch.subItemFieldId !== undefined) {
+      if (patch.subItemFieldId === null) {
+        delete next.subItemFieldId;
+      } else {
+        next.subItemFieldId = patch.subItemFieldId;
       }
     }
     return next;
@@ -131,16 +160,19 @@ export class DatabaseSettingsHelper {
     const next = this.merge(settings, {
       fieldMeta: { [fieldId]: null },
       ...(settings?.iconFieldId === fieldId ? { iconFieldId: null } : {}),
+      ...(settings?.subItemFieldId === fieldId ? { subItemFieldId: null } : {}),
     });
     if (next.pageLayout) {
+      const layout = next.pageLayout;
+      const without = (ids: string[] | undefined) =>
+        ids?.filter((id) => id !== fieldId);
       next.pageLayout = {
-        ...next.pageLayout,
-        hiddenFieldIds: next.pageLayout.hiddenFieldIds?.filter(
-          (id) => id !== fieldId
-        ),
-        hideWhenEmptyFieldIds: next.pageLayout.hideWhenEmptyFieldIds?.filter(
-          (id) => id !== fieldId
-        ),
+        ...layout,
+        hiddenFieldIds: without(layout.hiddenFieldIds),
+        hideWhenEmptyFieldIds: without(layout.hideWhenEmptyFieldIds),
+        fieldOrder: without(layout.fieldOrder),
+        pinnedFieldIds: without(layout.pinnedFieldIds),
+        tabs: layout.tabs?.filter((tab) => tab.fieldId !== fieldId),
       };
     }
     return next;
@@ -201,6 +233,7 @@ function overrideKeys(
   overrides: NullableOverrides
 ): (keyof DatabaseViewOverrides)[] {
   const keys: (keyof DatabaseViewOverrides)[] = [
+    "icon",
     "layout",
     "subGroupFieldId",
     "stackOrder",
@@ -209,6 +242,9 @@ function overrideKeys(
     "openPagesIn",
     "defaultTemplateId",
     "timeline",
+    "subItems",
+    "groupCalculation",
+    "loadLimit",
   ];
   return keys.filter((key) => key in overrides);
 }

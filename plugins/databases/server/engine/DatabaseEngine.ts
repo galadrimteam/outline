@@ -7,14 +7,17 @@ import type {
   DatabaseFieldType,
   DatabaseFilter,
   DatabaseGroup,
+  DatabaseGroupLayout,
   DatabaseGroupPoint,
   DatabaseHistoryEntry,
   DatabaseLayout,
+  DatabaseLookupOptions,
   DatabaseRecord,
   DatabaseRecordOrder,
   DatabaseRecordPosition,
   DatabaseSort,
   DatabaseStatisticFunc,
+  DatabaseStatisticResult,
   DatabaseView,
   DatabaseViewOptions,
 } from "@shared/databases/types";
@@ -432,6 +435,8 @@ export interface DatabaseRecordQuery {
   /** Sorted before the view's sort. */
   sort?: DatabaseSort | null;
   search?: string;
+  /** The order of the view's groups and those it folds away (not for boards, whose columns have their own). */
+  groupLayout?: DatabaseGroupLayout;
   skip: number;
   take: number;
 }
@@ -459,6 +464,8 @@ export interface DatabaseGroupQuery {
   groupBy?: DatabaseGroup | null;
   filter?: DatabaseFilter | null;
   search?: string;
+  /** The order of the view's groups and those it folds away, when grouped as the view says. */
+  groupLayout?: DatabaseGroupLayout;
 }
 
 export interface DatabaseAggregateQuery {
@@ -466,11 +473,13 @@ export interface DatabaseAggregateQuery {
   fieldStats: Record<string, DatabaseStatisticFunc>;
   filter?: DatabaseFilter | null;
   search?: string;
+  /** Also compute each statistic per group of the view (Notion's calculation under every group). */
+  byGroup?: boolean;
+  /** The order of the view's groups and those it folds away. */
+  groupLayout?: DatabaseGroupLayout;
 }
 
-export interface DatabaseAggregateValue {
-  value: number | string | null;
-}
+export type DatabaseAggregateValue = DatabaseStatisticResult;
 
 export interface DatabaseLinkCandidateQuery {
   fieldId: string;
@@ -503,6 +512,10 @@ export interface DatabaseFieldCreate {
   name: string;
   type: DatabaseFieldType;
   options?: DatabaseFieldOptions;
+  /** The link and the field a rollup or a lookup reads through. */
+  lookupOptions?: DatabaseLookupOptions;
+  /** A lookup: the field shows the looked-up values as they are. */
+  isLookup?: boolean;
   /** The view the field is added from, where it stays visible. */
   viewId?: string;
 }
@@ -520,6 +533,9 @@ export interface DatabaseFieldDuplicate {
 export interface DatabaseFieldConvert {
   type: DatabaseFieldType;
   options?: DatabaseFieldOptions;
+  /** The link and the field a rollup or a lookup reads through; kept from the field when not given. */
+  lookupOptions?: DatabaseLookupOptions;
+  isLookup?: boolean;
 }
 
 export interface DatabaseViewCreate {

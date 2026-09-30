@@ -21,6 +21,7 @@ import type {
   DatabaseRecordPosition,
   DatabaseSort,
   DatabaseStatisticFunc,
+  DatabaseStatisticResult,
   DatabaseUserInput,
   DatabaseUserValue,
 } from "@shared/databases/types";
@@ -325,6 +326,20 @@ export class RecordQuery {
       this.scheduleRefresh();
     }
   };
+
+  /**
+   * Computes statistics over all the rows of the query, loaded or not.
+   *
+   * @param fieldStats the function per field.
+   * @returns the value per field.
+   */
+  aggregate = (
+    fieldStats: Record<string, DatabaseStatisticFunc>
+  ): Promise<Record<string, { value: number | string | null }>> =>
+    this.store.aggregate(this.databaseId, this.viewId, fieldStats, {
+      filter: combineFilters(this.params.filter, this.params.extraFilter),
+      search: this.params.search || undefined,
+    });
 
   /**
    * Applies a change made here to the loaded rows, without asking the server.
@@ -758,28 +773,30 @@ export default class DatabaseRecordsStore {
   };
 
   /**
-   * Computes column statistics (footer of a table).
+   * Computes column statistics (footer of a table), per group too with
+   * `byGroup`.
    *
    * @param databaseId the database id.
    * @param viewId the view id.
    * @param fieldStats the function per field.
-   * @param params the filter and search.
+   * @param params the filter and search, and whether to compute per group.
    * @returns the value per field.
    */
   aggregate = async (
     databaseId: string,
     viewId: string,
     fieldStats: Record<string, DatabaseStatisticFunc>,
-    params: RecordSearchParams = {}
-  ): Promise<Record<string, { value: number | string | null }>> => {
-    const res = await databaseRpc<
-      Record<string, { value: number | string | null }>
-    >("/databaseRecords.aggregate", {
-      databaseId,
-      viewId,
-      fieldStats,
-      ...params,
-    });
+    params: RecordSearchParams & { byGroup?: boolean } = {}
+  ): Promise<Record<string, DatabaseStatisticResult>> => {
+    const res = await databaseRpc<Record<string, DatabaseStatisticResult>>(
+      "/databaseRecords.aggregate",
+      {
+        databaseId,
+        viewId,
+        fieldStats,
+        ...params,
+      }
+    );
     return res.data;
   };
 

@@ -11,8 +11,20 @@ export interface TeableViewRef {
   viewId: string | null;
 }
 
+/** How the migration asks the block of an embed to look, from the query string of the `/framed` wrapper. */
+export interface TeableBlockSettings {
+  /**
+   * The views the block shows, in tab order (`views=viw1,viw2`): the views of
+   * the Notion block, which may be fewer than the table's. Null when the URL
+   * does not list them.
+   */
+  blockViewIds: string[] | null;
+  /** Whether the block hides the database name (`notitle=1`), as Notion's block did. */
+  hideTitle: boolean;
+}
+
 /** A Teable embed found in a Prosemirror document. */
-export interface TeableEmbed extends TeableViewRef {
+export interface TeableEmbed extends TeableViewRef, TeableBlockSettings {
   /** The URL of the embed. */
   href: string;
   /** Whether the embed is the only content of the document: a full-page database. */
@@ -75,6 +87,30 @@ export function parseTeableHref(href: string): TeableViewRef | null {
 }
 
 /**
+ * Reads the block settings the migration writes next to the wrapped path of a
+ * Teable embed: `/framed?u=/base/…/viw1&views=viw1,viw2&notitle=1`.
+ *
+ * @param href the URL of the embed.
+ * @returns the settings; no view list and a shown title when the URL has none.
+ */
+export function parseTeableBlockSettings(href: string): TeableBlockSettings {
+  let params: URLSearchParams;
+  try {
+    params = new URL(href).searchParams;
+  } catch {
+    return { blockViewIds: null, hideTitle: false };
+  }
+  const views = (params.get("views") ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => ViewId.test(id));
+  return {
+    blockViewIds: views.length ? [...new Set(views)] : null,
+    hideTitle: params.get("notitle") === "1",
+  };
+}
+
+/**
  * Lists the Teable embeds of a Prosemirror document, at any depth.
  *
  * @param doc the document as JSON.
@@ -116,8 +152,11 @@ export function convertTeableEmbeds(
       attrs: {
         id: createId(),
         databaseId: database.databaseId,
-        viewIds: embed.fullPage || !embed.viewId ? null : [embed.viewId],
+        viewIds:
+          embed.blockViewIds ??
+          (embed.fullPage || !embed.viewId ? null : [embed.viewId]),
         fullPage: embed.fullPage,
+        hideTitle: embed.hideTitle,
         legacyHref: embed.href,
         title: database.title || null,
       },
@@ -132,6 +171,8 @@ const ViewPath =
   /^\/base\/(bse[A-Za-z0-9]+)\/(?:table\/)?(tbl[A-Za-z0-9]+)(?:\/(viw[A-Za-z0-9]+))?\/?$/;
 
 const TeableHost = /^teable\./i;
+
+const ViewId = /^viw[A-Za-z0-9]+$/;
 
 function mapTeableEmbeds(
   node: ProsemirrorData,
@@ -176,6 +217,7 @@ function describeEmbed(
 
   return {
     ...ref,
+    ...parseTeableBlockSettings(href),
     href,
     fullPage:
       parent.type === "doc" &&

@@ -17,6 +17,7 @@ import type {
   DatabaseField,
   DatabaseRecord,
   DatabaseTimelineZoom,
+  DatabaseViewOverrides,
 } from "@shared/databases/types";
 import { calendarDayToISO, fieldTimeZone } from "../../cells/format";
 import type { DaySpan } from "../CalendarView/calendarModel";
@@ -28,6 +29,14 @@ export const PX_PER_DAY: Record<DatabaseTimelineZoom, number> = {
   month: 28,
   quarter: 10,
   year: 3,
+};
+
+/** How far the previous and next buttons move the timeline, in days, per zoom. */
+export const STEP_DAYS: Record<DatabaseTimelineZoom, number> = {
+  week: 7,
+  month: 30,
+  quarter: 91,
+  year: 365,
 };
 
 /** What a pointer drag on a bar changes. */
@@ -63,26 +72,44 @@ const PADDING_DAYS: Record<DatabaseTimelineZoom, number> = {
 const MAX_DAYS = 3650;
 
 /**
- * Returns the days the timeline covers: every bar and today, with room on
- * both sides, starting on a Monday (or a January 1st for years) so that grid
- * lines fall on weeks.
+ * Whether a timeline shows its table on the left. Notion leaves it folded
+ * unless the view says otherwise.
+ *
+ * @param timeline the timeline settings of the view.
+ * @returns true when the table is shown.
+ */
+export function showsTimelineTable(
+  timeline: DatabaseViewOverrides["timeline"]
+): boolean {
+  return timeline?.showTable === true;
+}
+
+/**
+ * Returns the days the timeline covers: every bar, today and the days the
+ * reader moved to, with room on both sides, starting on a Monday (or a
+ * January 1st for years) so that grid lines fall on weeks.
  *
  * @param spans the spans of the rows.
  * @param today the current day.
  * @param zoom the zoom level.
+ * @param visited days that must be on the timeline too.
  * @returns the first day and the number of days.
  */
 export function timelineRange(
   spans: DaySpan[],
   today: Date,
-  zoom: DatabaseTimelineZoom
+  zoom: DatabaseTimelineZoom,
+  visited: Date[] = []
 ): { start: Date; days: number } {
   const padding = PADDING_DAYS[zoom];
   const first = addDays(
-    minDate([today, ...spans.map((s) => s.start)]),
+    minDate([today, ...visited, ...spans.map((s) => s.start)]),
     -padding
   );
-  const last = addDays(maxDate([today, ...spans.map((s) => s.end)]), padding);
+  const last = addDays(
+    maxDate([today, ...visited, ...spans.map((s) => s.end)]),
+    padding
+  );
   const start =
     zoom === "year"
       ? startOfYear(first)
@@ -213,6 +240,8 @@ export function spanFields(
 /**
  * Builds the two header lines of a zoom level: months over days (week and
  * month zooms), months over weeks (quarter) or years over months (year).
+ * Months are named in full, the year only on the first one and on January,
+ * as Notion does.
  *
  * @param rangeStart the first day of the timeline.
  * @param days the number of days.
@@ -248,11 +277,18 @@ export function timelineScale(
     return result;
   };
 
+  const firstMonth = startOfMonth(rangeStart);
   const months = units(
-    startOfMonth(rangeStart),
+    firstMonth,
     (date) => addMonths(date, 1),
     (date) =>
-      format(date, zoom === "quarter" ? "MMM yyyy" : "LLLL yyyy", { locale }),
+      format(
+        date,
+        date.getTime() === firstMonth.getTime() || date.getMonth() === 0
+          ? "LLLL yyyy"
+          : "LLLL",
+        { locale }
+      ),
     "m"
   );
 

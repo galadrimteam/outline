@@ -5,15 +5,19 @@ import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "styled-components";
 import { vi } from "vitest";
 import type {
+  DatabaseField,
   DatabaseGroupPoint,
   DatabaseRecord,
+  DatabaseSettings,
   DatabaseView,
 } from "@shared/databases/types";
 import { DatabaseFieldType } from "@shared/databases/types";
 import { light } from "@shared/styles/theme";
 import { ActionContextProvider } from "~/hooks/useActionContext";
 import stores from "~/stores";
+import type { RecordQueryParams } from "~/stores/DatabaseRecordsStore";
 import { client } from "~/utils/ApiClient";
+import { rowCommentCounts } from "../../comments/rowCommentCounts";
 import { makeField, makeView } from "./testFixtures";
 import { TableView } from ".";
 
@@ -42,12 +46,45 @@ const fields = [
 ];
 
 const records: DatabaseRecord[] = [
-  { id: "rec1", fields: { name: "Maquettes", status: "Terminé", estimate: 2 } },
+  {
+    id: "rec1",
+    fields: {
+      name: "Maquettes",
+      status: "Terminé",
+      estimate: 2,
+      progress: 0.5,
+    },
+  },
   {
     id: "rec2",
     fields: { name: "Intégration", status: "À faire", estimate: 3 },
   },
   { id: "rec3", fields: { name: "Recette", status: "À faire" } },
+];
+
+const subItemFields = [
+  ...fields,
+  makeField({
+    id: "children",
+    name: "Sous-élément",
+    type: DatabaseFieldType.Link,
+    isMultipleCellValue: true,
+    options: { symmetricFieldId: "parent" },
+  }),
+  makeField({
+    id: "parent",
+    name: "Élément parent",
+    type: DatabaseFieldType.Link,
+    isMultipleCellValue: true,
+    options: { symmetricFieldId: "children" },
+  }),
+];
+
+const subItemRecords: DatabaseRecord[] = [
+  {
+    id: "sub1",
+    fields: { name: "Chat vocal", parent: [{ id: "rec1", title: "Visio" }] },
+  },
 ];
 
 const points: DatabaseGroupPoint[] = [
@@ -61,6 +98,8 @@ describe("TableView", () => {
   let container: HTMLDivElement;
   let root: Root;
   let calls: { path: string; body: Record<string, unknown> }[];
+  let listed: DatabaseRecord[];
+  let commentCounts: Record<string, number>;
 
   beforeEach(() => {
     // @ts-expect-error the flag React reads to allow act() outside of its own test utilities.
@@ -75,6 +114,8 @@ describe("TableView", () => {
     Element.prototype.scrollIntoView = vi.fn();
     globalThis.CSS ??= { escape: (value: string) => value } as typeof CSS;
     calls = [];
+    listed = records;
+    commentCounts = {};
     vi.mocked(client.post).mockReset();
     vi.mocked(client.post).mockImplementation(async (path, body) => {
       calls.push({ path, body: (body ?? {}) as Record<string, unknown> });
@@ -82,9 +123,35 @@ describe("TableView", () => {
         case "/databaseRecords.groups":
           return { data: points };
         case "/databaseRecords.aggregate":
-          return { data: { estimate: { value: 5 } } };
+          return {
+            data: {
+              estimate: {
+                value: 5,
+                ...((body as { byGroup?: boolean })?.byGroup
+                  ? { groups: { g1: 2, g2: 3 } }
+                  : {}),
+              },
+            },
+          };
         case "/databaseRecords.update":
           return { data: records[0] };
+        case "/databaseRecords.list":
+          if (JSON.stringify(body).includes("hasAnyOf")) {
+            return {
+              data: subItemRecords,
+              pagination: {
+                offset: 0,
+                limit: 200,
+                total: subItemRecords.length,
+              },
+            };
+          }
+          return {
+            data: listed,
+            pagination: { offset: 0, limit: 100, total: listed.length },
+          };
+        case "/databaseRecords.commentCounts":
+          return { data: commentCounts };
         default:
           return {
             data: records,
@@ -102,7 +169,14 @@ describe("TableView", () => {
     container.remove();
   });
 
-  async function render(view: DatabaseView) {
+  async function render(
+    view: DatabaseView,
+    options: {
+      settings?: DatabaseSettings;
+      fields?: DatabaseField[];
+      params?: RecordQueryParams;
+    } = {}
+  ) {
     const database = stores.databases.add({
       id: databaseId,
       title: "Suivi",
@@ -110,11 +184,15 @@ describe("TableView", () => {
       collectionId: "40000000-0000-4000-8000-000000000002",
       documentId: null,
       url: `/db/${databaseId}`,
-      settings: {},
-      fields,
+      settings: options.settings ?? {},
+      fields: options.fields ?? fields,
       views: [view],
     });
-    const query = stores.databaseRecords.query(databaseId, view.id, {});
+    const query = stores.databaseRecords.query(
+      databaseId,
+      view.id,
+      options.params ?? {}
+    );
     await act(async () => {
       root.render(
         <Provider rootStore={stores}>
@@ -341,7 +419,32 @@ describe("TableView", () => {
     ]);
   });
 
-  it("draws groups with their counts and the calculations", async () => {
+  it("draws the calculations of the whole table", async () => {
+    await render(
+      makeView({
+        id: "viwTable15",
+        columnMeta: { estimate: { order: 2, statisticFunc: "sum" } },
+      })
+    );
+    await wait(500);
+    expect(container.textContent).toMatch(/Sum5[.,]0/);
+  });
+
+  it("shows the open comments of a row's page after its title", async () => {
+    rowCommentCounts.invalidate(databaseId);
+    commentCounts = { rec1: 5 };
+    await render(makeView({ id: "viwTable11" }));
+    await wait(80);
+
+    const notes = container.querySelectorAll("[role='note']");
+    expect(notes).toHaveLength(1);
+    expect(notes[0].closest("[data-cell]")?.getAttribute("data-cell")).toBe(
+      "rec1:name"
+    );
+    expect(notes[0].textContent).toBe("5");
+  });
+
+  it("draws each group with its column headers and its calculations", async () => {
     await render(
       makeView({
         id: "viwTable4",
@@ -352,9 +455,96 @@ describe("TableView", () => {
     await wait(500);
     const text = container.textContent ?? "";
     expect(text.indexOf("Terminé")).toBeLessThan(text.indexOf("Maquettes"));
-    expect(text).toMatch(/Sum5[.,]0/);
+    expect(text).toMatch(/Sum2[.,]0[\s\S]*Sum3[.,]0/);
+    expect(text).not.toMatch(/Sum5/);
+    const headers = Array.from(
+      container.querySelectorAll("[role='columnheader']")
+    ).map((header) => header.textContent);
+    expect(headers).toEqual([
+      "Nom",
+      "Estimation",
+      "Statut",
+      "Nom",
+      "Estimation",
+      "Statut",
+    ]);
+    expect(
+      calls.find((call) => call.path === "/databaseRecords.aggregate")?.body
+    ).toMatchObject({ byGroup: true });
     expect(calls.some((call) => call.path === "/databaseRecords.groups")).toBe(
       true
     );
+  });
+
+  it("aligns numbers right and draws the ring a number is shown as", async () => {
+    await render(makeView({ id: "viwTable14" }), {
+      fields: [
+        ...fields,
+        makeField({
+          id: "progress",
+          name: "Avancement",
+          type: DatabaseFieldType.Formula,
+          isComputed: true,
+          cellValueType: "number",
+          options: {
+            formatting: { type: "percent", precision: 0 },
+            showAs: { type: "ring", color: "green", maxValue: 100 },
+          },
+        }),
+      ],
+    });
+    const estimate = container.querySelector(
+      "[data-cell='rec1:estimate'] span"
+    );
+    expect(estimate && getComputedStyle(estimate).textAlign).toBe("right");
+    expect(
+      container.querySelectorAll("[data-cell='rec1:progress'] svg circle")
+    ).toHaveLength(2);
+  });
+
+  it("unfolds the sub-items of a row under it", async () => {
+    listed = [
+      {
+        id: "rec1",
+        fields: { name: "Visio", children: [{ id: "sub1", title: "Chat" }] },
+      },
+      { id: "rec2", fields: { name: "Divers" } },
+    ];
+    await render(makeView({ id: "viwTable12" }), {
+      settings: { subItemFieldId: "children" },
+      fields: subItemFields,
+    });
+    expect(container.textContent).not.toContain("Chat vocal");
+    const toggles = container.querySelectorAll<HTMLElement>(
+      "[aria-label='Show sub-items']"
+    );
+    expect(toggles).toHaveLength(1);
+    await act(async () => {
+      toggles[0].click();
+    });
+    await wait(50);
+    const text = container.textContent ?? "";
+    expect(text).toContain("Chat vocal");
+    expect(text.indexOf("Chat vocal")).toBeLessThan(text.indexOf("Divers"));
+    expect(
+      calls.some(
+        (call) =>
+          call.path === "/databaseRecords.list" &&
+          JSON.stringify(call.body.filter ?? null).includes('"hasAnyOf"') &&
+          JSON.stringify(call.body.filter ?? null).includes('"rec1"')
+      )
+    ).toBe(true);
+  });
+
+  it("writes the parent of a sub-item in a flattened table", async () => {
+    listed = subItemRecords;
+    await render(
+      makeView({ id: "viwTable13", overrides: { subItems: "flattened" } }),
+      { settings: { subItemFieldId: "children" }, fields: subItemFields }
+    );
+    const title = container.querySelector("[data-cell='sub1:name']");
+    expect(title?.textContent).toContain("Chat vocal");
+    expect(title?.textContent).toContain("Visio");
+    expect(container.querySelector("[aria-label='Show sub-items']")).toBeNull();
   });
 });

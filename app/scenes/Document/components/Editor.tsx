@@ -31,8 +31,10 @@ import useQuery from "~/hooks/useQuery";
 import useStores from "~/hooks/useStores";
 import { decodeURIComponentSafe } from "~/utils/urls";
 import MultiplayerEditor from "./AsyncMultiplayerEditor";
+import { isDatabasePage } from "~/components/Database/databasePage";
 import { DatabaseProperties } from "./DatabaseProperties";
 import DocumentTitle from "./DocumentTitle";
+import { RowPageTabs } from "./RowPageTabs";
 import { first } from "es-toolkit/compat";
 import useShare from "@shared/hooks/useShare";
 import CodeWordBreak from "@shared/editor/extensions/CodeWordBreak";
@@ -221,6 +223,9 @@ function DocumentEditor(props: Props, ref: React.ForwardedRef<SharedEditor>) {
         }
         icon={document.icon}
         color={iconColor}
+        databasePage={
+          document instanceof Document && isDatabasePage(document.data)
+        }
         onChangeTitle={onChangeTitle}
         onChangeIcon={onChangeIcon}
         onGoToNextInput={handleGoToNextInput}
@@ -241,49 +246,53 @@ function DocumentEditor(props: Props, ref: React.ForwardedRef<SharedEditor>) {
           {t("Last updated")} <Time dateTime={document.updatedAt} addSuffix />
         </SharedMeta>
       ) : null}
-      {/* The editor core loads lazily and can suspend after the title and
-          meta above have mounted. A nested boundary prevents that suspension
-          from hiding mounted content, which would detach refs mid-commit. */}
-      <React.Suspense fallback={<PlaceholderDocument />}>
-        <EditorComponent
-          ref={mergeRefs([ref, editorRef, handleRefChanged])}
-          lang={getLangFor(document.language)}
-          autoFocus={!!document.title && !props.defaultValue}
-          placeholder={t("Type '/' to insert, or start writing…")}
-          scrollTo={decodeURIComponentSafe(location.hash)}
-          readOnly={readOnly}
-          userId={user?.id}
-          focusedCommentId={focusedComment?.id}
-          onClickCommentMark={
-            commentingEnabled && can.comment
-              ? handleClickCommentMark
-              : undefined
-          }
-          onCreateCommentMark={
-            commentingEnabled && can.comment ? handleDraftComment : undefined
-          }
-          onDeleteCommentMark={
-            commentingEnabled && can.comment ? handleRemoveComment : undefined
-          }
-          onOpenCommentsSidebar={
-            commentingEnabled
-              ? () => ui.setRightSidebar("comments", pane)
-              : undefined
-          }
-          onInit={handleInit}
-          onDestroy={handleDestroy}
-          onChange={updateDocState}
-          headingPrefix={
-            document instanceof Document
-              ? document.getPreference(DocumentPreference.HeadingPrefix)
-              : undefined
-          }
-          extensions={extensions}
-          editorStyle={editorStyle}
-          {...rest}
-          canComment={commentingEnabled && can.comment}
-        />
-      </React.Suspense>
+      <RowPageTabs
+        document={document instanceof Document ? document : undefined}
+      >
+        {/* The editor core loads lazily and can suspend after the title and
+            meta above have mounted. A nested boundary prevents that suspension
+            from hiding mounted content, which would detach refs mid-commit. */}
+        <React.Suspense fallback={<PlaceholderDocument />}>
+          <EditorComponent
+            ref={mergeRefs([ref, editorRef, handleRefChanged])}
+            lang={getLangFor(document.language)}
+            autoFocus={!!document.title && !props.defaultValue}
+            placeholder={t("Type '/' to insert, or start writing…")}
+            scrollTo={decodeURIComponentSafe(location.hash)}
+            readOnly={readOnly}
+            userId={user?.id}
+            focusedCommentId={focusedComment?.id}
+            onClickCommentMark={
+              commentingEnabled && can.comment
+                ? handleClickCommentMark
+                : undefined
+            }
+            onCreateCommentMark={
+              commentingEnabled && can.comment ? handleDraftComment : undefined
+            }
+            onDeleteCommentMark={
+              commentingEnabled && can.comment ? handleRemoveComment : undefined
+            }
+            onOpenCommentsSidebar={
+              commentingEnabled
+                ? () => ui.setRightSidebar("comments", pane)
+                : undefined
+            }
+            onInit={handleInit}
+            onDestroy={handleDestroy}
+            onChange={updateDocState}
+            headingPrefix={
+              document instanceof Document
+                ? document.getPreference(DocumentPreference.HeadingPrefix)
+                : undefined
+            }
+            extensions={extensions}
+            editorStyle={editorStyle}
+            {...rest}
+            canComment={commentingEnabled && can.comment}
+          />
+        </React.Suspense>
+      </RowPageTabs>
       <div ref={childRef}>{children}</div>
     </Flex>
   );

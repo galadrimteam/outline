@@ -13,13 +13,14 @@ export interface DatabaseLinkSettings {
   databaseId: string;
   viewIds: string[] | null;
   fullPage: boolean;
+  hideTitle: boolean;
   legacyHref: string | null;
 }
 
 /**
  * Writes the link of a database block, keeping its settings in the query
  * string so that a markdown round trip (`documents.update` with `text`) does
- * not lose them: `/db/<id>?views=<v1>,<v2>&full=1&from=<legacy url>`.
+ * not lose them: `/db/<id>?views=<v1>,<v2>&full=1&notitle=1&from=<legacy url>`.
  *
  * @param settings the block's settings.
  * @returns the link, bare when no setting differs from the default.
@@ -31,6 +32,9 @@ export function databaseHref(settings: DatabaseLinkSettings): string {
   }
   if (settings.fullPage) {
     params.push("full=1");
+  }
+  if (settings.hideTitle) {
+    params.push("notitle=1");
   }
   if (settings.legacyHref) {
     params.push(`from=${encodeParam(settings.legacyHref)}`);
@@ -59,6 +63,7 @@ export function parseDatabaseHref(
     databaseId: match[1].toLowerCase(),
     viewIds: views.length ? views : null,
     fullPage: params.get("full") === "1",
+    hideTitle: params.get("notitle") === "1",
     legacyHref: params.get("from") || null,
   };
 }
@@ -106,6 +111,7 @@ export default function databases(md: MarkdownIt) {
       token.attrSet("databaseId", settings.databaseId);
       token.attrSet("viewIds", settings.viewIds?.join(",") ?? "");
       token.attrSet("fullPage", settings.fullPage ? "true" : "");
+      token.attrSet("hideTitle", settings.hideTitle ? "true" : "");
       token.attrSet("legacyHref", settings.legacyHref ?? "");
       token.attrSet("title", inner.map((child) => child.content).join(""));
 

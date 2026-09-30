@@ -10,22 +10,27 @@ import type {
 } from "@shared/databases/types";
 import { borderRadius, ellipsis, s } from "@shared/styles";
 import type Database from "~/models/Database";
-import { groupPrefill, groupRecords } from "../../toolbar/grouping";
+import {
+  groupPrefill,
+  groupRecords,
+  viewGroupLayout,
+} from "../../toolbar/grouping";
 import type { DatabaseViewProps } from "../../types";
 import { GallerySection } from "../GalleryView";
 import {
   CardProperties,
   openableProps,
   RecordTitle,
-  recordIcon,
   visibleCardFields,
 } from "../GalleryView/cards";
 import { CommentCount } from "../../comments/CommentCount";
+import { IconGlyph, useRowIcon } from "../../RowIcon";
 
 /**
  * Notion-like list: one compact line per row, its page icon and title on the
  * left, the visible properties on the right; grouped in sections when the
- * view is grouped.
+ * view is grouped. Inline in a page, it shows the view's load limit of rows
+ * before « Load more ».
  *
  * @param props the database, the view, its rows and the callbacks.
  * @returns the list.
@@ -76,24 +81,27 @@ export const ListView = observer(function ListView({
   return (
     <Wrapper aria-busy={query.isLoading}>
       {groupField
-        ? groupRecords(query.records, groupField, groupLevel?.order).map(
-            (group) => {
-              const value = groupPrefill(groupField, group);
-              return (
-                <GallerySection
-                  key={group.key}
-                  database={database}
-                  field={groupField}
-                  group={group}
-                >
-                  {renderRows(
-                    group.records,
-                    value === undefined ? undefined : { [groupField.id]: value }
-                  )}
-                </GallerySection>
-              );
-            }
-          )
+        ? groupRecords(
+            query.records,
+            groupField,
+            groupLevel?.order,
+            viewGroupLayout(view.overrides)
+          ).map((group) => {
+            const value = groupPrefill(groupField, group);
+            return (
+              <GallerySection
+                key={group.key}
+                database={database}
+                field={groupField}
+                group={group}
+              >
+                {renderRows(
+                  group.records,
+                  value === undefined ? undefined : { [groupField.id]: value }
+                )}
+              </GallerySection>
+            );
+          })
         : renderRows(query.records)}
       {query.isLoaded && !query.records.length && !canCreate && (
         <Empty>{t("No pages to show")}</Empty>
@@ -124,18 +132,20 @@ const ListRow = observer(function ListRow({
   fields,
   onOpen,
 }: RowProps) {
-  const hasIcon = !!recordIcon(database, record);
+  const icon = useRowIcon(database, record);
 
   return (
-    <Row role="listitem">
+    <div role="listitem">
       <RowButton {...openableProps(() => onOpen(record.id))}>
-        {!hasIcon && (
-          <PageIcon>
+        <PageIcon>
+          {icon ? (
+            <IconGlyph icon={icon} size={18} />
+          ) : (
             <DocumentIcon size={18} />
-          </PageIcon>
-        )}
+          )}
+        </PageIcon>
         <Title>
-          <RecordTitle database={database} record={record} />
+          <RecordTitle database={database} record={record} showIcon={false} />
         </Title>
         <Right>
           <CardProperties
@@ -151,33 +161,29 @@ const ListRow = observer(function ListRow({
           />
         </Right>
       </RowButton>
-    </Row>
+    </div>
   );
 });
 
 const Wrapper = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 4px;
   padding: 4px 0 16px;
 `;
 
 const Rows = styled.div`
   display: flex;
   flex-direction: column;
-  border-top: 1px solid ${s("divider")};
-`;
-
-const Row = styled.div`
-  border-bottom: 1px solid ${s("divider")};
+  gap: 2px;
 `;
 
 const RowButton = styled.div`
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 4px 6px;
+  gap: 6px;
+  min-height: 30px;
+  padding: 2px 6px;
   ${borderRadius(4)}
   cursor: var(--pointer);
 
@@ -218,9 +224,10 @@ const NewRow = styled.button`
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 34px;
-  padding: 4px 6px;
+  min-height: 30px;
+  padding: 2px 6px;
   border: 0;
+  ${borderRadius(4)}
   background: none;
   color: ${s("textTertiary")};
   font-size: 14px;

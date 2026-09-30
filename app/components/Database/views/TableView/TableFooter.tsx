@@ -33,8 +33,8 @@ interface Props {
 }
 
 /**
- * The line of calculations under the table (Notion's "Calculate"): one per column, picked from
- * the functions the engine offers for its type and saved in the view.
+ * The line of calculations under the table or under a group (Notion's "Calculate"): one per
+ * column, picked from the functions the engine offers for its type and saved in the view.
  *
  * @param props the columns and the results.
  * @returns the footer line.
@@ -159,7 +159,11 @@ const FooterColumn = observer(function FooterColumn_({
   );
 });
 
+// A narrow column shortens the name of the calculation, never its value.
 const Label = styled.span`
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-transform: uppercase;
   letter-spacing: 0.02em;
   font-size: 11px;
@@ -167,6 +171,7 @@ const Label = styled.span`
 `;
 
 const Value = styled.span`
+  flex-shrink: 0;
   font-size: 13px;
   color: ${s("textSecondary")};
   font-variant-numeric: tabular-nums;

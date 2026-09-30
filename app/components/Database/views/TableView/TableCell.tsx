@@ -2,14 +2,17 @@ import { observer } from "mobx-react";
 import { SidebarIcon } from "outline-icons";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
+import styled from "styled-components";
 import type {
   DatabaseCellInput,
   DatabaseRecord,
 } from "@shared/databases/types";
 import type Database from "~/models/Database";
 import { getCell } from "../../cells/registry";
+import { CommentCount } from "../../comments/CommentCount";
+import { RowIcon } from "../../RowIcon";
 import type { TableColumn } from "./layout";
-import { Cell, OpenButton, RowIcon } from "./styles";
+import { Cell, OpenButton } from "./styles";
 
 interface Props {
   database: Database;
@@ -21,7 +24,14 @@ interface Props {
   initialInput?: string;
   /** Room to keep on the left when the cell is scrolled into view. */
   scrollMarginLeft: number;
+  /** Whether the content shows on several lines. */
   wrap: boolean;
+  /** Whether rows can be taller than a line: cells then start at the top, like Notion's. */
+  alignTop: boolean;
+  /** Drawn before the value (the sub-item toggle of a title). */
+  leading?: React.ReactNode;
+  /** Drawn after the value (the parents of a sub-item). */
+  trailing?: React.ReactNode;
   readOnly: boolean;
   /** Makes the cell active, and starts editing it when `edit` is set. */
   onActivate: (recordId: string, fieldId: string, edit: boolean) => void;
@@ -54,6 +64,9 @@ export const TableCell = observer(function TableCell_({
   initialInput,
   scrollMarginLeft,
   wrap,
+  alignTop,
+  leading,
+  trailing,
   readOnly,
   onActivate,
   onChange,
@@ -66,9 +79,6 @@ export const TableCell = observer(function TableCell_({
   const cell = getCell(field.type);
   const editable = !readOnly && !!cell.Editor && cell.isEditable(field);
   const value = record.fields[field.id];
-  const iconFieldId = database.settings?.iconFieldId;
-  const icon =
-    field.isPrimary && iconFieldId ? record.fields[iconFieldId] : undefined;
 
   const handleClick = React.useCallback(() => {
     onActivate(record.id, field.id, editable);
@@ -128,14 +138,24 @@ export const TableCell = observer(function TableCell_({
       $left={column.left}
       $scrollMarginLeft={column.frozen ? 0 : scrollMarginLeft}
       $active={isActive}
-      $wrap={wrap}
+      $top={alignTop}
       $editable={editable}
+      $primary={field.isPrimary}
       onClick={handleClick}
     >
-      {typeof icon === "string" && icon && (
-        <RowIcon aria-hidden>{icon}</RowIcon>
+      {leading}
+      {field.isPrimary && (
+        <TitleIcon database={database} record={record} size={18} />
       )}
       {content}
+      {!isEditing && trailing}
+      {field.isPrimary && !isEditing && (
+        <TitleCommentCount
+          databaseId={database.id}
+          recordId={record.id}
+          documentId={record.documentId}
+        />
+      )}
       {field.isPrimary && !isEditing && (
         <OpenButton
           type="button"
@@ -150,3 +170,12 @@ export const TableCell = observer(function TableCell_({
     </Cell>
   );
 });
+
+const TitleIcon = styled(RowIcon)`
+  margin-right: 6px;
+`;
+
+const TitleCommentCount = styled(CommentCount)`
+  flex-shrink: 0;
+  margin-left: 6px;
+`;

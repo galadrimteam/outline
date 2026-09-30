@@ -9,6 +9,7 @@ import type { APIContext } from "@server/types";
 import { databaseRecordFromTemplateCreator } from "../commands/databaseRecordFromTemplateCreator";
 import { engineFor } from "../engine";
 import { presentDatabaseRecord } from "../presenters/databaseRecords";
+import { actorFor } from "../utils/actor";
 import { rowCommentCounts } from "../utils/rowCommentCounts";
 import {
   DatabaseRateLimit,
@@ -60,7 +61,7 @@ router.post(
 
     ctx.body = {
       data: {
-        record: await presentDatabaseRecord(database, record),
+        record: await presentDatabaseRecord(database, record, actorFor(user)),
         document: await presentDocument(ctx, document),
       },
       policies: presentPolicies(user, [document]),

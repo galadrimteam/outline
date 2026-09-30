@@ -57,6 +57,7 @@ describe("DatabaseSettingsHelper", () => {
         },
         fieldMeta: { fldA: { endFieldId: "fldB" } },
         iconFieldId: "fldIcon",
+        subItemFieldId: "fldSub",
       },
       {
         viewOverrides: { viwA: { openPagesIn: "fullPage" }, viwB: null },
@@ -67,26 +68,92 @@ describe("DatabaseSettingsHelper", () => {
     expect(settings).toEqual({
       viewOverrides: { viwA: { openPagesIn: "fullPage" } },
       fieldMeta: { fldA: { endFieldId: "fldB" } },
+      subItemFieldId: "fldSub",
     });
+    expect(
+      DatabaseSettingsHelper.merge(settings, { subItemFieldId: null })
+    ).not.toHaveProperty("subItemFieldId");
   });
 
   it("merges a view's overrides key by key", () => {
     const settings = DatabaseSettingsHelper.mergeViewOverrides(
       { viewOverrides: { viwA: { cardSize: "small", hiddenStacks: [""] } } },
       "viwA",
-      { hiddenStacks: null, stackOrder: ["Done", "To do"] }
+      { hiddenStacks: null, stackOrder: ["Done", "To do"], subItems: "off" }
     );
 
     expect(settings.viewOverrides).toEqual({
-      viwA: { cardSize: "small", stackOrder: ["Done", "To do"] },
+      viwA: {
+        cardSize: "small",
+        stackOrder: ["Done", "To do"],
+        subItems: "off",
+      },
     });
 
     const emptied = DatabaseSettingsHelper.mergeViewOverrides(
       settings,
       "viwA",
-      { cardSize: null, stackOrder: null }
+      { cardSize: null, stackOrder: null, subItems: null }
     );
     expect(emptied.viewOverrides).toEqual({});
+  });
+
+  it("gives the engine the order and the folded groups of a view", () => {
+    const settings = {
+      viewOverrides: {
+        viwA: { stackOrder: ["S1", ""], hiddenStacks: [""] },
+        viwB: { cardSize: "small" as const },
+      },
+    };
+    expect(DatabaseSettingsHelper.groupLayout(settings, "viwA")).toEqual({
+      order: ["S1", ""],
+      hidden: [""],
+    });
+    expect(DatabaseSettingsHelper.groupLayout(settings, "viwB")).toBe(
+      undefined
+    );
+    expect(DatabaseSettingsHelper.groupLayout(settings, undefined)).toBe(
+      undefined
+    );
+  });
+
+  it("keeps a board's calculation and an inline load limit", () => {
+    const settings = DatabaseSettingsHelper.mergeViewOverrides({}, "viwA", {
+      groupCalculation: { func: "sum", fieldId: "fldEstimate" },
+      loadLimit: 10,
+    });
+
+    expect(settings.viewOverrides).toEqual({
+      viwA: {
+        groupCalculation: { func: "sum", fieldId: "fldEstimate" },
+        loadLimit: 10,
+      },
+    });
+
+    const cleared = DatabaseSettingsHelper.mergeViewOverrides(
+      settings,
+      "viwA",
+      { groupCalculation: null }
+    );
+    expect(cleared.viewOverrides).toEqual({ viwA: { loadLimit: 10 } });
+  });
+
+  it("keeps and removes a view's icon", () => {
+    const settings = DatabaseSettingsHelper.mergeViewOverrides(
+      { viewOverrides: { viwA: { cardSize: "small" } } },
+      "viwA",
+      { icon: "map" }
+    );
+    expect(settings.viewOverrides).toEqual({
+      viwA: { cardSize: "small", icon: "map" },
+    });
+
+    const cleared = DatabaseSettingsHelper.mergeViewOverrides(
+      settings,
+      "viwA",
+      { icon: null }
+    );
+    expect(cleared.viewOverrides).toEqual({ viwA: { cardSize: "small" } });
   });
 
   it("forgets a deleted field", () => {
@@ -94,14 +161,68 @@ describe("DatabaseSettingsHelper", () => {
       {
         fieldMeta: { fldA: {}, fldB: {} },
         iconFieldId: "fldA",
-        pageLayout: { hiddenFieldIds: ["fldA", "fldB"], hideEmpty: true },
+        pageLayout: {
+          hiddenFieldIds: ["fldA", "fldB"],
+          hideEmpty: true,
+          fieldOrder: ["fldB", "fldA"],
+          pinnedFieldIds: ["fldA"],
+        },
+        subItemFieldId: "fldA",
       },
       "fldA"
     );
 
     expect(settings.fieldMeta).toEqual({ fldB: {} });
     expect(settings.iconFieldId).toBeUndefined();
+    expect(settings.subItemFieldId).toBeUndefined();
     expect(settings.pageLayout?.hiddenFieldIds).toEqual(["fldB"]);
     expect(settings.pageLayout?.hideEmpty).toBe(true);
+    expect(settings.pageLayout?.fieldOrder).toEqual(["fldB"]);
+    expect(settings.pageLayout?.pinnedFieldIds).toEqual([]);
+  });
+
+  it("merges the page layout key by key, its tabs kept", () => {
+    const tabs = [
+      { id: "tabContent", kind: "content" as const },
+      { id: "tabTasks", kind: "relation" as const, fieldId: "fldTasks" },
+    ];
+    const withTabs = DatabaseSettingsHelper.merge(
+      { pageLayout: { hiddenFieldIds: ["fldA"] } },
+      { pageLayout: { tabs } }
+    );
+    expect(withTabs.pageLayout).toEqual({ hiddenFieldIds: ["fldA"], tabs });
+
+    const hidden = DatabaseSettingsHelper.merge(withTabs, {
+      pageLayout: { hiddenFieldIds: [], hideEmpty: true },
+    });
+    expect(hidden.pageLayout).toEqual({
+      hiddenFieldIds: [],
+      hideEmpty: true,
+      tabs,
+    });
+
+    expect(
+      DatabaseSettingsHelper.merge(hidden, { pageLayout: null }).pageLayout
+    ).toBeUndefined();
+  });
+
+  it("drops the relation tab of a deleted field", () => {
+    const settings = DatabaseSettingsHelper.withoutField(
+      {
+        pageLayout: {
+          tabs: [
+            { id: "tabContent", kind: "content" },
+            { id: "tabTasks", kind: "relation", fieldId: "fldTasks" },
+            { id: "tabBugs", kind: "relation", fieldId: "fldBugs" },
+          ],
+        },
+      },
+      "fldTasks"
+    );
+
+    expect(settings.pageLayout?.tabs?.map((tab) => tab.id)).toEqual([
+      "tabContent",
+      "tabBugs",
+    ]);
   });
 });

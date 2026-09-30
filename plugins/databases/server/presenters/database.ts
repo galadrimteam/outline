@@ -8,6 +8,8 @@ export interface PresentedDatabaseForUser extends PresentedDatabase {
   externalBaseId?: string;
   /** The engine table, for admins only (migration tools). */
   externalTableId?: string;
+  /** The automations turned on, for the people who may edit the database. */
+  automationCount?: number;
 }
 
 /**

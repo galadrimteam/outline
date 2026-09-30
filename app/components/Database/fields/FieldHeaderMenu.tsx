@@ -1,6 +1,7 @@
 import { observer } from "mobx-react";
 import {
   BackIcon,
+  CheckmarkIcon,
   DuplicateIcon,
   EditIcon,
   HiddenIcon,
@@ -9,6 +10,7 @@ import {
   PinIcon,
   SortAscendingIcon,
   SortDescendingIcon,
+  TextWrapIcon,
   TrashIcon,
 } from "outline-icons";
 import * as React from "react";
@@ -18,6 +20,7 @@ import type {
   DatabaseSortOrder,
   DatabaseView,
 } from "@shared/databases/types";
+import { DatabaseLayout } from "@shared/databases/types";
 import ConfirmationDialog from "~/components/ConfirmationDialog";
 import { Popover, PopoverTrigger } from "~/components/primitives/Popover";
 import useStores from "~/hooks/useStores";
@@ -25,6 +28,7 @@ import type Database from "~/models/Database";
 import { visibilityPatch } from "../toolbar/columns";
 import { FilterIcon } from "../toolbar/icons";
 import { viewDrafts } from "../toolbar/viewDrafts";
+import { columnWraps } from "../views/TableView/layout";
 import { FieldKindIcon } from "./FieldKindIcon";
 import { FieldKindList } from "./FieldKindList";
 import { FieldOptionsPanel } from "./FieldOptionsPanel";
@@ -198,6 +202,22 @@ export const FieldHeaderMenu = observer(function FieldHeaderMenu_({
         .catch(() => undefined);
     }
   }, [close, database.id, field.id, stores, view]);
+
+  const wraps =
+    view?.layout === DatabaseLayout.Table
+      ? columnWraps(view, field.id)
+      : undefined;
+
+  const handleWrap = React.useCallback(() => {
+    close();
+    if (view) {
+      void stores.databases
+        .updateView(database.id, view.id, {
+          columnMeta: { [field.id]: { wrap: !wraps } },
+        })
+        .catch(() => undefined);
+    }
+  }, [close, database.id, field.id, stores, view, wraps]);
 
   const handleInsert = React.useCallback(
     async (side: "left" | "right") => {
@@ -388,6 +408,18 @@ export const FieldHeaderMenu = observer(function FieldHeaderMenu_({
                   <MenuItem type="button" onClick={handleHide}>
                     <HiddenIcon size={18} />
                     <MenuLabel>{t("Hide in view")}</MenuLabel>
+                  </MenuItem>
+                )}
+                {wraps !== undefined && (
+                  <MenuItem
+                    type="button"
+                    role="menuitemcheckbox"
+                    aria-checked={wraps}
+                    onClick={handleWrap}
+                  >
+                    <TextWrapIcon size={18} />
+                    <MenuLabel>{t("Wrap text")}</MenuLabel>
+                    {wraps && <CheckmarkIcon size={18} />}
                   </MenuItem>
                 )}
                 <MenuItem type="button" onClick={handleFreeze}>

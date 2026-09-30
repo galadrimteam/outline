@@ -1,4 +1,4 @@
-import styled, { useTheme } from "styled-components";
+import styled, { css, useTheme } from "styled-components";
 import type { DatabaseSelectChoice } from "@shared/databases/types";
 import { toneColors } from "../../colors";
 
@@ -8,6 +8,15 @@ interface Props {
   /** Draws the dot of a status before the name. */
   status?: boolean;
 }
+
+const pillFontSize = "--database-pill-font-size";
+const pillHeight = "--database-pill-height";
+
+/** Draws the pills inside a container at the size of Notion's cards. */
+export const compactPills = css`
+  ${pillFontSize}: 12px;
+  ${pillHeight}: 18px;
+`;
 
 /**
  * A select option as a coloured pill, with a dot for status options like Notion.
@@ -38,11 +47,11 @@ const Pill = styled.span<{ $status: boolean }>`
   flex-shrink: 0;
   min-width: 0;
   max-width: 100%;
-  height: 20px;
+  height: var(${pillHeight}, 20px);
   padding: 0 ${(props) => (props.$status ? "8px 0 7px" : "6px")};
   border-radius: ${(props) => (props.$status ? "10px" : "3px")};
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(${pillFontSize}, 14px);
+  line-height: var(${pillHeight}, 20px);
   white-space: nowrap;
 `;
 
