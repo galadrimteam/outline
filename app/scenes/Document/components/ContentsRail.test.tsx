@@ -38,6 +38,7 @@ describe("ContentsRail", () => {
   let root: Root;
 
   beforeEach(() => {
+    // @ts-expect-error the flag React reads to allow act() outside of its own test utilities.
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
     container = document.createElement("div");
     document.body.appendChild(container);

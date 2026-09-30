@@ -116,7 +116,7 @@ describe("DatabaseProperties", () => {
       collectionId: "40000000-0000-4000-8000-000000000003",
       databaseId,
       databaseRecordId: "rec1",
-      parentDocumentId: home,
+      parentDocumentId: home ?? undefined,
     });
 
     await act(async () => {
