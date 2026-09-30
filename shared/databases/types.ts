@@ -455,6 +455,20 @@ export interface DatabaseHistoryEntry {
   createdBy: DatabaseUserValue | null;
 }
 
+/** A tab of a row page (Notion's page layout). */
+export interface DatabasePageTab {
+  /** Stable id of the tab (the Notion view id when imported). */
+  id: string;
+  /** "content": the page's own body. "relation": the rows a relation field of this database links to. */
+  kind: "content" | "relation";
+  /** Label; the content tab defaults to t("Content"), a relation tab to its field's name. */
+  name?: string;
+  /** kind "relation": a link (relation) field of THIS database. */
+  fieldId?: string;
+  /** kind "relation": fields of the LINKED database shown as columns, in order. Absent: its primary field only. */
+  visibleFieldIds?: string[];
+}
+
 /** Settings Outline keeps on a database (column `databases.settings`). */
 export interface DatabaseSettings {
   viewOverrides?: Record<string, DatabaseViewOverrides>;
@@ -465,6 +479,8 @@ export interface DatabaseSettings {
     hideWhenEmptyFieldIds?: string[];
     /** Hide every empty property on row pages. */
     hideEmpty?: boolean;
+    /** The tabs under the properties (Notion's page layout); none shows the body alone. */
+    tabs?: DatabasePageTab[];
   };
   /** The field holding a row's emoji (the migration writes one called « Icon »). */
   iconFieldId?: string;

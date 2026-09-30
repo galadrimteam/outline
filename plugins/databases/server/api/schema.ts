@@ -296,6 +296,18 @@ const zFieldMeta = z.object({
   endFieldId: zIdOrEmpty,
 });
 
+const zPageTab = z
+  .object({
+    id: zEngineId,
+    kind: z.enum(["content", "relation"]),
+    name: z.string().max(1000).optional(),
+    fieldId: zEngineId.optional(),
+    visibleFieldIds: z.array(zEngineId).max(500).optional(),
+  })
+  .refine((tab) => tab.kind !== "relation" || !!tab.fieldId, {
+    error: "a relation tab needs a fieldId",
+  });
+
 const zSettingsPatch = z.object({
   viewOverrides: z.record(zEngineId, zViewOverrides.nullable()).optional(),
   fieldMeta: z.record(zEngineId, zFieldMeta.nullable()).optional(),
@@ -304,6 +316,7 @@ const zSettingsPatch = z.object({
       hiddenFieldIds: z.array(zEngineId).max(500).optional(),
       hideWhenEmptyFieldIds: z.array(zEngineId).max(500).optional(),
       hideEmpty: z.boolean().optional(),
+      tabs: z.array(zPageTab).max(20).optional(),
     })
     .nullish(),
   iconFieldId: zEngineId.nullish(),

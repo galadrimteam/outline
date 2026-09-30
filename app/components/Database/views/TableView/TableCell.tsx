@@ -9,6 +9,7 @@ import type {
 } from "@shared/databases/types";
 import type Database from "~/models/Database";
 import { getCell } from "../../cells/registry";
+import { CommentCount } from "../../comments/CommentCount";
 import { RowIcon } from "../../RowIcon";
 import type { TableColumn } from "./layout";
 import { Cell, OpenButton } from "./styles";
@@ -137,6 +138,13 @@ export const TableCell = observer(function TableCell_({
       )}
       {content}
       {field.isPrimary && !isEditing && (
+        <TitleCommentCount
+          databaseId={database.id}
+          recordId={record.id}
+          documentId={record.documentId}
+        />
+      )}
+      {field.isPrimary && !isEditing && (
         <OpenButton
           type="button"
           data-open-button
@@ -153,4 +161,9 @@ export const TableCell = observer(function TableCell_({
 
 const TitleIcon = styled(RowIcon)`
   margin-right: 6px;
+`;
+
+const TitleCommentCount = styled(CommentCount)`
+  flex-shrink: 0;
+  margin-left: 6px;
 `;

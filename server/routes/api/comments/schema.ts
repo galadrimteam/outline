@@ -10,6 +10,11 @@ const BaseIdSchema = z.object({
   id: z.uuid(),
 });
 
+const pastDate = (field: string) =>
+  z.coerce.date().refine((date) => date < new Date(), {
+    error: `${field} must be in the past`,
+  });
+
 const CommentsSortParamsSchema = z.object({
   /** Specifies the attributes by which comments will be sorted in the list */
   sort: z
@@ -82,6 +87,64 @@ export const CommentsCreateSchema = BaseSchema.extend({
 });
 
 export type CommentsCreateReq = z.infer<typeof CommentsCreateSchema>;
+
+export const CommentsImportSchema = BaseSchema.extend({
+  body: z
+    .object({
+      /** The comment's id, derived from the source so that a replay finds it */
+      id: z.uuid(),
+
+      /** The document the comment belongs to */
+      documentId: z.uuid(),
+
+      /** The thread the comment replies to, imported before it */
+      parentCommentId: z.uuid().nullish(),
+
+      /** The author, a user of the team */
+      createdById: z.uuid(),
+
+      /** When the author wrote the comment */
+      createdAt: pastDate("createdAt"),
+
+      /** The comment as ProseMirror data */
+      data: ProsemirrorSchema({ schema: commentSchema }).nullish(),
+
+      /** The comment as Markdown */
+      text: z.string().nullish(),
+
+      /** When the thread was resolved, ignored on a reply which follows its thread */
+      resolvedAt: pastDate("resolvedAt").nullish(),
+
+      /** Who resolved the thread, a user of the team: the author when omitted */
+      resolvedById: z.uuid().nullish(),
+
+      /**
+       * Plain text to anchor the thread to, ignored on a reply. The comment
+       * stays a document comment when the text is not found.
+       */
+      anchorText: z.string().nullish(),
+
+      /** Plain text immediately preceding `anchorText` in the document */
+      anchorPrefix: z.string().nullish(),
+
+      /** Plain text immediately following `anchorText` in the document */
+      anchorSuffix: z.string().nullish(),
+    })
+    .refine((obj) => !(isEmpty(obj.data) && isEmpty(obj.text)), {
+      error: "One of data or text is required",
+    })
+    .refine(
+      (obj) => !((obj.anchorPrefix || obj.anchorSuffix) && !obj.anchorText),
+      {
+        error: "anchorPrefix and anchorSuffix require anchorText",
+      }
+    )
+    .refine((obj) => !(obj.resolvedById && !obj.resolvedAt), {
+      error: "resolvedById requires resolvedAt",
+    }),
+});
+
+export type CommentsImportReq = z.infer<typeof CommentsImportSchema>;
 
 export const CommentsUpdateSchema = BaseSchema.extend({
   body: BaseIdSchema.extend({

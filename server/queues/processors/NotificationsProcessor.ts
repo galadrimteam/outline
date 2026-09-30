@@ -120,6 +120,11 @@ export default class NotificationsProcessor extends BaseProcessor {
   }
 
   async commentCreated(event: CommentEvent) {
+    // an imported comment is history: nobody is told about it again
+    if (event.name === "comments.create" && event.data?.source === "import") {
+      return;
+    }
+
     await new CommentCreatedNotificationsTask().schedule(event);
   }
 

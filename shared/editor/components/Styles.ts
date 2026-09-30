@@ -786,6 +786,17 @@ width: 100%;
     margin-top: 1em;
   }
 
+  /* galadrim: the paragraphs a list item holds after its own text are blocks of
+     their own in Notion, 10px under that text and 16px apart (« —> » answers
+     under a question); glued into one block of lines here otherwise. */
+  li > p + p {
+    margin-top: 10px;
+  }
+
+  li > p + p + p {
+    margin-top: 16px;
+  }
+
   [data-heading-prefix]::before {
     content: attr(data-heading-prefix);
     color: ${props.theme.text};
