@@ -38,6 +38,28 @@ describe("columns", () => {
     ]);
   });
 
+  it("keeps the title where the view puts it", () => {
+    const notionOrder = {
+      columnMeta: { a: { order: 0 }, title: { order: 1 }, b: { order: 2 } },
+    };
+    expect(orderedFields(fields, notionOrder).map((f) => f.id)).toEqual([
+      "a",
+      "title",
+      "b",
+      "c",
+    ]);
+  });
+
+  it("puts the title first when the view gives it no place", () => {
+    const partial = { columnMeta: { b: { order: 0 }, a: { order: 1 } } };
+    expect(orderedFields(fields, partial).map((f) => f.id)).toEqual([
+      "title",
+      "b",
+      "a",
+      "c",
+    ]);
+  });
+
   it("hides with the flag of the view type", () => {
     expect(isFieldVisible(grid, fields[2])).toBe(false);
     expect(isFieldVisible(grid, fields[3])).toBe(true);

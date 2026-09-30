@@ -21,7 +21,7 @@ const notes = makeField({ id: "notes", type: DatabaseFieldType.LongText });
 const fields = [title, status, done, notes];
 
 describe("tableColumns", () => {
-  it("orders visible columns by the view, the title first", () => {
+  it("orders visible columns by the view, the title at its place", () => {
     const view = makeView({
       columnMeta: {
         title: { order: 3 },
@@ -32,11 +32,11 @@ describe("tableColumns", () => {
     });
     const columns = tableColumns(fields, view);
     expect(columns.map((column) => column.field.id)).toEqual([
-      "title",
       "done",
       "status",
+      "title",
     ]);
-    expect(columns[2].width).toBe(150);
+    expect(columns[1].width).toBe(150);
   });
 
   it("freezes columns up to the frozen field, else the first one", () => {
