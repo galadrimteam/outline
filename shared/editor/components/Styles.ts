@@ -782,6 +782,19 @@ width: 100%;
   h2 { margin-top: 36px; }
   h3 { margin-top: 32px; }
 
+  /* galadrim: a toggle heading keeps the room Notion leaves above a heading
+     (upstream: the 0.5em of any block, 55px between two toggle h2 instead of
+     Notion's 67px). */
+  .${EditorStyleHelper.toggleBlock}:has(> .${EditorStyleHelper.toggleBlockContent} > .${EditorStyleHelper.toggleBlockHead} > h1) {
+    margin-top: 40px;
+  }
+  .${EditorStyleHelper.toggleBlock}:has(> .${EditorStyleHelper.toggleBlockContent} > .${EditorStyleHelper.toggleBlockHead} > h2) {
+    margin-top: 36px;
+  }
+  .${EditorStyleHelper.toggleBlock}:has(> .${EditorStyleHelper.toggleBlockContent} > .${EditorStyleHelper.toggleBlockHead} > h3) {
+    margin-top: 32px;
+  }
+
   & > p + p {
     margin-top: 1em;
   }
@@ -1003,6 +1016,10 @@ th .image .image-wrapper img {
     object-fit: cover;
     object-position: center;
   }
+}
+
+.${EditorStyleHelper.tableFitContent} table {
+  width: auto;
 }
 
 .${EditorStyleHelper.tableFullWidth} {
@@ -1441,7 +1458,7 @@ blockquote {
   &::before {
     content: "";
     display: inline-block;
-    width: 2px;
+    width: 3px;
     border-radius: 1px;
     position: absolute;
     margin-left: -1.5em;
@@ -1844,7 +1861,11 @@ code {
   font-size: 90%;
 
   &.inline {
-    color: ${props.theme.codeKeyword};
+    color: ${props.theme.codeInline};
+    background: ${props.theme.codeInlineBackground};
+    border-color: transparent;
+    padding: 0.2em 0.4em;
+    font-size: 85%;
   }
 
   .${EditorStyleHelper.codeWord} {
@@ -2163,6 +2184,8 @@ table {
     padding: 4px 8px;
     text-align: start;
     font-weight: normal;
+    /* galadrim: Notion's tables are set at 14px. */
+    font-size: 14px;
     border-left: 1px solid ${props.theme.divider};
     border-top: 1px solid ${props.theme.divider};
   }
@@ -2865,6 +2888,16 @@ li > .${EditorStyleHelper.toggleBlock} {
     &:has(+ .${EditorStyleHelper.toggleBlockContent} > .${EditorStyleHelper.toggleBlockHead} > h4) {
       --line-height: calc(var(--line-height-h) + 0.2);
       --font-size: var(--font-size-h4);
+    }
+
+    /* galadrim: Notion's heading toggles have a larger, solid triangle. */
+    &:has(+ .${EditorStyleHelper.toggleBlockContent} > .${EditorStyleHelper.toggleBlockHead} > :is(h1, h2, h3)) {
+      opacity: 1;
+
+      > svg {
+        width: 17px;
+        height: 34px;
+      }
     }
 
     color: ${props.theme.text};

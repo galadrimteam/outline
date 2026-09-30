@@ -137,6 +137,9 @@ export class EditorStyleHelper {
   /** Full-width table layout */
   static readonly tableFullWidth = "table-full-width";
 
+  /** galadrim: a table without column widths, as wide as its content like Notion's simple tables */
+  static readonly tableFitContent = "table-fit-content";
+
   /** Shadow on the right side of the table */
   static readonly tableShadowRight = "table-shadow-right";
 

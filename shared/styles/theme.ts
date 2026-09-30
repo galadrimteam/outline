@@ -179,9 +179,13 @@ export const buildLightTheme = (input: Partial<Colors>): DefaultTheme => {
     tooltipText: colors.white,
     toastBackground: colors.white,
     toastText: colors.almostBlack,
-    quote: colors.slateLight,
+    // galadrim: Notion draws quotes with a bar of the text colour.
+    quote: "#2c2c2b",
     codeBackground: colors.smoke,
     codeBorder: colors.smokeDark,
+    // galadrim: Notion's inline code (upstream: dark blue on the code block grey).
+    codeInline: "#eb5757",
+    codeInlineBackground: "rgba(135, 131, 120, 0.15)",
     embedBorder: colors.slateLight,
     horizontalRule: colors.smokeDark,
     progressBarBackground: colors.slateLight,
@@ -249,6 +253,8 @@ export const buildDarkTheme = (input: Partial<Colors>): DefaultTheme => {
     code: colors.almostWhite,
     codeBackground: "#1d202a",
     codeBorder: colors.white10,
+    codeInline: "#ff7369",
+    codeInlineBackground: "rgba(135, 131, 120, 0.15)",
     codeComment: "#6a9955",
     codePunctuation: "#b3b3b3",
     codeProperty: "#b5cea8",
