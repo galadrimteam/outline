@@ -27,6 +27,7 @@ import {
 } from "./cards";
 import { CommentCount } from "../../comments/CommentCount";
 import { GroupLabel } from "../GroupLabel";
+import { SubItemCount } from "../SubItemCount";
 
 /**
  * Notion-like gallery: cards with a cover image (the view's cover property),
@@ -226,6 +227,7 @@ const GalleryCard = observer(function GalleryCard({
           fields={fields}
           showNames={showNames}
         />
+        <SubItemCount database={database} record={record} />
         <CommentCount
           databaseId={database.id}
           recordId={record.id}

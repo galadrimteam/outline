@@ -752,6 +752,8 @@
   "No date ({{ count }})_plural": "No date ({{ count }})",
   "Rows without a date": "Rows without a date",
   "Hide sub-items": "Hide sub-items",
+  "{{ count }} sub-items": "{{ count }} sub-item",
+  "{{ count }} sub-items_plural": "{{ count }} sub-items",
   "Drag to move, drag an edge to change a date": "Drag to move, drag an edge to change a date",
   "Couldn’t move the view": "Couldn’t move the view",
   "Couldn’t add the view": "Couldn’t add the view",
