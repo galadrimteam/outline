@@ -35,6 +35,26 @@ describe("pageFields", () => {
     ).toEqual(["notes", "status"]);
   });
 
+  it("follows the page order of the layout, then the table for the others", () => {
+    const priority = makeField({ id: "priority" });
+    const table = makeView({
+      id: "table",
+      columnMeta: {
+        notes: { order: 0 },
+        priority: { order: 1 },
+        status: { order: 2 },
+      },
+    });
+    expect(
+      pageFields(
+        [title, icon, status, notes, priority],
+        [table],
+        "icon",
+        ["status", "notes"]
+      ).map((field) => field.id)
+    ).toEqual(["status", "notes", "priority"]);
+  });
+
   it("shows a date range as one property, its start", () => {
     const start = makeField({
       id: "start",
@@ -81,8 +101,22 @@ describe("splitPageProperties", () => {
   });
 
   it("shows everything by default", () => {
-    expect(
-      splitPageProperties([status, notes], record, undefined).hidden
-    ).toEqual([]);
+    const split = splitPageProperties([status, notes], record, undefined);
+    expect(split.hidden).toEqual([]);
+    expect(split.pinned).toBe(false);
+  });
+
+  it("shows only the pinned properties, in their order, the others behind details", () => {
+    const priority = makeField({ id: "priority" });
+    const split = splitPageProperties([status, notes, priority], record, {
+      pinnedFieldIds: ["priority", "gone", "status"],
+      hideEmpty: true,
+    });
+    expect(split.pinned).toBe(true);
+    expect(split.shown.map((field) => field.id)).toEqual([
+      "priority",
+      "status",
+    ]);
+    expect(split.hidden.map((field) => field.id)).toEqual(["notes"]);
   });
 });

@@ -10,8 +10,8 @@ import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import styled from "styled-components";
-import type { DatabaseCellInput } from "@shared/databases/types";
+import styled, { css } from "styled-components";
+import type { DatabaseCellInput, DatabaseField } from "@shared/databases/types";
 import { s } from "@shared/styles";
 import { AddFieldButton } from "~/components/Database/fields/AddFieldButton";
 import { CustomizePageMenu } from "~/components/Database/fields/CustomizePageMenu";
@@ -33,8 +33,10 @@ interface Props {
 
 /**
  * The properties of a database row, under the title of its page, like Notion: one line per
- * property edited in place, "Add a property", the properties hidden by the page layout behind a
- * toggle, "Customize page", and a link back to the database. Values follow the database live.
+ * property edited in place, the properties hidden by the page layout behind « N more properties »
+ * (or, with pinned properties, every other one behind « Show details »), then, on hover, "Add a
+ * property", "Customize page" and the history. A link back to the database shows only when the
+ * breadcrumb does not lead to it. Values follow the database live.
  *
  * @param props the row page and whether it is read-only.
  * @returns the properties, or nothing while they load or when the database cannot be read.
@@ -92,47 +94,64 @@ export const DatabaseProperties = observer(function DatabaseProperties_({
   const fields = pageFields(
     database.fields,
     database.views,
-    database.settings?.iconFieldId
+    database.settings?.iconFieldId,
+    layout?.fieldOrder
   );
-  const { shown, hidden } = splitPageProperties(fields, record, layout);
-  const listed = showHidden ? [...shown, ...hidden] : shown;
+  const { shown, hidden, pinned } = splitPageProperties(fields, record, layout);
+  const inBreadcrumb =
+    !!database.documentId && database.documentId === document.parentDocumentId;
+  const collapsed = hidden.length > 0 && !showHidden;
+
+  const renderRow = (field: DatabaseField, stacked: boolean) => (
+    <PropertyRow
+      key={field.id}
+      database={database}
+      field={field}
+      record={record}
+      readOnly={readOnly}
+      stacked={stacked}
+      onChange={handleChange}
+      onChangeFields={handleChangeFields}
+    />
+  );
+
+  const toggle = hidden.length > 0 && (
+    <Action
+      type="button"
+      aria-expanded={showHidden}
+      onClick={() => setShowHidden((value) => !value)}
+    >
+      <Chevron $open={showHidden}>
+        <CollapsedIcon size={18} />
+      </Chevron>
+      {pinned
+        ? showHidden
+          ? t("Hide details")
+          : t("Show details")
+        : showHidden
+          ? t("Hide {{ count }} properties", { count: hidden.length })
+          : t("{{ count }} more properties", { count: hidden.length })}
+    </Action>
+  );
 
   return (
     <Wrapper aria-label={t("Properties")}>
-      <Back to={database.url || `/db/${database.id}`}>
-        <DatabaseIcon size={16} />
-        <span>{database.title || t("Untitled database")}</span>
-      </Back>
+      {!inBreadcrumb && (
+        <Back to={database.url || `/db/${database.id}`}>
+          <DatabaseIcon size={16} />
+          <span>{database.title || t("Untitled database")}</span>
+        </Back>
+      )}
 
-      {listed.map((field) => (
-        <PropertyRow
-          key={field.id}
-          database={database}
-          field={field}
-          record={record}
-          readOnly={readOnly}
-          onChange={handleChange}
-          onChangeFields={handleChangeFields}
-        />
-      ))}
+      {pinned && <Actions>{toggle}</Actions>}
+      {shown.map((field) => renderRow(field, pinned))}
+      {showHidden && hidden.map((field) => renderRow(field, false))}
 
       <Actions>
-        {hidden.length > 0 && (
-          <Action
-            type="button"
-            onClick={() => setShowHidden((value) => !value)}
-          >
-            <Chevron $open={showHidden}>
-              <CollapsedIcon size={18} />
-            </Chevron>
-            {showHidden
-              ? t("Hide {{ count }} properties", { count: hidden.length })
-              : t("{{ count }} more properties", { count: hidden.length })}
-          </Action>
-        )}
+        {!pinned && toggle}
         {!readOnly && (
           <AddFieldButton database={database}>
-            <Action type="button">
+            <Action type="button" $onHover={collapsed}>
               <PlusIcon size={18} />
               {t("Add a property")}
             </Action>
@@ -140,7 +159,7 @@ export const DatabaseProperties = observer(function DatabaseProperties_({
         )}
         {!readOnly && (
           <CustomizePageMenu database={database} fields={fields}>
-            <Action type="button">
+            <Action type="button" $onHover>
               <SettingsIcon size={18} />
               {t("Customize page")}
             </Action>
@@ -149,6 +168,7 @@ export const DatabaseProperties = observer(function DatabaseProperties_({
         <Action
           type="button"
           aria-expanded={showHistory}
+          $onHover={!showHistory}
           onClick={() => setShowHistory((value) => !value)}
         >
           <HistoryIcon size={18} />
@@ -197,7 +217,8 @@ const Actions = styled.div`
   margin-top: 4px;
 `;
 
-const Action = styled.button`
+/** A button of the panel; `$onHover` ones only show while the panel is hovered or focused. */
+const Action = styled.button<{ $onHover?: boolean }>`
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -220,6 +241,19 @@ const Action = styled.button`
     color: ${s("textSecondary")};
     background: ${s("listItemHoverBackground")};
   }
+
+  ${(props) =>
+    props.$onHover &&
+    css`
+      opacity: 0;
+      transition: opacity 100ms ease;
+
+      ${Wrapper}:hover &,
+      ${Wrapper}:focus-within &,
+      &[data-state="open"] {
+        opacity: 1;
+      }
+    `}
 `;
 
 const Chevron = styled.span<{ $open: boolean }>`

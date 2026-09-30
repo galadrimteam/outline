@@ -281,6 +281,7 @@ const zFieldMeta = z.object({
     .record(z.string().max(1000), z.enum(DatabaseStatusGroup))
     .optional(),
   endFieldId: zIdOrEmpty,
+  icon: z.string().min(1).max(100).optional(),
 });
 
 const zSettingsPatch = z.object({
@@ -291,6 +292,8 @@ const zSettingsPatch = z.object({
       hiddenFieldIds: z.array(zEngineId).max(500).optional(),
       hideWhenEmptyFieldIds: z.array(zEngineId).max(500).optional(),
       hideEmpty: z.boolean().optional(),
+      fieldOrder: z.array(zEngineId).max(500).optional(),
+      pinnedFieldIds: z.array(zEngineId).max(500).optional(),
     })
     .nullish(),
   iconFieldId: zEngineId.nullish(),

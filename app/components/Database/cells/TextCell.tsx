@@ -14,7 +14,7 @@ import {
   InlineInput,
 } from "./components/styles";
 import { isWritable } from "./editable";
-import { cellValueToText, hrefForText } from "./format";
+import { cellValueToText, hrefForText, shortUrl } from "./format";
 import {
   moveCaretToEnd,
   stopPropagation,
@@ -57,16 +57,28 @@ function TextRenderer({ field, value, variant, wrap }: CellRendererProps) {
 
   const href = hrefForText(text, field.options.showAs?.type);
   if (href) {
+    const short =
+      variant === "property" && field.options.showAs?.type === "url"
+        ? shortUrl(href)
+        : undefined;
     return (
       <CellLink
         href={href}
         target="_blank"
         rel="noopener noreferrer"
+        title={short ? text : undefined}
         $variant={variant}
         $wrap={wrap}
         onClick={stopPropagation}
       >
-        {text}
+        {short ? (
+          <>
+            {short.host}
+            <UrlRest>{short.rest}</UrlRest>
+          </>
+        ) : (
+          text
+        )}
       </CellLink>
     );
   }
@@ -241,4 +253,8 @@ const Textarea = styled.textarea`
   line-height: 1.5;
   color: ${s("text")};
   background: transparent;
+`;
+
+const UrlRest = styled.span`
+  color: ${s("textTertiary")};
 `;

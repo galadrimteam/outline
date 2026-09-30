@@ -107,6 +107,8 @@ export interface DatabaseFieldMeta {
   statusGroups?: Record<string, DatabaseStatusGroup>;
   /** The field holding the end of a date range whose start is this field. */
   endFieldId?: string;
+  /** The icon shown instead of the type icon: an emoji, an icon name or a custom emoji id. */
+  icon?: string;
 }
 
 /** Where a lookup field or a rollup reads: through a link of its table, a field of the linked table. */
@@ -443,6 +445,16 @@ export interface DatabaseSettings {
     hideWhenEmptyFieldIds?: string[];
     /** Hide every empty property on row pages. */
     hideEmpty?: boolean;
+    /**
+     * The order of the properties on row pages (Notion's page order); the others follow in the
+     * order of the database's first table.
+     */
+    fieldOrder?: string[];
+    /**
+     * Notion's page layout with pinned properties: only these show on row pages, in this order,
+     * every other one behind « Show details ».
+     */
+    pinnedFieldIds?: string[];
   };
   /** The field holding a row's emoji (the migration writes one called « Icon »). */
   iconFieldId?: string;
