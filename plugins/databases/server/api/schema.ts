@@ -190,6 +190,7 @@ const zColumnMeta = z.object({
   visible: z.boolean().optional(),
   required: z.boolean().optional(),
   statisticFunc: zStatisticFunc.nullable().optional(),
+  wrap: z.boolean().nullable().optional(),
 });
 
 /** An id the app clears with "": dropped on creation. */

@@ -215,7 +215,8 @@ export const Cell = styled.div<{
   $frozen?: boolean;
   $left?: number;
   $active?: boolean;
-  $wrap?: boolean;
+  /** Content starts at the top of the cell rather than in its middle. */
+  $top?: boolean;
   $editable?: boolean;
   /** Room kept on the left when the cell is scrolled into view, under the frozen columns. */
   $scrollMarginLeft?: number;
@@ -223,10 +224,10 @@ export const Cell = styled.div<{
   position: relative;
   scroll-margin-left: ${(props) => props.$scrollMarginLeft ?? 0}px;
   display: flex;
-  align-items: ${(props) => (props.$wrap ? "flex-start" : "center")};
+  align-items: ${(props) => (props.$top ? "flex-start" : "center")};
   min-width: 0;
   min-height: 100%;
-  padding: ${(props) => (props.$wrap ? "7px 8px" : "0 8px")};
+  padding: ${(props) => (props.$top ? "7px 8px" : "0 8px")};
   overflow: hidden;
   cursor: ${(props) => (props.$editable ? "text" : "default")};
   ${cellLine}

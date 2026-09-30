@@ -23,6 +23,8 @@ export interface TableColumn {
   frozen: boolean;
   /** Offset from the left edge of the table, for frozen columns. */
   left: number;
+  /** Whether its cells show their whole content on several lines. */
+  wrap: boolean;
 }
 
 /** How tall rows are and whether their cells wrap. */
@@ -72,8 +74,8 @@ export function clampColumnWidth(width: number): number {
 }
 
 /**
- * The visible columns of a table view, in the view's order, with their width and frozen state.
- * Columns up to `options.frozenFieldId` are frozen; without it, the first column is.
+ * The visible columns of a table view, in the view's order, with their width, frozen state and
+ * wrapping. Columns up to `options.frozenFieldId` are frozen; without it, the first column is.
  *
  * @param fields the database fields.
  * @param view the view.
@@ -100,10 +102,28 @@ export function tableColumns(
       view.columnMeta[field.id]?.width ??
       defaultColumnWidth(field);
     const frozen = index <= frozenIndex;
-    const column = { field, width, frozen, left };
+    const wrap = columnWraps(view, field.id);
+    const column = { field, width, frozen, left, wrap };
     left += width;
     return column;
   });
+}
+
+/**
+ * Whether a column of a table shows its cells on several lines: as its own `columnMeta.wrap` says
+ * (Notion's « Wrap column »), else as the view's row height does.
+ *
+ * @param view the view.
+ * @param fieldId the field of the column.
+ * @returns true when the column wraps.
+ */
+export function columnWraps(
+  view: Pick<DatabaseView, "columnMeta" | "options">,
+  fieldId: string
+): boolean {
+  return (
+    view.columnMeta[fieldId]?.wrap ?? rowLayout(view.options.rowHeight).wrap
+  );
 }
 
 /**
@@ -143,6 +163,26 @@ export function rowLayout(
     default:
       return { height: 36, wrap: false, autoFit: false };
   }
+}
+
+/**
+ * The row layout of a table: its view's row height, grown to fit the content of short rows when
+ * one of their columns wraps.
+ *
+ * @param rowHeight the view option.
+ * @param columns the columns of the table.
+ * @returns the row layout.
+ */
+export function tableRowLayout(
+  rowHeight: DatabaseViewOptions["rowHeight"],
+  columns: Pick<TableColumn, "wrap">[]
+): RowLayout {
+  const layout = rowLayout(rowHeight);
+  if (layout.autoFit || layout.wrap) {
+    return layout;
+  }
+  const wraps = columns.some((column) => column.wrap);
+  return wraps ? { ...layout, wrap: true, autoFit: true } : layout;
 }
 
 /**

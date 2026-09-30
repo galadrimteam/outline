@@ -21,7 +21,10 @@ interface Props {
   initialInput?: string;
   /** Room to keep on the left when the cell is scrolled into view. */
   scrollMarginLeft: number;
+  /** Whether the content shows on several lines. */
   wrap: boolean;
+  /** Whether rows can be taller than a line: cells then start at the top, like Notion's. */
+  alignTop: boolean;
   readOnly: boolean;
   /** Makes the cell active, and starts editing it when `edit` is set. */
   onActivate: (recordId: string, fieldId: string, edit: boolean) => void;
@@ -54,6 +57,7 @@ export const TableCell = observer(function TableCell_({
   initialInput,
   scrollMarginLeft,
   wrap,
+  alignTop,
   readOnly,
   onActivate,
   onChange,
@@ -128,7 +132,7 @@ export const TableCell = observer(function TableCell_({
       $left={column.left}
       $scrollMarginLeft={column.frozen ? 0 : scrollMarginLeft}
       $active={isActive}
-      $wrap={wrap}
+      $top={alignTop}
       $editable={editable}
       onClick={handleClick}
     >

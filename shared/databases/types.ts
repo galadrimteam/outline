@@ -261,6 +261,8 @@ export interface DatabaseColumnMeta {
   visible?: boolean;
   required?: boolean;
   statisticFunc?: DatabaseStatisticFunc | null;
+  /** Wraps the column's text on several lines (Notion's « Wrap column »); unset follows the view's row height. */
+  wrap?: boolean | null;
 }
 
 /** Options stored by the engine, per view type. */

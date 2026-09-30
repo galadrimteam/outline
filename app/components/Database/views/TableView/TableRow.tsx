@@ -22,10 +22,11 @@ interface Props {
   template: string;
   index: number;
   start: number;
-  wrap: boolean;
   /** Row height; the minimum height when rows fit their content. */
   height: number;
   autoFit: boolean;
+  /** Whether rows can be taller than a line of text. */
+  tall: boolean;
   readOnly: boolean;
   /** Whether rows can be dragged to a new place (no sort on the view). */
   draggable: boolean;
@@ -66,9 +67,9 @@ export const TableRow = observer(function TableRow_({
   template,
   index,
   start,
-  wrap,
   height,
   autoFit,
+  tall,
   readOnly,
   draggable,
   isSelected,
@@ -151,7 +152,8 @@ export const TableRow = observer(function TableRow_({
             activeFieldId === column.field.id ? editInput : undefined
           }
           scrollMarginLeft={scrollMarginLeft}
-          wrap={wrap}
+          wrap={column.wrap}
+          alignTop={tall}
           readOnly={readOnly}
           onActivate={onActivate}
           onChange={onChange}

@@ -17,7 +17,7 @@ import { borderRadius, s } from "@shared/styles";
 import Switch from "~/components/Switch";
 import useStores from "~/hooks/useStores";
 import type Database from "~/models/Database";
-import { orderedFields } from "./columns";
+import { orderedFields, wrapResetPatch } from "./columns";
 import {
   CompactSelect,
   PanelDivider,
@@ -217,7 +217,10 @@ const LayoutOptions = observer(function LayoutOptions({
               checked={rowHeight === "autoFit"}
               disabled={disabled}
               onChange={(wrap) =>
-                setOptions({ rowHeight: wrap ? "autoFit" : "short" })
+                onUpdate({
+                  options: { rowHeight: wrap ? "autoFit" : "short" },
+                  columnMeta: wrapResetPatch(view),
+                })
               }
             />
           </Setting>

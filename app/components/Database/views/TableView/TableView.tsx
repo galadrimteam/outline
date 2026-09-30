@@ -34,7 +34,7 @@ import { getCell } from "../../cells/registry";
 import { orderPatch, orderedFields } from "../../toolbar/columns";
 import type { DatabaseViewProps } from "../../types";
 import { GroupAddRow, GroupHeaderRow } from "./GroupRows";
-import { GUTTER_WIDTH, moveId, rowLayout, tableColumns } from "./layout";
+import { GUTTER_WIDTH, moveId, tableColumns, tableRowLayout } from "./layout";
 import { moveCell, navigationKey } from "./navigation";
 import type { AddDisplayRow, GroupPathItem, RecordDisplayRow } from "./rows";
 import { buildDisplayRows, dropSide, pathChange, pathPrefill } from "./rows";
@@ -120,7 +120,7 @@ export const TableView = observer(function TableView_({
     () => tableColumns(fields ?? [], view, widths),
     [fields, view, widths]
   );
-  const layout = rowLayout(view.options.rowHeight);
+  const layout = tableRowLayout(view.options.rowHeight, columns);
   const template = `${GUTTER_WIDTH}px ${columns
     .map((column) => `${column.width}px`)
     .join(" ")} minmax(${ADD_COLUMN_WIDTH}px, 1fr)`;
@@ -829,9 +829,9 @@ export const TableView = observer(function TableView_({
                     template={template}
                     index={item.index}
                     start={start}
-                    wrap={layout.wrap}
                     height={layout.height}
                     autoFit={layout.autoFit}
+                    tall={layout.wrap}
                     readOnly={readOnly}
                     draggable={draggable}
                     isSelected={selectedIds.includes(row.record.id)}

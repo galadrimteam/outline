@@ -114,3 +114,22 @@ export function orderPatch(
   });
   return patch;
 }
+
+/**
+ * Returns the column meta changes that make every column of a view follow
+ * the view's wrapping again, like Notion's « Wrap all columns ».
+ *
+ * @param view the view.
+ * @returns the column meta changes, by field id.
+ */
+export function wrapResetPatch(
+  view: Pick<DatabaseView, "columnMeta">
+): Record<string, Partial<DatabaseColumnMeta>> {
+  const patch: Record<string, Partial<DatabaseColumnMeta>> = {};
+  for (const [fieldId, meta] of Object.entries(view.columnMeta)) {
+    if (meta.wrap !== undefined && meta.wrap !== null) {
+      patch[fieldId] = { wrap: null };
+    }
+  }
+  return patch;
+}

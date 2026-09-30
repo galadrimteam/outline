@@ -5,6 +5,7 @@ import {
   orderedFields,
   orderPatch,
   visibilityPatch,
+  wrapResetPatch,
 } from "./columns";
 
 const fields = [
@@ -71,6 +72,19 @@ describe("columns", () => {
   it("lists card properties without the title", () => {
     expect(cardFields(fields, grid).map((f) => f.id)).toEqual(["a", "c"]);
     expect(cardFields(fields, kanban).map((f) => f.id)).toEqual(["a"]);
+  });
+
+  it("resets the columns that wrap on their own", () => {
+    expect(
+      wrapResetPatch({
+        columnMeta: {
+          a: { order: 0, wrap: true },
+          b: { order: 1, wrap: false },
+          c: { order: 2 },
+          d: { order: 3, wrap: null },
+        },
+      })
+    ).toEqual({ a: { wrap: null }, b: { wrap: null } });
   });
 
   it("builds visibility and order patches", () => {

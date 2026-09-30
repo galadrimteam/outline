@@ -2,12 +2,14 @@ import { DatabaseFieldType } from "@shared/databases/types";
 import {
   GUTTER_WIDTH,
   clampColumnWidth,
+  columnWraps,
   defaultColumnWidth,
   frozenEdge,
   insertionOrder,
   moveId,
   rowLayout,
   tableColumns,
+  tableRowLayout,
 } from "./layout";
 import { makeField, makeView } from "./testFixtures";
 
@@ -91,6 +93,45 @@ describe("rowLayout", () => {
     });
     expect(rowLayout("tall").wrap).toBe(true);
     expect(rowLayout("autoFit").autoFit).toBe(true);
+  });
+});
+
+describe("wrapping", () => {
+  it("wraps a column as its own setting says, else as the row height", () => {
+    const view = makeView({
+      columnMeta: {
+        title: { order: 0, wrap: true },
+        status: { order: 1 },
+        done: { order: 2, wrap: null },
+      },
+    });
+    expect(columnWraps(view, "title")).toBe(true);
+    expect(columnWraps(view, "status")).toBe(false);
+    expect(columnWraps(view, "done")).toBe(false);
+    const tall = { ...view, options: { rowHeight: "tall" as const } };
+    expect(columnWraps(tall, "status")).toBe(true);
+    expect(
+      columnWraps(
+        { ...tall, columnMeta: { status: { order: 1, wrap: false } } },
+        "status"
+      )
+    ).toBe(false);
+    expect(tableColumns(fields, view).map((column) => column.wrap)).toEqual([
+      true,
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  it("lets short rows grow when a column wraps", () => {
+    expect(tableRowLayout("short", [{ wrap: false }])).toEqual(
+      rowLayout("short")
+    );
+    expect(
+      tableRowLayout(undefined, [{ wrap: false }, { wrap: true }])
+    ).toEqual({ height: 36, wrap: true, autoFit: true });
+    expect(tableRowLayout("tall", [{ wrap: true }])).toEqual(rowLayout("tall"));
   });
 });
 
