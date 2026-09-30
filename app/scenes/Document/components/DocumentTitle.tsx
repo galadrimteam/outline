@@ -236,7 +236,13 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
   const dir = ref.current?.getComputedDirection();
   const initial = title.charAt(0).toUpperCase();
   const fallbackIcon = icon ? (
-    <Icon value={icon} initial={initial} color={color} size={pageIconSize} />
+    <Icon
+      value={icon}
+      initial={initial}
+      color={color}
+      size={pageIconSize}
+      fullSize
+    />
   ) : null;
   // galadrim: without an icon the picker is only a small "add icon" button that
   // appears just above the title on hover, where Notion shows its "Add icon".
@@ -283,7 +289,9 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
               onClose={handleClose}
               allowDelete
               borderOnHover
-            />
+            >
+              {fallbackIcon}
+            </StyledIconPicker>
           </React.Suspense>
         </IconTitleWrapper>
       ) : icon ? (
