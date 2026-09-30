@@ -46,12 +46,10 @@ describe("pageFields", () => {
       },
     });
     expect(
-      pageFields(
-        [title, icon, status, notes, priority],
-        [table],
-        "icon",
-        ["status", "notes"]
-      ).map((field) => field.id)
+      pageFields([title, icon, status, notes, priority], [table], "icon", [
+        "status",
+        "notes",
+      ]).map((field) => field.id)
     ).toEqual(["status", "notes", "priority"]);
   });
 
