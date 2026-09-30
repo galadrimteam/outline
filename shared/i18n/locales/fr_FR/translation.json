@@ -1401,6 +1401,8 @@
   "Add content to your document, then use headings or dividers to separate it into slides.": "Ajoutez du contenu à votre document, puis utilisez des titres ou des séparateurs pour le diviser en diapositives.",
   "Learn more": "En savoir plus",
   "Backlinks": "Rétroliens",
+  "{{ count }} backlinks": "{{ count }} rétrolien",
+  "{{ count }} backlinks_plural": "{{ count }} rétroliens",
   "Clear search highlight": "Effacer la surbrillance de recherche",
   "Warning": "Avertissement",
   "This document is large which may affect performance": "Ce document est volumineux et peut affecter les performances",

@@ -1401,6 +1401,8 @@
   "Add content to your document, then use headings or dividers to separate it into slides.": "Add content to your document, then use headings or dividers to separate it into slides.",
   "Learn more": "Learn more",
   "Backlinks": "Backlinks",
+  "{{ count }} backlinks": "{{ count }} backlinks",
+  "{{ count }} backlinks_plural": "{{ count }} backlinks",
   "Clear search highlight": "Clear search highlight",
   "Warning": "Warning",
   "This document is large which may affect performance": "This document is large which may affect performance",

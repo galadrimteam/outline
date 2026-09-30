@@ -1,6 +1,6 @@
 import { observer } from "mobx-react";
 import { useEffect, useRef, Fragment, useMemo, useState } from "react";
-import { Trans } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import styled from "styled-components";
 import type Document from "~/models/Document";
 import Fade from "~/components/Fade";
@@ -10,7 +10,11 @@ import useCurrentUser from "~/hooks/useCurrentUser";
 import { useLocationSidebarContext } from "~/hooks/useLocationSidebarContext";
 import useStores from "~/hooks/useStores";
 import ReferenceListItem from "./ReferenceListItem";
-import { getLinkedDocumentKeys, isLinkedDocument } from "./linkedDocuments";
+import {
+  getLinkedDocumentKeys,
+  getShownDatabaseIds,
+  isLinkedDocument,
+} from "./linkedDocuments";
 import useShare from "@shared/hooks/useShare";
 import type { NavigationNode } from "@shared/types";
 import { flattenTree } from "@shared/utils/tree";
@@ -22,11 +26,13 @@ type Props = {
 type TabType = "children" | "backlinks";
 
 function References({ document }: Props) {
-  const { documents } = useStores();
+  const { t } = useTranslation();
+  const { documents, databases } = useStores();
   const user = useCurrentUser({ rejectOnEmpty: false });
   const locationSidebarContext = useLocationSidebarContext();
   const { sharedTree, isShare } = useShare();
-  const [activeTab, setActiveTab] = useState<TabType>("children");
+  // galadrim: backlinks stay folded until asked for, as Notion's « N backlinks ».
+  const [activeTab, setActiveTab] = useState<TabType | null>(null);
   const isJustCreated = useMemo(
     () => document.isJustCreated,
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -51,8 +57,20 @@ function References({ document }: Props) {
     () => getLinkedDocumentKeys(document.data),
     [document.data]
   );
+  const shownDatabaseIds = useMemo(
+    () => getShownDatabaseIds(document.data),
+    [document.data]
+  );
+  // galadrim: the page holding the rows of a database the document shows is
+  // already on it, through that database.
+  const databaseHomes = new Set(
+    Array.from(shownDatabaseIds).flatMap((id) => {
+      const home = databases.get(id)?.documentId;
+      return home ? [home] : [];
+    })
+  );
   const children = allChildren.filter(
-    (node) => !isLinkedDocument(linkedKeys, node)
+    (node) => !isLinkedDocument(linkedKeys, node) && !databaseHomes.has(node.id)
   );
   const ancestorIds = document.pathTo.map((node) => node.id);
   const backlinks = allBacklinks.filter(
@@ -62,27 +80,33 @@ function References({ document }: Props) {
   const showBacklinks = !!backlinks.length;
   const showChildDocuments = !!children.length;
   const shouldFade = useRef(!showBacklinks && !showChildDocuments);
-  const isBacklinksTab = activeTab === "backlinks" || !showChildDocuments;
-  const height = Math.max(backlinks.length, children.length) * 40;
+  const isBacklinksTab = activeTab === "backlinks" && showBacklinks;
+  const isChildrenTab =
+    showChildDocuments && (activeTab === "children" || activeTab === null);
+  const height = isBacklinksTab
+    ? backlinks.length * 40
+    : isChildrenTab
+      ? children.length * 40
+      : 0;
   const Component = shouldFade.current ? Fade : Fragment;
 
   return showBacklinks || showChildDocuments ? (
     <Component>
       <Tabs>
         {showChildDocuments && (
-          <Tab
-            active={!isBacklinksTab}
-            onClick={() => setActiveTab("children")}
-          >
+          <Tab active={isChildrenTab} onClick={() => setActiveTab("children")}>
             <Trans>Documents</Trans>
           </Tab>
         )}
         {showBacklinks && (
           <Tab
             active={isBacklinksTab}
-            onClick={() => setActiveTab("backlinks")}
+            aria-expanded={isBacklinksTab}
+            onClick={() =>
+              setActiveTab(isBacklinksTab ? "children" : "backlinks")
+            }
           >
-            <Trans>Backlinks</Trans>
+            {t("{{ count }} backlinks", { count: backlinks.length })}
           </Tab>
         )}
       </Tabs>
@@ -116,7 +140,7 @@ function References({ document }: Props) {
           </List>
         )}
         {showChildDocuments && (
-          <List $active={!isBacklinksTab}>
+          <List $active={isChildrenTab}>
             {children.map((node) => {
               // If we have the document in the store already then use it to get the extra
               // contextual info, otherwise the collection node will do (only has title and id)

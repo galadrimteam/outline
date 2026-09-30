@@ -1,5 +1,9 @@
 import type { ProsemirrorData } from "@shared/types";
-import { getLinkedDocumentKeys, isLinkedDocument } from "./linkedDocuments";
+import {
+  getLinkedDocumentKeys,
+  getShownDatabaseIds,
+  isLinkedDocument,
+} from "./linkedDocuments";
 
 const text = (value: string, href?: string): ProsemirrorData => ({
   type: "text",
@@ -146,5 +150,27 @@ describe("isLinkedDocument", () => {
       isLinkedDocument(keys, { id: "doc-uuid-3", url: "/doc/title-Nn77Mm88" })
     ).toBe(false);
     expect(isLinkedDocument(keys, { id: "doc-uuid-4" })).toBe(false);
+  });
+});
+
+describe("getShownDatabaseIds", () => {
+  it("collects the databases of the database blocks, at any depth", () => {
+    expect(
+      getShownDatabaseIds({
+        type: "doc",
+        content: [
+          { type: "database", attrs: { databaseId: "db-points" } },
+          {
+            type: "container_toggle",
+            content: [{ type: "database", attrs: { databaseId: "db-kanban" } }],
+          },
+          { type: "paragraph" },
+        ],
+      })
+    ).toEqual(new Set(["db-points", "db-kanban"]));
+  });
+
+  it("is empty without content", () => {
+    expect(getShownDatabaseIds(undefined)).toEqual(new Set());
   });
 });
