@@ -1,12 +1,23 @@
+import { randomUUID } from "node:crypto";
 import { Node } from "prosemirror-model";
 import { prosemirrorToYDoc } from "y-prosemirror";
 import * as Y from "yjs";
 import type { ProsemirrorData, ReactionSummary } from "@shared/types";
-import { CommentStatusFilter } from "@shared/types";
+import {
+  CommentingAccess,
+  CommentStatusFilter,
+  TeamPreference,
+} from "@shared/types";
 import { ProsemirrorHelper as SharedProsemirrorHelper } from "@shared/utils/ProsemirrorHelper";
 import documentCollaborativeUpdater from "@server/commands/documentCollaborativeUpdater";
 import { schema } from "@server/editor";
-import { Comment, Document, Reaction } from "@server/models";
+import {
+  Comment,
+  Document,
+  Event,
+  Notification,
+  Reaction,
+} from "@server/models";
 import { DocumentHelper } from "@server/models/helpers/DocumentHelper";
 import {
   buildAdmin,
@@ -1004,6 +1015,398 @@ describe("#comments.create", () => {
 
       expect(res.status).toEqual(404);
     });
+  });
+});
+
+describe("#comments.import", () => {
+  const writtenAt = new Date("2024-03-01T09:30:00.000Z");
+  const resolvedAt = new Date("2024-03-02T10:00:00.000Z");
+  const documentContent = {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [{ type: "text", text: "The quick brown fox" }],
+      },
+    ],
+  } as ProsemirrorData;
+
+  const setup = async () => {
+    const team = await buildTeam();
+    const admin = await buildAdmin({ teamId: team.id });
+    const author = await buildUser({ teamId: team.id });
+    const doc = Node.fromJSON(schema, documentContent);
+    const document = await buildDocument({
+      userId: author.id,
+      teamId: team.id,
+      content: documentContent,
+      state: Buffer.from(
+        Y.encodeStateAsUpdate(prosemirrorToYDoc(doc, "default"))
+      ),
+    });
+    return { team, admin, author, document };
+  };
+
+  const commentMarks = async (documentId: string) => {
+    const document = await Document.findByPk(documentId, {
+      rejectOnEmpty: true,
+    });
+    return SharedProsemirrorHelper.getComments(
+      DocumentHelper.toProsemirror(document)
+    );
+  };
+
+  it("should require authentication", async () => {
+    const res = await server.post("/api/comments.import");
+    expect(res.status).toEqual(401);
+  });
+
+  it("should refuse a user who is not an admin", async () => {
+    const { author, document } = await setup();
+
+    const res = await server.post("/api/comments.import", author, {
+      body: {
+        id: randomUUID(),
+        documentId: document.id,
+        createdById: author.id,
+        createdAt: writtenAt,
+        text: "hello",
+      },
+    });
+
+    expect(res.status).toEqual(403);
+  });
+
+  it("should create a comment with its author, date and resolved state", async () => {
+    const { team, admin, author, document } = await setup();
+    const resolver = await buildUser({ teamId: team.id });
+    const id = randomUUID();
+
+    const res = await server.post("/api/comments.import", admin, {
+      body: {
+        id,
+        documentId: document.id,
+        createdById: author.id,
+        createdAt: writtenAt.toISOString(),
+        text: "Looks **good**",
+        resolvedAt: resolvedAt.toISOString(),
+        resolvedById: resolver.id,
+      },
+    });
+    const body = await res.json();
+
+    expect(res.status).toEqual(200);
+    expect(body.created).toEqual(true);
+    expect(body.anchored).toEqual(false);
+    expect(body.data).toMatchObject({
+      id,
+      documentId: document.id,
+      createdById: author.id,
+      createdBy: { id: author.id },
+      createdAt: writtenAt.toISOString(),
+      updatedAt: writtenAt.toISOString(),
+      resolvedAt: resolvedAt.toISOString(),
+      resolvedById: resolver.id,
+      resolvedBy: { id: resolver.id },
+    });
+
+    const comment = await Comment.findByPk(id, { rejectOnEmpty: true });
+    expect(comment.createdById).toEqual(author.id);
+    expect(comment.createdAt).toEqual(writtenAt);
+    expect(comment.updatedAt).toEqual(writtenAt);
+    expect(comment.resolvedAt).toEqual(resolvedAt);
+    expect(comment.toPlainText()).toEqual("Looks good");
+  });
+
+  it("should make the author the resolver when none is given", async () => {
+    const { admin, author, document } = await setup();
+
+    const res = await server.post("/api/comments.import", admin, {
+      body: {
+        id: randomUUID(),
+        documentId: document.id,
+        createdById: author.id,
+        createdAt: writtenAt,
+        text: "done",
+        resolvedAt,
+      },
+    });
+    const body = await res.json();
+
+    expect(res.status).toEqual(200);
+    expect(body.data.resolvedById).toEqual(author.id);
+  });
+
+  it("should work when commenting is disabled for the team", async () => {
+    const { team, admin, author, document } = await setup();
+    team.setPreference(TeamPreference.Commenting, CommentingAccess.None);
+    await team.save();
+
+    const res = await server.post("/api/comments.import", admin, {
+      body: {
+        id: randomUUID(),
+        documentId: document.id,
+        createdById: author.id,
+        createdAt: writtenAt,
+        text: "hello",
+      },
+    });
+
+    expect(res.status).toEqual(200);
+  });
+
+  it("should return the existing comment unchanged when replayed", async () => {
+    const { admin, author, document } = await setup();
+    const id = randomUUID();
+    const first = await server.post("/api/comments.import", admin, {
+      body: {
+        id,
+        documentId: document.id,
+        createdById: author.id,
+        createdAt: writtenAt,
+        text: "first",
+        anchorText: "brown fox",
+      },
+    });
+    const firstBody = await first.json();
+    const documentBefore = await Document.findByPk(document.id, {
+      rejectOnEmpty: true,
+    });
+
+    const res = await server.post("/api/comments.import", admin, {
+      body: {
+        id,
+        documentId: document.id,
+        createdById: admin.id,
+        createdAt: resolvedAt,
+        text: "second",
+        resolvedAt,
+        anchorText: "quick",
+      },
+    });
+    const body = await res.json();
+
+    expect(res.status).toEqual(200);
+    expect(body.created).toEqual(false);
+    expect(body.anchored).toEqual(true);
+    expect(body.data).toEqual(firstBody.data);
+    expect(await Comment.count({ where: { documentId: document.id } })).toEqual(
+      1
+    );
+    const marks = await commentMarks(document.id);
+    expect(marks.map((mark) => mark.text)).toEqual(["brown fox"]);
+    const documentAfter = await Document.findByPk(document.id, {
+      rejectOnEmpty: true,
+    });
+    expect(documentAfter.updatedAt).toEqual(documentBefore.updatedAt);
+  });
+
+  it("should refuse an id already used on another document", async () => {
+    const { admin, author, document } = await setup();
+    const other = await buildDocument({
+      userId: author.id,
+      teamId: author.teamId,
+    });
+    const comment = await buildComment({
+      userId: author.id,
+      documentId: other.id,
+    });
+
+    const res = await server.post("/api/comments.import", admin, {
+      body: {
+        id: comment.id,
+        documentId: document.id,
+        createdById: author.id,
+        createdAt: writtenAt,
+        text: "hello",
+      },
+    });
+
+    expect(res.status).toEqual(400);
+  });
+
+  it("should refuse an author outside the team", async () => {
+    const { admin, document } = await setup();
+    const stranger = await buildUser();
+
+    const res = await server.post("/api/comments.import", admin, {
+      body: {
+        id: randomUUID(),
+        documentId: document.id,
+        createdById: stranger.id,
+        createdAt: writtenAt,
+        text: "hello",
+      },
+    });
+
+    expect(res.status).toEqual(400);
+  });
+
+  it("should refuse a resolver outside the team", async () => {
+    const { admin, author, document } = await setup();
+    const stranger = await buildUser();
+
+    const res = await server.post("/api/comments.import", admin, {
+      body: {
+        id: randomUUID(),
+        documentId: document.id,
+        createdById: author.id,
+        createdAt: writtenAt,
+        text: "hello",
+        resolvedAt,
+        resolvedById: stranger.id,
+      },
+    });
+
+    expect(res.status).toEqual(400);
+  });
+
+  it("should refuse a document of another team", async () => {
+    const { admin, author } = await setup();
+    const document = await buildDocument();
+
+    const res = await server.post("/api/comments.import", admin, {
+      body: {
+        id: randomUUID(),
+        documentId: document.id,
+        createdById: author.id,
+        createdAt: writtenAt,
+        text: "hello",
+      },
+    });
+
+    expect(res.status).toEqual(403);
+  });
+
+  it("should refuse a date in the future", async () => {
+    const { admin, author, document } = await setup();
+
+    const res = await server.post("/api/comments.import", admin, {
+      body: {
+        id: randomUUID(),
+        documentId: document.id,
+        createdById: author.id,
+        createdAt: new Date(Date.now() + 60_000),
+        text: "hello",
+      },
+    });
+
+    expect(res.status).toEqual(400);
+  });
+
+  it("should anchor the comment to its text on behalf of the author", async () => {
+    const { admin, author, document } = await setup();
+    const id = randomUUID();
+
+    const res = await server.post("/api/comments.import", admin, {
+      body: {
+        id,
+        documentId: document.id,
+        createdById: author.id,
+        createdAt: writtenAt,
+        text: "which fox?",
+        anchorText: "brown fox",
+      },
+    });
+    const body = await res.json();
+
+    expect(res.status).toEqual(200);
+    expect(body.anchored).toEqual(true);
+    expect(await commentMarks(document.id)).toMatchObject([
+      { id, userId: author.id, text: "brown fox" },
+    ]);
+    const updated = await Document.findByPk(document.id, {
+      rejectOnEmpty: true,
+    });
+    expect(updated.updatedAt).toEqual(document.updatedAt);
+  });
+
+  it("should keep the comment unanchored when its text is not found", async () => {
+    const { admin, author, document } = await setup();
+    const id = randomUUID();
+
+    const res = await server.post("/api/comments.import", admin, {
+      body: {
+        id,
+        documentId: document.id,
+        createdById: author.id,
+        createdAt: writtenAt,
+        text: "which elephant?",
+        anchorText: "purple elephant",
+      },
+    });
+    const body = await res.json();
+
+    expect(res.status).toEqual(200);
+    expect(body.created).toEqual(true);
+    expect(body.anchored).toEqual(false);
+    expect(await commentMarks(document.id)).toEqual([]);
+    expect(await Comment.findByPk(id)).toBeTruthy();
+  });
+
+  it("should import a reply into a resolved thread", async () => {
+    const { team, admin, author, document } = await setup();
+    const replier = await buildUser({ teamId: team.id });
+    const parentId = randomUUID();
+    await server.post("/api/comments.import", admin, {
+      body: {
+        id: parentId,
+        documentId: document.id,
+        createdById: author.id,
+        createdAt: writtenAt,
+        text: "question",
+        resolvedAt,
+      },
+    });
+
+    const id = randomUUID();
+    const res = await server.post("/api/comments.import", admin, {
+      body: {
+        id,
+        documentId: document.id,
+        parentCommentId: parentId,
+        createdById: replier.id,
+        createdAt: new Date("2024-03-01T11:00:00.000Z"),
+        text: "answer",
+        anchorText: "brown fox",
+      },
+    });
+    const body = await res.json();
+
+    expect(res.status).toEqual(200);
+    expect(body.anchored).toEqual(false);
+    expect(body.data).toMatchObject({
+      parentCommentId: parentId,
+      createdById: replier.id,
+      resolvedAt: resolvedAt.toISOString(),
+      resolvedById: author.id,
+      resolvedBy: { id: author.id },
+    });
+    expect(await commentMarks(document.id)).toEqual([]);
+  });
+
+  it("should publish the comment as an import, which notifies nobody", async () => {
+    const { admin, author, document } = await setup();
+    const id = randomUUID();
+
+    const res = await server.post("/api/comments.import", admin, {
+      body: {
+        id,
+        documentId: document.id,
+        createdById: author.id,
+        createdAt: writtenAt,
+        text: "hello",
+      },
+    });
+
+    expect(res.status).toEqual(200);
+    const event = await Event.findOne({
+      where: { name: "comments.create", modelId: id },
+      rejectOnEmpty: true,
+    });
+    expect(event.data).toEqual({ source: "import" });
+    expect(event.actorId).toEqual(admin.id);
+    expect(await Notification.count({ where: { commentId: id } })).toEqual(0);
   });
 });
 

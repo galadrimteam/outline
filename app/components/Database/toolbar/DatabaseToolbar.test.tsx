@@ -188,4 +188,37 @@ describe("DatabaseToolbar", () => {
     );
     expect(viewDrafts.get(databaseId, view.id)).toBeUndefined();
   });
+
+  it("marks an active filter by its colour, without a counter", async () => {
+    viewDrafts.set(databaseId, view.id, {
+      filter: {
+        conjunction: "and",
+        filterSet: [{ fieldId: "status", operator: "is", value: "Terminé" }],
+      },
+    });
+    await render(false);
+
+    const filter = button("Filter (1)");
+    expect(filter).toBeDefined();
+    expect(filter?.textContent).toBe("");
+  });
+
+  it("shows ⚡ to editors while an automation is on", async () => {
+    stores.policies.add({
+      id: databaseId,
+      abilities: { read: true, update: true },
+    });
+    const database = await render(false);
+    expect(button("Automations")).toBeUndefined();
+
+    await act(async () => {
+      database.automationCount = 2;
+    });
+    expect(button("Automations")).toBeDefined();
+
+    await act(async () => {
+      database.automationCount = 0;
+    });
+    expect(button("Automations")).toBeUndefined();
+  });
 });

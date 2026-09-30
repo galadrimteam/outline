@@ -310,8 +310,18 @@ export type DatabaseTimelineZoom = "week" | "month" | "quarter" | "year";
 /** How a table shows the sub-items of its rows: under their parent, folded (Notion's default), as rows of their own, or not at all. */
 export type DatabaseSubItemsMode = "nested" | "flattened" | "off";
 
+/** What a board column header shows after the group's name, Notion's calculation of a grouped view. */
+export interface DatabaseGroupCalculation {
+  /** "count" counts the cards, "none" shows nothing. */
+  func: DatabaseStatisticFunc | "none";
+  /** The property calculated; not used by "count" and "none". */
+  fieldId?: string;
+}
+
 /** What Outline adds to a view the engine does not know about. */
 export interface DatabaseViewOverrides {
+  /** The icon of the view's tab, in place of its layout's: an emoji, an icon name or a custom emoji id, like a document icon. */
+  icon?: string;
   /** Draw the engine's grid view as a list or a timeline; null goes back to the table. */
   layout?: DatabaseLayout.List | DatabaseLayout.Timeline | null;
   /** Second level of grouping on a board (swimlanes). */
@@ -322,6 +332,10 @@ export interface DatabaseViewOverrides {
   hiddenStacks?: string[];
   cardSize?: DatabaseCardSize;
   openPagesIn?: DatabaseOpenPagesIn;
+  /** Board column headers; the number of cards when absent. */
+  groupCalculation?: DatabaseGroupCalculation;
+  /** Rows shown before « Load more » when the view is inline in a page, Notion's load limit. */
+  loadLimit?: number;
   /** Outline template document used by "New" in this view. */
   defaultTemplateId?: string | null;
   /** How a table shows sub-items when the database has some; nested when unset. */
@@ -373,6 +387,10 @@ export interface DatabaseLinkValue {
   /** The linked record id. */
   id: string;
   title?: string;
+  /** The icon of the linked row's page, filled by the server. */
+  icon?: string | null;
+  /** The colour of that icon. */
+  iconColor?: string | null;
 }
 
 export interface DatabaseAttachmentValue {
@@ -421,6 +439,10 @@ export interface DatabaseRecord {
   lastModifiedBy?: string;
   /** The Outline document of this row, when it has been opened once. */
   documentId?: string | null;
+  /** The icon of that document, filled by the server. */
+  icon?: string | null;
+  /** The colour of that icon. */
+  iconColor?: string | null;
 }
 
 export interface DatabaseGroupHeader {
@@ -457,6 +479,20 @@ export interface DatabaseHistoryEntry {
   createdBy: DatabaseUserValue | null;
 }
 
+/** A tab of a row page (Notion's page layout). */
+export interface DatabasePageTab {
+  /** Stable id of the tab (the Notion view id when imported). */
+  id: string;
+  /** "content": the page's own body. "relation": the rows a relation field of this database links to. */
+  kind: "content" | "relation";
+  /** Label; the content tab defaults to t("Content"), a relation tab to its field's name. */
+  name?: string;
+  /** kind "relation": a link (relation) field of THIS database. */
+  fieldId?: string;
+  /** kind "relation": fields of the LINKED database shown as columns, in order. Absent: its primary field only. */
+  visibleFieldIds?: string[];
+}
+
 /** Settings Outline keeps on a database (column `databases.settings`). */
 export interface DatabaseSettings {
   viewOverrides?: Record<string, DatabaseViewOverrides>;
@@ -467,6 +503,8 @@ export interface DatabaseSettings {
     hideWhenEmptyFieldIds?: string[];
     /** Hide every empty property on row pages. */
     hideEmpty?: boolean;
+    /** The tabs under the properties (Notion's page layout); none shows the body alone. */
+    tabs?: DatabasePageTab[];
   };
   /** The field holding a row's emoji (the migration writes one called « Icon »). */
   iconFieldId?: string;

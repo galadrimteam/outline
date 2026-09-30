@@ -328,6 +328,20 @@ export class RecordQuery {
   };
 
   /**
+   * Computes statistics over all the rows of the query, loaded or not.
+   *
+   * @param fieldStats the function per field.
+   * @returns the value per field.
+   */
+  aggregate = (
+    fieldStats: Record<string, DatabaseStatisticFunc>
+  ): Promise<Record<string, { value: number | string | null }>> =>
+    this.store.aggregate(this.databaseId, this.viewId, fieldStats, {
+      filter: combineFilters(this.params.filter, this.params.extraFilter),
+      search: this.params.search || undefined,
+    });
+
+  /**
    * Applies a change made here to the loaded rows, without asking the server.
    *
    * @param recordIds the new row ids.

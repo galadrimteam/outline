@@ -2,14 +2,15 @@ import { observer } from "mobx-react";
 import { CollapsedIcon, PlusIcon } from "outline-icons";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
-import styled, { css } from "styled-components";
+import styled, { css, useTheme } from "styled-components";
 import type {
   DatabaseCardSize,
   DatabaseCellInput,
   DatabaseField,
   DatabaseRecord,
+  DatabaseView,
 } from "@shared/databases/types";
-import { borderRadius, ellipsis, s } from "@shared/styles";
+import { borderRadius, s } from "@shared/styles";
 import type Database from "~/models/Database";
 import {
   groupPrefill,
@@ -19,9 +20,10 @@ import {
 import type { RecordGroup } from "../../toolbar/grouping";
 import type { DatabaseViewProps } from "../../types";
 import {
+  CardHeading,
   CardProperties,
   openableProps,
-  RecordTitle,
+  recordCardColor,
   recordCover,
   visibleCardFields,
 } from "./cards";
@@ -64,6 +66,7 @@ export const GalleryView = observer(function GalleryView({
         <GalleryCard
           key={record.id}
           database={database}
+          view={view}
           record={record}
           fields={fields}
           size={size}
@@ -81,7 +84,7 @@ export const GalleryView = observer(function GalleryView({
           $size={size}
         >
           <PlusIcon size={18} />
-          {t("New")}
+          {t("New page")}
         </NewCard>
       )}
     </Grid>
@@ -180,6 +183,7 @@ export const GallerySection = observer(function GallerySection({
 
 interface CardProps {
   database: Database;
+  view: DatabaseView;
   record: DatabaseRecord;
   fields: DatabaseField[];
   size: DatabaseCardSize;
@@ -192,6 +196,7 @@ interface CardProps {
 
 const GalleryCard = observer(function GalleryCard({
   database,
+  view,
   record,
   fields,
   size,
@@ -201,10 +206,12 @@ const GalleryCard = observer(function GalleryCard({
   coverOf,
   onOpen,
 }: CardProps) {
+  const theme = useTheme();
   const image = cover ? coverOf(record) : undefined;
+  const background = recordCardColor(database, view, record, theme);
 
   return (
-    <Card {...openableProps(() => onOpen(record.id))}>
+    <Card {...openableProps(() => onOpen(record.id))} style={{ background }}>
       {cover && (
         <Cover $size={size}>
           {image && (
@@ -218,9 +225,7 @@ const GalleryCard = observer(function GalleryCard({
         </Cover>
       )}
       <CardBody>
-        <CardTitle>
-          <RecordTitle database={database} record={record} />
-        </CardTitle>
+        <CardHeading database={database} record={record} />
         <CardProperties
           database={database}
           record={record}
@@ -309,16 +314,9 @@ const Cover = styled.div<{ $size: DatabaseCardSize }>`
 const CardBody = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px 10px 10px;
+  gap: 8px;
+  padding: 10px 12px 12px;
   min-width: 0;
-`;
-
-const CardTitle = styled.div`
-  font-size: 14px;
-  font-weight: 500;
-  color: ${s("text")};
-  ${ellipsis()}
 `;
 
 const NewCard = styled.button<{ $size: DatabaseCardSize }>`

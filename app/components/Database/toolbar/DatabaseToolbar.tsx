@@ -35,6 +35,7 @@ import {
   viewDrafts,
 } from "./viewDrafts";
 import { ViewSettings } from "./ViewSettings";
+import { AutomationsToolbarButton } from "../automations/AutomationsToolbarButton";
 import { useDatabaseBlock } from "../DatabaseBlockContext";
 
 interface Props {
@@ -122,7 +123,7 @@ export const DatabaseToolbar = observer(function DatabaseToolbar({
   return (
     <Bar role="group" aria-label={t("View options")}>
       {(filterDirty || sortDirty) && (
-        <Draft>
+        <Draft data-sticky>
           <DraftButton type="button" onClick={handleReset}>
             {t("Reset")}
           </DraftButton>
@@ -159,6 +160,8 @@ export const DatabaseToolbar = observer(function DatabaseToolbar({
       >
         <SortMenu database={database} sort={sort} onChange={handleSortChange} />
       </ToolbarPopover>
+
+      <AutomationsToolbarButton database={database} />
 
       {canSave && layoutSupportsGrouping(view.layout) && (
         <ToolbarPopover
@@ -212,7 +215,7 @@ interface ToolbarPopoverProps {
   label: string;
   /** Icon of the button. */
   icon: React.ReactNode;
-  /** Number shown next to the icon when above zero. */
+  /** How many rules are active: above zero, the button takes the accent colour, as in Notion. */
   count?: number;
   /** Draws the button in the accent colour. */
   active?: boolean;
@@ -251,7 +254,6 @@ function ToolbarPopover({
             $active={active || count > 0}
           >
             {icon}
-            {count > 0 && <Count>{count}</Count>}
           </ToolbarButton>
         </PopoverTrigger>
       </Tooltip>
@@ -288,11 +290,6 @@ const Bar = styled.div`
 
 const Content = styled(PopoverContent)`
   max-width: calc(100vw - 24px);
-`;
-
-const Count = styled.span`
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
 `;
 
 const Label = styled.span`

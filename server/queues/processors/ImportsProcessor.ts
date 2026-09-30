@@ -2,7 +2,7 @@ import fractionalIndex from "fractional-index";
 import { chunk, keyBy, truncate } from "es-toolkit/compat";
 import { Fragment, Node } from "prosemirror-model";
 import type { CreateOptions, CreationAttributes, Transaction } from "sequelize";
-import { UniqueConstraintError } from "sequelize";
+import { Op, UniqueConstraintError } from "sequelize";
 import { randomUUID } from "node:crypto";
 import { randomElement } from "@shared/random";
 import type {
@@ -39,6 +39,7 @@ import { DocumentHelper } from "@server/models/helpers/DocumentHelper";
 import { ProsemirrorHelper } from "@server/models/helpers/ProsemirrorHelper";
 import { sequelize } from "@server/storage/database";
 import type { Event, ImportEvent } from "@server/types";
+import parseAttachmentIds from "@server/utils/parseAttachmentIds";
 import { generateUrlId } from "@server/utils/url";
 import BaseProcessor from "./BaseProcessor";
 
@@ -384,9 +385,10 @@ export default abstract class ImportsProcessor<
 
             const collectionItem = importInput[externalId];
 
-            const attachments = await Attachment.findAll({
-              attributes: ["id", "size"],
-              where: { documentId: externalId }, // This will be set for root pages too (which will be imported as collection)
+            const attachments = await this.findAttachments({
+              externalId,
+              content: output.content,
+              teamId: importModel.teamId,
               transaction,
             });
 
@@ -555,6 +557,40 @@ export default abstract class ImportsProcessor<
   }
 
   /**
+   * Find the attachments of an imported page: those uploaded for it, and those
+   * its content links to by their redirect URL, as a Markdown zip's files are
+   * uploaded for no page.
+   *
+   * @param externalId id of the page in the source, also set on its attachments.
+   * @param content ProseMirrorDoc of the page.
+   * @param teamId id of the team the import belongs to.
+   * @param transaction the transaction to read in.
+   * @returns the attachments, with their id and size.
+   */
+  private async findAttachments({
+    externalId,
+    content,
+    teamId,
+    transaction,
+  }: {
+    externalId: string;
+    content: ProsemirrorDoc;
+    teamId: string;
+    transaction: Transaction;
+  }): Promise<Attachment[]> {
+    return Attachment.findAll({
+      attributes: ["id", "size"],
+      where: {
+        [Op.or]: [
+          { documentId: externalId }, // This will be set for root pages too (which will be imported as collection)
+          { id: parseAttachmentIds(JSON.stringify(content)), teamId },
+        ],
+      },
+      transaction,
+    });
+  }
+
+  /**
    * Rewrite the mentions, attachments, and internal document/collection link
    * marks in a ProseMirrorDoc so they resolve against the imported models
    * rather than the source export.
@@ -619,7 +655,12 @@ export default abstract class ImportsProcessor<
       const json = node.toJSON() as ProsemirrorData;
       const attrs = json.attrs ?? {};
 
-      attrs.size = attachmentsMap[attrs.id as string]?.size;
+      const id =
+        typeof attrs.id === "string"
+          ? attrs.id
+          : parseAttachmentIds(String(attrs.href ?? ""))[0];
+      // a node the attachments do not know keeps the size its source gave
+      attrs.size = attachmentsMap[id]?.size ?? attrs.size;
 
       json.attrs = attrs;
       return Node.fromJSON(schema, json);

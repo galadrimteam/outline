@@ -10,7 +10,7 @@ import {
   DatabaseStatusGroup,
 } from "@shared/databases/types";
 import { BaseSchema } from "@server/routes/api/schema";
-import { zodShareIdType } from "@server/utils/zod";
+import { zodIconType, zodShareIdType } from "@server/utils/zod";
 
 /** An engine id (table, field, view, record): never trusted beyond its format. */
 const zEngineId = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, {
@@ -254,7 +254,15 @@ const zTimelineOverrides = z.object({
   showTable: z.boolean().optional(),
 });
 
+const zGroupCalculation = z.object({
+  func: z.union([zStatisticFunc, z.literal("none")]),
+  fieldId: zEngineId.optional(),
+});
+
+const zLoadLimit = z.number().int().min(1).max(200);
+
 const zViewOverrides = z.object({
+  icon: zodIconType().optional(),
   layout: z.enum([DatabaseLayout.List, DatabaseLayout.Timeline]).optional(),
   subGroupFieldId: zIdOrEmpty,
   stackOrder: z.array(z.string().max(1000)).max(1000).optional(),
@@ -264,10 +272,13 @@ const zViewOverrides = z.object({
   defaultTemplateId: z.uuid().optional(),
   timeline: zTimelineOverrides.optional(),
   subItems: z.enum(["nested", "flattened", "off"]).optional(),
+  groupCalculation: zGroupCalculation.optional(),
+  loadLimit: zLoadLimit.optional(),
 });
 
 /** Overrides of `databaseViews.update`: null (or "" for an id) removes a key. */
 const zViewOverridesPatch = z.object({
+  icon: zodIconType().nullish(),
   layout: z.enum([DatabaseLayout.List, DatabaseLayout.Timeline]).nullish(),
   subGroupFieldId: zIdOrUnset,
   stackOrder: z.array(z.string().max(1000)).max(1000).nullish(),
@@ -277,6 +288,8 @@ const zViewOverridesPatch = z.object({
   defaultTemplateId: z.uuid().nullish(),
   timeline: zTimelineOverrides.nullish(),
   subItems: z.enum(["nested", "flattened", "off"]).nullish(),
+  groupCalculation: zGroupCalculation.nullish(),
+  loadLimit: zLoadLimit.nullish(),
 });
 
 const zFieldMeta = z.object({
@@ -286,6 +299,18 @@ const zFieldMeta = z.object({
   endFieldId: zIdOrEmpty,
 });
 
+const zPageTab = z
+  .object({
+    id: zEngineId,
+    kind: z.enum(["content", "relation"]),
+    name: z.string().max(1000).optional(),
+    fieldId: zEngineId.optional(),
+    visibleFieldIds: z.array(zEngineId).max(500).optional(),
+  })
+  .refine((tab) => tab.kind !== "relation" || !!tab.fieldId, {
+    error: "a relation tab needs a fieldId",
+  });
+
 const zSettingsPatch = z.object({
   viewOverrides: z.record(zEngineId, zViewOverrides.nullable()).optional(),
   fieldMeta: z.record(zEngineId, zFieldMeta.nullable()).optional(),
@@ -294,6 +319,7 @@ const zSettingsPatch = z.object({
       hiddenFieldIds: z.array(zEngineId).max(500).optional(),
       hideWhenEmptyFieldIds: z.array(zEngineId).max(500).optional(),
       hideEmpty: z.boolean().optional(),
+      tabs: z.array(zPageTab).max(20).optional(),
     })
     .nullish(),
   iconFieldId: zEngineId.nullish(),

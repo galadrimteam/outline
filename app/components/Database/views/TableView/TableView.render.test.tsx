@@ -17,6 +17,7 @@ import { ActionContextProvider } from "~/hooks/useActionContext";
 import stores from "~/stores";
 import type { RecordQueryParams } from "~/stores/DatabaseRecordsStore";
 import { client } from "~/utils/ApiClient";
+import { rowCommentCounts } from "../../comments/rowCommentCounts";
 import { makeField, makeView } from "./testFixtures";
 import { TableView } from ".";
 
@@ -98,6 +99,7 @@ describe("TableView", () => {
   let root: Root;
   let calls: { path: string; body: Record<string, unknown> }[];
   let listed: DatabaseRecord[];
+  let commentCounts: Record<string, number>;
 
   beforeEach(() => {
     // @ts-expect-error the flag React reads to allow act() outside of its own test utilities.
@@ -113,6 +115,7 @@ describe("TableView", () => {
     globalThis.CSS ??= { escape: (value: string) => value } as typeof CSS;
     calls = [];
     listed = records;
+    commentCounts = {};
     vi.mocked(client.post).mockReset();
     vi.mocked(client.post).mockImplementation(async (path, body) => {
       calls.push({ path, body: (body ?? {}) as Record<string, unknown> });
@@ -147,6 +150,8 @@ describe("TableView", () => {
             data: listed,
             pagination: { offset: 0, limit: 100, total: listed.length },
           };
+        case "/databaseRecords.commentCounts":
+          return { data: commentCounts };
         default:
           return {
             data: records,
@@ -417,12 +422,26 @@ describe("TableView", () => {
   it("draws the calculations of the whole table", async () => {
     await render(
       makeView({
-        id: "viwTable11",
+        id: "viwTable15",
         columnMeta: { estimate: { order: 2, statisticFunc: "sum" } },
       })
     );
     await wait(500);
     expect(container.textContent).toMatch(/Sum5[.,]0/);
+  });
+
+  it("shows the open comments of a row's page after its title", async () => {
+    rowCommentCounts.invalidate(databaseId);
+    commentCounts = { rec1: 5 };
+    await render(makeView({ id: "viwTable11" }));
+    await wait(80);
+
+    const notes = container.querySelectorAll("[role='note']");
+    expect(notes).toHaveLength(1);
+    expect(notes[0].closest("[data-cell]")?.getAttribute("data-cell")).toBe(
+      "rec1:name"
+    );
+    expect(notes[0].textContent).toBe("5");
   });
 
   it("draws each group with its column headers and its calculations", async () => {

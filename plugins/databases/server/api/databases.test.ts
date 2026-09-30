@@ -1,6 +1,6 @@
 import type { Job } from "bull";
 import { DatabaseLayout, DatabaseStatusGroup } from "@shared/databases/types";
-import { Database, Document } from "@server/models";
+import { Database, DatabaseAutomation, Document } from "@server/models";
 import { BaseTask } from "@server/queues/tasks/base/BaseTask";
 import {
   buildAdmin,
@@ -131,6 +131,43 @@ describe("#databases.info", () => {
       externalTableId: database.externalTableId,
     });
     expect(call.actor).toMatchObject({ outlineUserId: user.id });
+  });
+
+  it("counts the automations turned on for editors only", async () => {
+    const user = await buildUser();
+    const collection = await buildCollection({
+      teamId: user.teamId,
+      userId: user.id,
+    });
+    const database = await buildDatabase({
+      teamId: user.teamId,
+      collectionId: collection.id,
+    });
+    for (const enabled of [true, true, false]) {
+      await DatabaseAutomation.create({
+        teamId: database.teamId,
+        databaseId: database.id,
+        name: "Done",
+        enabled,
+        trigger: { type: "recordCreated" },
+        actions: [],
+        createdById: user.id,
+      });
+    }
+    const viewer = await buildViewer({ teamId: user.teamId });
+
+    const editorRes = await server.post("/api/databases.info", user, {
+      body: { id: database.id },
+    });
+    const viewerRes = await server.post("/api/databases.info", viewer, {
+      body: { id: database.id },
+    });
+
+    expect((await editorRes.json()).data.database.automationCount).toBe(2);
+    expect(viewerRes.status).toEqual(200);
+    expect(
+      (await viewerRes.json()).data.database.automationCount
+    ).toBeUndefined();
   });
 });
 
@@ -450,6 +487,71 @@ describe("#databases.update", () => {
       pageLayout: { hideEmpty: true },
       subItemFieldId: "fldSubItems",
     });
+  });
+
+  it("keeps the tabs of row pages", async () => {
+    const user = await buildUser();
+    const collection = await buildCollection({
+      teamId: user.teamId,
+      userId: user.id,
+    });
+    const database = await buildDatabase({
+      teamId: user.teamId,
+      collectionId: collection.id,
+      settings: { pageLayout: { hiddenFieldIds: ["fldNotes"] } },
+    });
+    const tabs = [
+      { id: "8a7e1c2d-0000-4000-8000-000000000001", kind: "content" },
+      {
+        id: "8a7e1c2d-0000-4000-8000-000000000002",
+        kind: "relation",
+        name: "Suivi Kanban MGE",
+        fieldId: "fldTasks",
+        visibleFieldIds: ["fldStatus", "fldOwner"],
+      },
+    ];
+
+    const res = await server.post("/api/databases.update", user, {
+      body: { id: database.id, settings: { pageLayout: { tabs } } },
+    });
+    const body = await res.json();
+
+    expect(res.status).toEqual(200);
+    expect(body.data.settings.pageLayout).toEqual({
+      hiddenFieldIds: ["fldNotes"],
+      tabs,
+    });
+
+    const hidden = await server.post("/api/databases.update", user, {
+      body: {
+        id: database.id,
+        settings: { pageLayout: { hiddenFieldIds: [], hideEmpty: true } },
+      },
+    });
+    expect((await hidden.json()).data.settings.pageLayout.tabs).toEqual(tabs);
+    const reloaded = await Database.findByPk(database.id);
+    expect(reloaded?.settings.pageLayout?.tabs).toEqual(tabs);
+  });
+
+  it("refuses a relation tab without its field", async () => {
+    const user = await buildUser();
+    const collection = await buildCollection({
+      teamId: user.teamId,
+      userId: user.id,
+    });
+    const database = await buildDatabase({
+      teamId: user.teamId,
+      collectionId: collection.id,
+    });
+
+    const res = await server.post("/api/databases.update", user, {
+      body: {
+        id: database.id,
+        settings: { pageLayout: { tabs: [{ id: "tab", kind: "relation" }] } },
+      },
+    });
+
+    expect(res.status).toEqual(400);
   });
 
   it("forbids a viewer", async () => {

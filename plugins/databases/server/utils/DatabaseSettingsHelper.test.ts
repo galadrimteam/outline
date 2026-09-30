@@ -117,6 +117,45 @@ describe("DatabaseSettingsHelper", () => {
     );
   });
 
+  it("keeps a board's calculation and an inline load limit", () => {
+    const settings = DatabaseSettingsHelper.mergeViewOverrides({}, "viwA", {
+      groupCalculation: { func: "sum", fieldId: "fldEstimate" },
+      loadLimit: 10,
+    });
+
+    expect(settings.viewOverrides).toEqual({
+      viwA: {
+        groupCalculation: { func: "sum", fieldId: "fldEstimate" },
+        loadLimit: 10,
+      },
+    });
+
+    const cleared = DatabaseSettingsHelper.mergeViewOverrides(
+      settings,
+      "viwA",
+      { groupCalculation: null }
+    );
+    expect(cleared.viewOverrides).toEqual({ viwA: { loadLimit: 10 } });
+  });
+
+  it("keeps and removes a view's icon", () => {
+    const settings = DatabaseSettingsHelper.mergeViewOverrides(
+      { viewOverrides: { viwA: { cardSize: "small" } } },
+      "viwA",
+      { icon: "map" }
+    );
+    expect(settings.viewOverrides).toEqual({
+      viwA: { cardSize: "small", icon: "map" },
+    });
+
+    const cleared = DatabaseSettingsHelper.mergeViewOverrides(
+      settings,
+      "viwA",
+      { icon: null }
+    );
+    expect(cleared.viewOverrides).toEqual({ viwA: { cardSize: "small" } });
+  });
+
   it("forgets a deleted field", () => {
     const settings = DatabaseSettingsHelper.withoutField(
       {
@@ -133,5 +172,50 @@ describe("DatabaseSettingsHelper", () => {
     expect(settings.subItemFieldId).toBeUndefined();
     expect(settings.pageLayout?.hiddenFieldIds).toEqual(["fldB"]);
     expect(settings.pageLayout?.hideEmpty).toBe(true);
+  });
+
+  it("merges the page layout key by key, its tabs kept", () => {
+    const tabs = [
+      { id: "tabContent", kind: "content" as const },
+      { id: "tabTasks", kind: "relation" as const, fieldId: "fldTasks" },
+    ];
+    const withTabs = DatabaseSettingsHelper.merge(
+      { pageLayout: { hiddenFieldIds: ["fldA"] } },
+      { pageLayout: { tabs } }
+    );
+    expect(withTabs.pageLayout).toEqual({ hiddenFieldIds: ["fldA"], tabs });
+
+    const hidden = DatabaseSettingsHelper.merge(withTabs, {
+      pageLayout: { hiddenFieldIds: [], hideEmpty: true },
+    });
+    expect(hidden.pageLayout).toEqual({
+      hiddenFieldIds: [],
+      hideEmpty: true,
+      tabs,
+    });
+
+    expect(
+      DatabaseSettingsHelper.merge(hidden, { pageLayout: null }).pageLayout
+    ).toBeUndefined();
+  });
+
+  it("drops the relation tab of a deleted field", () => {
+    const settings = DatabaseSettingsHelper.withoutField(
+      {
+        pageLayout: {
+          tabs: [
+            { id: "tabContent", kind: "content" },
+            { id: "tabTasks", kind: "relation", fieldId: "fldTasks" },
+            { id: "tabBugs", kind: "relation", fieldId: "fldBugs" },
+          ],
+        },
+      },
+      "fldTasks"
+    );
+
+    expect(settings.pageLayout?.tabs?.map((tab) => tab.id)).toEqual([
+      "tabContent",
+      "tabBugs",
+    ]);
   });
 });
