@@ -11,6 +11,9 @@ import { DocumentHelper } from "@server/models/helpers/DocumentHelper";
 import { BaseTask, TaskPriority } from "@server/queues/tasks/base/BaseTask";
 import { sequelize } from "@server/storage/database";
 import { engineFor } from "../engine";
+import env from "../env";
+import type { TableEngineName } from "../utils/tableEngine";
+import { engineOfTable } from "../utils/tableEngine";
 import type { DatabaseRef } from "../engine/DatabaseEngine";
 import type { ResolvedDatabase, TeableEmbed } from "../utils/teableEmbeds";
 import { convertTeableEmbeds, findTeableEmbeds } from "../utils/teableEmbeds";
@@ -362,6 +365,10 @@ class DatabaseResolver {
     }
 
     const embed = embeds.find((e) => e.fullPage) ?? embeds[0];
+    const engineName = await engineOfTable(this.options.teamId, tableId);
+    if (engineName === "teable" && !env.isTeableConfigured) {
+      return null;
+    }
     const anchor = await this.chooseAnchor(
       tableId,
       embeds,
@@ -371,7 +378,7 @@ class DatabaseResolver {
     const title = (
       anchor.title ??
       embed.heading ??
-      (await tableName({
+      (await tableName(this.options.teamId, engineName, {
         externalBaseId: embed.baseId,
         externalTableId: tableId,
       })) ??
@@ -399,7 +406,7 @@ class DatabaseResolver {
               collectionId: anchor.collectionId,
               documentId: anchor.documentId,
               title,
-              engine: "teable",
+              engine: engineName,
               externalBaseId: embed.baseId,
               externalTableId: tableId,
               createdById: this.options.createdById,
@@ -580,14 +587,18 @@ class DatabaseResolver {
 }
 
 /** The table's name in its engine, or null when the engine cannot tell. */
-async function tableName(ref: DatabaseRef): Promise<string | null> {
+async function tableName(
+  teamId: string,
+  engine: TableEngineName,
+  ref: DatabaseRef
+): Promise<string | null> {
   try {
     return (
-      (await engineFor({ engine: "teable" }).describeTable("system", ref))
-        .name || null
+      (await engineFor({ engine, teamId }).describeTable("system", ref)).name ||
+      null
     );
   } catch (error) {
-    Logger.warn("Could not read the name of a Teable table", {
+    Logger.warn("Could not read the name of an engine table", {
       tableId: ref.externalTableId,
       error: toError(error).message,
     });

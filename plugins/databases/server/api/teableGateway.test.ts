@@ -1,4 +1,5 @@
-import { buildAdmin, buildUser } from "@server/test/factories";
+import { buildAdmin, buildCollection, buildUser } from "@server/test/factories";
+import { Database } from "@server/models";
 import { getTestServer } from "@server/test/support";
 
 const server = getTestServer();
@@ -164,5 +165,38 @@ describe("teable gateway", () => {
     const views = await call("get", `/table/${tasks.id}/view`);
     const saved = views.find((v: { id: string }) => v.id === board.id);
     expect(saved.columnMeta[points.id].hidden).toBe(true);
+  });
+
+  it("registers a table it built as a database of the Outline engine", async () => {
+    const admin = await buildAdmin();
+    const collection = await buildCollection({
+      teamId: admin.teamId,
+      userId: admin.id,
+    });
+    const base = await (
+      await server.post(`${api}/base`, admin, { body: { name: "Projet" } })
+    ).json();
+    const table = await (
+      await server.post(`${api}/base/${base.id}/table`, admin, {
+        body: {
+          name: "Tickets",
+          fields: [{ name: "Nom", type: "singleLineText" }],
+        },
+      })
+    ).json();
+
+    const res = await server.post("/api/databases.register", admin, {
+      body: {
+        collectionId: collection.id,
+        externalBaseId: base.id,
+        externalTableId: table.id,
+      },
+    });
+    const body = await res.json();
+
+    expect(res.status).toEqual(200);
+    expect(body.data.title).toEqual("Tickets");
+    const database = await Database.findByPk(body.data.id);
+    expect(database?.engine).toEqual("outline");
   });
 });

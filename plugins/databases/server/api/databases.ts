@@ -14,6 +14,7 @@ import { QueryHelper } from "@server/storage/QueryHelper";
 import type { APIContext } from "@server/types";
 import { databaseCreator } from "../commands/databaseCreator";
 import { engineFor, refFor } from "../engine";
+import { engineOfTable } from "../utils/tableEngine";
 import env from "../env";
 import { ConvertTeableEmbedsTask } from "../tasks/ConvertTeableEmbedsTask";
 import { MoveDatabaseEngineTask } from "../tasks/MoveDatabaseEngineTask";
@@ -161,7 +162,10 @@ router.post(
     const { transaction } = ctx.state;
     const { collectionId, documentId, externalBaseId, externalTableId, title } =
       ctx.input.body;
-    requireTeable();
+    const engineName = await engineOfTable(user.teamId, externalTableId);
+    if (engineName === "teable") {
+      requireTeable();
+    }
 
     const collection = await Collection.findByPk(collectionId, {
       userId: user.id,
@@ -180,7 +184,7 @@ router.post(
     }
 
     const ref = { externalBaseId, externalTableId };
-    const engine = engineFor({ engine: "teable" });
+    const engine = engineFor({ engine: engineName, teamId: user.teamId });
     const info = await engine.describeTable("system", ref);
 
     const [database] = await Database.findOrCreate({
@@ -190,7 +194,7 @@ router.post(
         collectionId,
         documentId: documentId ?? null,
         title: title || info.name,
-        engine: "teable",
+        engine: engineName,
         externalBaseId,
         externalTableId,
         settings: {},
@@ -296,7 +300,6 @@ router.post(
   async (ctx: APIContext<T.DatabasesConvertEmbedsReq>) => {
     const { user } = ctx.state.auth;
     const { documentId, collectionId, dryRun } = ctx.input.body;
-    requireTeable();
 
     if (documentId) {
       const document = await Document.findByPk(documentId, {
