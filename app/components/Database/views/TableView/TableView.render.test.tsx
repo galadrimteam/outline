@@ -45,7 +45,15 @@ const fields = [
 ];
 
 const records: DatabaseRecord[] = [
-  { id: "rec1", fields: { name: "Maquettes", status: "Terminé", estimate: 2 } },
+  {
+    id: "rec1",
+    fields: {
+      name: "Maquettes",
+      status: "Terminé",
+      estimate: 2,
+      progress: 0.5,
+    },
+  },
   {
     id: "rec2",
     fields: { name: "Intégration", status: "À faire", estimate: 3 },
@@ -447,6 +455,32 @@ describe("TableView", () => {
     expect(calls.some((call) => call.path === "/databaseRecords.groups")).toBe(
       true
     );
+  });
+
+  it("aligns numbers right and draws the ring a number is shown as", async () => {
+    await render(makeView({ id: "viwTable14" }), {
+      fields: [
+        ...fields,
+        makeField({
+          id: "progress",
+          name: "Avancement",
+          type: DatabaseFieldType.Formula,
+          isComputed: true,
+          cellValueType: "number",
+          options: {
+            formatting: { type: "percent", precision: 0 },
+            showAs: { type: "ring", color: "green", maxValue: 100 },
+          },
+        }),
+      ],
+    });
+    const estimate = container.querySelector(
+      "[data-cell='rec1:estimate'] span"
+    );
+    expect(estimate && getComputedStyle(estimate).textAlign).toBe("right");
+    expect(
+      container.querySelectorAll("[data-cell='rec1:progress'] svg circle")
+    ).toHaveLength(2);
   });
 
   it("unfolds the sub-items of a row under it", async () => {
