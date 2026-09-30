@@ -109,6 +109,7 @@ export const TableView = observer(function TableView_({
   const [menuFieldId, setMenuFieldId] = React.useState<string | null>(null);
   const [drop, setDrop] = React.useState<DropTarget | null>(null);
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
+  const [scrolled, setScrolled] = React.useState(false);
 
   React.useLayoutEffect(() => {
     editingRef.current = editing;
@@ -721,6 +722,12 @@ export const TableView = observer(function TableView_({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.recordId, active?.fieldId]);
 
+  const handleScroll = React.useCallback(
+    (event: React.UIEvent<HTMLDivElement>) =>
+      setScrolled(event.currentTarget.scrollLeft > 0),
+    []
+  );
+
   const draggedRecord = draggingId
     ? databaseRecords.recordById(database.id, draggingId)
     : undefined;
@@ -737,7 +744,7 @@ export const TableView = observer(function TableView_({
           onClear={() => setSelected([])}
         />
       )}
-      <Scroller>
+      <Scroller data-scrolled={scrolled || undefined} onScroll={handleScroll}>
         <Grid
           ref={gridRef}
           role="grid"

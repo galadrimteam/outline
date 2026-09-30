@@ -1,26 +1,47 @@
 import { transparentize } from "polished";
 import styled, { css } from "styled-components";
+import breakpoint from "styled-components-breakpoint";
 import { s } from "@shared/styles";
 import { GUTTER_WIDTH } from "./layout";
 
 /** Height of the header and footer lines. */
 export const HEADER_HEIGHT = 34;
 
+// The gutter lies in the page margin, like Notion's row handles: lines start
+// where the columns do.
 const gridLine = css`
-  border-bottom: 1px solid
-    ${(props) => transparentize(0.2, props.theme.divider)};
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    left: ${GUTTER_WIDTH}px;
+    right: 0;
+    bottom: 0;
+    border-bottom: 1px solid
+      ${(props) => transparentize(0.2, props.theme.divider)};
+    pointer-events: none;
+  }
 `;
 
 const cellLine = css`
   border-right: 1px solid ${(props) => transparentize(0.2, props.theme.divider)};
 `;
 
-/** Scrolls the table sideways when it is wider than the page. */
+/**
+ * Scrolls the table sideways when it is wider than the page. It starts a
+ * gutter's width left of the page column so that the drag handles and
+ * checkboxes take no room from the columns.
+ */
 export const Scroller = styled.div`
   position: relative;
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 4px;
+
+  ${breakpoint("tablet")`
+    margin-inline-start: -${GUTTER_WIDTH}px;
+  `};
 `;
 
 /** The table, as wide as its columns. */
@@ -42,8 +63,17 @@ export const Line = styled.div<{ $template: string }>`
 /** The line of column headers. */
 export const HeaderLine = styled(Line)`
   height: ${HEADER_HEIGHT}px;
-  border-top: 1px solid ${(props) => transparentize(0.2, props.theme.divider)};
   color: ${s("textSecondary")};
+
+  &::before {
+    content: "";
+    position: absolute;
+    left: ${GUTTER_WIDTH}px;
+    right: 0;
+    top: 0;
+    border-top: 1px solid ${(props) => transparentize(0.2, props.theme.divider)};
+    pointer-events: none;
+  }
 `;
 
 /** The rows container: rows are absolutely positioned inside it. */
@@ -92,7 +122,11 @@ const frozen = css<{ $frozen?: boolean; $left?: number }>`
     `}
 `;
 
-/** The left gutter of a line: drag handle and checkbox. */
+/**
+ * The left gutter of a line, in the page margin: drag handle and checkbox.
+ * It only hides the columns scrolled under it once the table scrolls
+ * sideways, so that it never covers the frame of the block.
+ */
 export const Gutter = styled.div`
   display: flex;
   align-items: center;
@@ -101,8 +135,11 @@ export const Gutter = styled.div`
   padding-right: 4px;
   position: sticky;
   left: 0;
-  z-index: 2;
-  background: ${s("background")};
+  z-index: 3;
+
+  [data-scrolled] & {
+    background: ${s("background")};
+  }
 `;
 
 /** A control in the gutter shown on hover (or while selected). */
@@ -288,7 +325,10 @@ export const NewButton = styled.button`
 /** The line of calculations under the rows. */
 export const FooterLine = styled(Line)`
   min-height: ${HEADER_HEIGHT}px;
-  border-bottom: 0;
+
+  &::after {
+    display: none;
+  }
 `;
 
 /** A calculation cell. */
