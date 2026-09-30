@@ -57,6 +57,7 @@ describe("DatabaseSettingsHelper", () => {
         },
         fieldMeta: { fldA: { endFieldId: "fldB" } },
         iconFieldId: "fldIcon",
+        subItemFieldId: "fldSub",
       },
       {
         viewOverrides: { viwA: { openPagesIn: "fullPage" }, viwB: null },
@@ -67,24 +68,32 @@ describe("DatabaseSettingsHelper", () => {
     expect(settings).toEqual({
       viewOverrides: { viwA: { openPagesIn: "fullPage" } },
       fieldMeta: { fldA: { endFieldId: "fldB" } },
+      subItemFieldId: "fldSub",
     });
+    expect(
+      DatabaseSettingsHelper.merge(settings, { subItemFieldId: null })
+    ).not.toHaveProperty("subItemFieldId");
   });
 
   it("merges a view's overrides key by key", () => {
     const settings = DatabaseSettingsHelper.mergeViewOverrides(
       { viewOverrides: { viwA: { cardSize: "small", hiddenStacks: [""] } } },
       "viwA",
-      { hiddenStacks: null, stackOrder: ["Done", "To do"] }
+      { hiddenStacks: null, stackOrder: ["Done", "To do"], subItems: "off" }
     );
 
     expect(settings.viewOverrides).toEqual({
-      viwA: { cardSize: "small", stackOrder: ["Done", "To do"] },
+      viwA: {
+        cardSize: "small",
+        stackOrder: ["Done", "To do"],
+        subItems: "off",
+      },
     });
 
     const emptied = DatabaseSettingsHelper.mergeViewOverrides(
       settings,
       "viwA",
-      { cardSize: null, stackOrder: null }
+      { cardSize: null, stackOrder: null, subItems: null }
     );
     expect(emptied.viewOverrides).toEqual({});
   });
@@ -94,6 +103,7 @@ describe("DatabaseSettingsHelper", () => {
       {
         fieldMeta: { fldA: {}, fldB: {} },
         iconFieldId: "fldA",
+        subItemFieldId: "fldA",
         pageLayout: { hiddenFieldIds: ["fldA", "fldB"], hideEmpty: true },
       },
       "fldA"
@@ -101,6 +111,7 @@ describe("DatabaseSettingsHelper", () => {
 
     expect(settings.fieldMeta).toEqual({ fldB: {} });
     expect(settings.iconFieldId).toBeUndefined();
+    expect(settings.subItemFieldId).toBeUndefined();
     expect(settings.pageLayout?.hiddenFieldIds).toEqual(["fldB"]);
     expect(settings.pageLayout?.hideEmpty).toBe(true);
   });

@@ -13,6 +13,7 @@ export interface DatabaseSettingsPatch {
   fieldMeta?: Record<string, DatabaseFieldMeta | null>;
   pageLayout?: DatabaseSettings["pageLayout"] | null;
   iconFieldId?: string | null;
+  subItemFieldId?: string | null;
 }
 
 /**
@@ -114,6 +115,13 @@ export class DatabaseSettingsHelper {
         next.iconFieldId = patch.iconFieldId;
       }
     }
+    if (patch.subItemFieldId !== undefined) {
+      if (patch.subItemFieldId === null) {
+        delete next.subItemFieldId;
+      } else {
+        next.subItemFieldId = patch.subItemFieldId;
+      }
+    }
     return next;
   }
 
@@ -131,6 +139,7 @@ export class DatabaseSettingsHelper {
     const next = this.merge(settings, {
       fieldMeta: { [fieldId]: null },
       ...(settings?.iconFieldId === fieldId ? { iconFieldId: null } : {}),
+      ...(settings?.subItemFieldId === fieldId ? { subItemFieldId: null } : {}),
     });
     if (next.pageLayout) {
       next.pageLayout = {
@@ -209,6 +218,7 @@ function overrideKeys(
     "openPagesIn",
     "defaultTemplateId",
     "timeline",
+    "subItems",
   ];
   return keys.filter((key) => key in overrides);
 }

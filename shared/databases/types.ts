@@ -297,6 +297,9 @@ export type DatabaseOpenPagesIn = "sidePeek" | "centerPeek" | "fullPage";
 
 export type DatabaseTimelineZoom = "week" | "month" | "quarter" | "year";
 
+/** How a table shows the sub-items of its rows: under their parent, folded (Notion's default), as rows of their own, or not at all. */
+export type DatabaseSubItemsMode = "nested" | "flattened" | "off";
+
 /** What Outline adds to a view the engine does not know about. */
 export interface DatabaseViewOverrides {
   /** Draw the engine's grid view as a list or a timeline; null goes back to the table. */
@@ -311,6 +314,8 @@ export interface DatabaseViewOverrides {
   openPagesIn?: DatabaseOpenPagesIn;
   /** Outline template document used by "New" in this view. */
   defaultTemplateId?: string | null;
+  /** How a table shows sub-items when the database has some; nested when unset. */
+  subItems?: DatabaseSubItemsMode;
   timeline?: {
     startFieldId?: string;
     endFieldId?: string;
@@ -455,6 +460,11 @@ export interface DatabaseSettings {
   };
   /** The field holding a row's emoji (the migration writes one called « Icon »). */
   iconFieldId?: string;
+  /**
+   * The relation of the table to itself listing a row's sub-items (Notion's « Sub-items »); its
+   * symmetric field holds each row's parent.
+   */
+  subItemFieldId?: string;
 }
 
 /** Websocket event sent to the readers of a database when its data changes. */

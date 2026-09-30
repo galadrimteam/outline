@@ -430,10 +430,11 @@ describe("#databases.update", () => {
         title: "Renamed",
         settings: {
           viewOverrides: {
-            viwGrid: { openPagesIn: "fullPage" },
+            viwGrid: { openPagesIn: "fullPage", subItems: "flattened" },
             viwBoard: null,
           },
           pageLayout: { hideEmpty: true },
+          subItemFieldId: "fldSubItems",
         },
       },
     });
@@ -442,9 +443,12 @@ describe("#databases.update", () => {
     expect(res.status).toEqual(200);
     expect(body.data.title).toEqual("Renamed");
     expect(body.data.settings).toEqual({
-      viewOverrides: { viwGrid: { openPagesIn: "fullPage" } },
+      viewOverrides: {
+        viwGrid: { openPagesIn: "fullPage", subItems: "flattened" },
+      },
       iconFieldId: "fldIcon",
       pageLayout: { hideEmpty: true },
+      subItemFieldId: "fldSubItems",
     });
   });
 

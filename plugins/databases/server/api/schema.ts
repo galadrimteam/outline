@@ -263,6 +263,7 @@ const zViewOverrides = z.object({
   openPagesIn: z.enum(["sidePeek", "centerPeek", "fullPage"]).optional(),
   defaultTemplateId: z.uuid().optional(),
   timeline: zTimelineOverrides.optional(),
+  subItems: z.enum(["nested", "flattened", "off"]).optional(),
 });
 
 /** Overrides of `databaseViews.update`: null (or "" for an id) removes a key. */
@@ -275,6 +276,7 @@ const zViewOverridesPatch = z.object({
   openPagesIn: z.enum(["sidePeek", "centerPeek", "fullPage"]).nullish(),
   defaultTemplateId: z.uuid().nullish(),
   timeline: zTimelineOverrides.nullish(),
+  subItems: z.enum(["nested", "flattened", "off"]).nullish(),
 });
 
 const zFieldMeta = z.object({
@@ -295,6 +297,7 @@ const zSettingsPatch = z.object({
     })
     .nullish(),
   iconFieldId: zEngineId.nullish(),
+  subItemFieldId: zEngineId.nullish(),
 });
 
 const zFieldOptions = z.object({
