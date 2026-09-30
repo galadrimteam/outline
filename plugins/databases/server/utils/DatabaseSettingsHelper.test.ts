@@ -98,6 +98,25 @@ describe("DatabaseSettingsHelper", () => {
     expect(emptied.viewOverrides).toEqual({});
   });
 
+  it("gives the engine the order and the folded groups of a view", () => {
+    const settings = {
+      viewOverrides: {
+        viwA: { stackOrder: ["S1", ""], hiddenStacks: [""] },
+        viwB: { cardSize: "small" as const },
+      },
+    };
+    expect(DatabaseSettingsHelper.groupLayout(settings, "viwA")).toEqual({
+      order: ["S1", ""],
+      hidden: [""],
+    });
+    expect(DatabaseSettingsHelper.groupLayout(settings, "viwB")).toBe(
+      undefined
+    );
+    expect(DatabaseSettingsHelper.groupLayout(settings, undefined)).toBe(
+      undefined
+    );
+  });
+
   it("forgets a deleted field", () => {
     const settings = DatabaseSettingsHelper.withoutField(
       {

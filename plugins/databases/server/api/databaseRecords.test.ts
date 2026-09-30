@@ -364,6 +364,30 @@ describe("#databaseRecords reads", () => {
     expect(historyBody.pagination).toEqual({ nextCursor: null });
   });
 
+  it("reads a view's rows with the order and the folded groups it keeps", async () => {
+    await database.update({
+      settings: {
+        ...database.settings,
+        viewOverrides: {
+          viwGrid: { stackOrder: ["S1", ""], hiddenStacks: [""] },
+        },
+      },
+    });
+    await server.post("/api/databaseRecords.list", user, {
+      body: { databaseId: database.id, viewId: "viwGrid" },
+    });
+    await server.post("/api/databaseRecords.groups", user, {
+      body: { databaseId: database.id, viewId: "viwGrid" },
+    });
+    const layout = { order: ["S1", ""], hidden: [""] };
+    expect(engine.callsTo("listRecords")[0].args[0]).toMatchObject({
+      groupLayout: layout,
+    });
+    expect(engine.callsTo("groupPoints")[0].args[0]).toMatchObject({
+      groupLayout: layout,
+    });
+  });
+
   it("asks the engine for the calculations of each group", async () => {
     await server.post("/api/databaseRecords.aggregate", user, {
       body: {

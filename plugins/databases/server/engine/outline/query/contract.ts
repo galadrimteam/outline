@@ -4,6 +4,7 @@ import type {
   DatabaseField,
   DatabaseFilter,
   DatabaseGroup,
+  DatabaseGroupLayout,
   DatabaseGroupPoint,
   DatabaseSort,
   DatabaseStatisticFunc,
@@ -52,6 +53,8 @@ export interface RecordSelection {
   sort?: DatabaseSort | null;
   /** Matches the displayed text of any field, case and accents ignored. */
   search?: string;
+  /** The order of the view's groups and those it folds away, whose records are left out. */
+  groupLayout?: DatabaseGroupLayout;
 }
 
 export interface InferredType {
@@ -97,7 +100,8 @@ export interface OutlineQuery {
   groupPoints(
     table: TableSnapshot,
     records: ComputedRecord[],
-    group: DatabaseGroup
+    group: DatabaseGroup,
+    layout?: DatabaseGroupLayout
   ): DatabaseGroupPoint[];
 
   /**
@@ -107,7 +111,8 @@ export interface OutlineQuery {
   groupMembers(
     table: TableSnapshot,
     records: ComputedRecord[],
-    group: DatabaseGroup
+    group: DatabaseGroup,
+    layout?: DatabaseGroupLayout
   ): Map<string, ComputedRecord[]>;
 
   /** One statistic per field over already selected records. */

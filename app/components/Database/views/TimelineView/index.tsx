@@ -28,7 +28,7 @@ import { getCell } from "../../cells/registry";
 import { MenuItem, MenuLabel, MenuPanel } from "../../fields/components";
 import { CompactSelect } from "../../toolbar/components";
 import type { RecordGroup } from "../../toolbar/grouping";
-import { groupRecords } from "../../toolbar/grouping";
+import { groupRecords, viewGroupLayout } from "../../toolbar/grouping";
 import { useViewUpdate } from "../../toolbar/useViewUpdate";
 import type { DatabaseViewProps } from "../../types";
 import type { DaySpan } from "../CalendarView/calendarModel";
@@ -203,19 +203,29 @@ export const TimelineView = observer(function TimelineView({
         record,
       }));
     }
-    return groupRecords(query.records, groupField, groupLevel?.order).flatMap(
-      (group): TimelineRow[] => [
-        { type: "group", key: `group:${group.key}`, group },
-        ...(collapsed.has(group.key)
-          ? []
-          : group.records.filter(dated).map((record) => ({
-              type: "record" as const,
-              key: `${group.key}:${record.id}`,
-              record,
-            }))),
-      ]
-    );
-  }, [query.records, spans, groupField, groupLevel?.order, collapsed]);
+    return groupRecords(
+      query.records,
+      groupField,
+      groupLevel?.order,
+      viewGroupLayout(view.overrides)
+    ).flatMap((group): TimelineRow[] => [
+      { type: "group", key: `group:${group.key}`, group },
+      ...(collapsed.has(group.key)
+        ? []
+        : group.records.filter(dated).map((record) => ({
+            type: "record" as const,
+            key: `${group.key}:${record.id}`,
+            record,
+          }))),
+    ]);
+  }, [
+    query.records,
+    spans,
+    groupField,
+    groupLevel?.order,
+    view.overrides,
+    collapsed,
+  ]);
 
   const visibleWidth = React.useCallback(
     (scroller: HTMLDivElement) => scroller.clientWidth - tableWidth,

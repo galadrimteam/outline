@@ -7,6 +7,7 @@ import type {
   DatabaseFieldType,
   DatabaseFilter,
   DatabaseGroup,
+  DatabaseGroupLayout,
   DatabaseGroupPoint,
   DatabaseHistoryEntry,
   DatabaseLayout,
@@ -434,6 +435,8 @@ export interface DatabaseRecordQuery {
   /** Sorted before the view's sort. */
   sort?: DatabaseSort | null;
   search?: string;
+  /** The order of the view's groups and those it folds away (not for boards, whose columns have their own). */
+  groupLayout?: DatabaseGroupLayout;
   skip: number;
   take: number;
 }
@@ -461,6 +464,8 @@ export interface DatabaseGroupQuery {
   groupBy?: DatabaseGroup | null;
   filter?: DatabaseFilter | null;
   search?: string;
+  /** The order of the view's groups and those it folds away, when grouped as the view says. */
+  groupLayout?: DatabaseGroupLayout;
 }
 
 export interface DatabaseAggregateQuery {
@@ -470,6 +475,8 @@ export interface DatabaseAggregateQuery {
   search?: string;
   /** Also compute each statistic per group of the view (Notion's calculation under every group). */
   byGroup?: boolean;
+  /** The order of the view's groups and those it folds away. */
+  groupLayout?: DatabaseGroupLayout;
 }
 
 export type DatabaseAggregateValue = DatabaseStatisticResult;

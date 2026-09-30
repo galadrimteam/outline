@@ -55,6 +55,29 @@ describe("groupRecords", () => {
     expect(groups[2].records.map((r) => r.id)).toEqual(["1", "4"]);
   });
 
+  it("follows the order of the view's groups and leaves the folded ones out", () => {
+    const records = [
+      record("1", "Done"),
+      record("2", "To do"),
+      record("3", undefined),
+      record("4", "Doing"),
+    ];
+    const groups = groupRecords(records, status, "asc", {
+      order: ["Done", "", "To do"],
+      hidden: ["To do"],
+    });
+    expect(groups.map((g) => g.key)).toEqual(["Done", "", "Doing"]);
+    const checkbox = field({
+      type: DatabaseFieldType.Checkbox,
+      cellValueType: "boolean",
+    });
+    expect(
+      groupRecords([record("1", null), record("2", true)], checkbox, "asc", {
+        order: ["true", "false"],
+      }).map((g) => g.key)
+    ).toEqual(["true", "false"]);
+  });
+
   it("reverses the filled groups when descending", () => {
     const groups = groupRecords(
       [record("1", "Done"), record("2", "To do"), record("3", null)],

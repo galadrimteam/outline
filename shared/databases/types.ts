@@ -230,6 +230,16 @@ export interface DatabaseSort {
 
 export type DatabaseGroup = DatabaseSortItem[];
 
+/**
+ * The order and the folded groups of the first level of a view's grouping (a board's `stackOrder`
+ * and `hiddenStacks`), keyed by the choice name, "true" or "false" for a checkbox, the id of a
+ * person or a linked row, "" for the rows without a value.
+ */
+export interface DatabaseGroupLayout {
+  order?: string[];
+  hidden?: string[];
+}
+
 export type DatabaseStatisticFunc =
   | "count"
   | "empty"

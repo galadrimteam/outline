@@ -21,6 +21,7 @@ import {
 } from "../presenters/databaseRecords";
 import { actorFor } from "../utils/actor";
 import { cellText } from "../utils/cellText";
+import { DatabaseSettingsHelper } from "../utils/DatabaseSettingsHelper";
 import { DatabaseUserMapper } from "../utils/DatabaseUserMapper";
 import {
   loadDatabaseForRead,
@@ -70,6 +71,10 @@ router.post(
           can(user, "update", database) === true,
         sort,
         search,
+        groupLayout: DatabaseSettingsHelper.groupLayout(
+          database.settings,
+          viewId
+        ),
         skip: offset,
         take: limit,
       }
@@ -306,7 +311,16 @@ router.post(
     const points = await engineFor(database).groupPoints(
       access.actor,
       refFor(database),
-      { viewId, groupBy, filter, search }
+      {
+        viewId,
+        groupBy,
+        filter,
+        search,
+        groupLayout: DatabaseSettingsHelper.groupLayout(
+          database.settings,
+          viewId
+        ),
+      }
     );
     await DatabaseUserMapper.enrichValues(
       database.teamId,
@@ -339,6 +353,10 @@ router.post(
           filter,
           search,
           byGroup,
+          groupLayout: DatabaseSettingsHelper.groupLayout(
+            database.settings,
+            viewId
+          ),
         })
       : {};
 

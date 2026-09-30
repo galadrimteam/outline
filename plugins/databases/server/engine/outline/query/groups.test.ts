@@ -157,6 +157,51 @@ describe("groupPoints", () => {
   });
 });
 
+describe("group layout", () => {
+  const group = [{ fieldId: "status", order: "asc" as const }];
+  const layout = { order: ["Doing", "", "Todo"], hidden: ["Todo"] };
+
+  it("orders the groups as the view says and leaves the folded ones out", () => {
+    const records = selectRecords(
+      table,
+      base,
+      { view: makeView({ id: "v", group }), groupLayout: layout },
+      context
+    );
+    expect(records.map((record) => record.row.id)).toEqual([
+      "rec1",
+      "rec3",
+      "rec5",
+      "rec4",
+    ]);
+    expect(shape(groupPoints(table, records, group, layout))).toEqual([
+      '0:"Doing"',
+      3,
+      "0:null",
+      1,
+    ]);
+    const members = groupMembers(table, records, group, layout);
+    expect(Array.from(members.values()).map((list) => list.length)).toEqual([
+      3, 1,
+    ]);
+  });
+
+  it("puts the groups the view does not list after the others", () => {
+    const records = selectRecords(
+      table,
+      base,
+      {
+        view: makeView({ id: "v", group }),
+        groupLayout: { order: ["Todo"] },
+      },
+      context
+    );
+    expect(
+      shape(groupPoints(table, records, group, { order: ["Todo"] }))
+    ).toEqual(['0:"Todo"', 1, "0:null", 1, '0:"Doing"', 3]);
+  });
+});
+
 describe("groupMembers", () => {
   it("gives the records of every group under the ids of the headers", () => {
     const group = [

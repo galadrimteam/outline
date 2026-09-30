@@ -10,7 +10,11 @@ import type {
 } from "@shared/databases/types";
 import { borderRadius, ellipsis, s } from "@shared/styles";
 import type Database from "~/models/Database";
-import { groupPrefill, groupRecords } from "../../toolbar/grouping";
+import {
+  groupPrefill,
+  groupRecords,
+  viewGroupLayout,
+} from "../../toolbar/grouping";
 import type { DatabaseViewProps } from "../../types";
 import { GallerySection } from "../GalleryView";
 import {
@@ -76,24 +80,27 @@ export const ListView = observer(function ListView({
   return (
     <Wrapper aria-busy={query.isLoading}>
       {groupField
-        ? groupRecords(query.records, groupField, groupLevel?.order).map(
-            (group) => {
-              const value = groupPrefill(groupField, group);
-              return (
-                <GallerySection
-                  key={group.key}
-                  database={database}
-                  field={groupField}
-                  group={group}
-                >
-                  {renderRows(
-                    group.records,
-                    value === undefined ? undefined : { [groupField.id]: value }
-                  )}
-                </GallerySection>
-              );
-            }
-          )
+        ? groupRecords(
+            query.records,
+            groupField,
+            groupLevel?.order,
+            viewGroupLayout(view.overrides)
+          ).map((group) => {
+            const value = groupPrefill(groupField, group);
+            return (
+              <GallerySection
+                key={group.key}
+                database={database}
+                field={groupField}
+                group={group}
+              >
+                {renderRows(
+                  group.records,
+                  value === undefined ? undefined : { [groupField.id]: value }
+                )}
+              </GallerySection>
+            );
+          })
         : renderRows(query.records)}
       {query.isLoaded && !query.records.length && !canCreate && (
         <Empty>{t("No pages to show")}</Empty>

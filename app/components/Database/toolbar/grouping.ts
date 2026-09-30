@@ -3,10 +3,12 @@ import type {
   DatabaseCellInput,
   DatabaseCellValue,
   DatabaseField,
+  DatabaseGroupLayout,
   DatabaseLinkValue,
   DatabaseRecord,
   DatabaseSortOrder,
   DatabaseUserValue,
+  DatabaseViewOverrides,
 } from "@shared/databases/types";
 import { DatabaseFieldType } from "@shared/databases/types";
 
@@ -30,17 +32,21 @@ interface GroupValue {
 /**
  * Splits rows into groups by a field, like Notion: a row with several values
  * (tags, people, relations) appears in the group of each value, the empty
- * group comes first, select groups follow the order of their options.
+ * group comes first, select groups follow the order of their options. A
+ * view's own order of its groups comes before that, and the groups it folds
+ * away are left out.
  *
  * @param records the rows, in view order (kept inside each group).
  * @param field the grouping field.
  * @param order the direction of the groups.
+ * @param layout the order and the folded groups of the view.
  * @returns the groups, empty ones left out.
  */
 export function groupRecords(
   records: DatabaseRecord[],
   field: DatabaseField,
-  order: DatabaseSortOrder = "asc"
+  order: DatabaseSortOrder = "asc",
+  layout?: DatabaseGroupLayout
 ): RecordGroup[] {
   const groups = new Map<string, RecordGroup>();
 
@@ -64,7 +70,32 @@ export function groupRecords(
   if (order === "desc") {
     filled.reverse();
   }
-  return empty ? [empty, ...filled] : filled;
+  const natural = empty ? [empty, ...filled] : filled;
+  const hidden = new Set(layout?.hidden ?? []);
+  const ranks = new Map(
+    (layout?.order ?? []).map((key, index) => [key, index])
+  );
+  const rank = (group: RecordGroup) =>
+    ranks.get(group.key) ?? Number.POSITIVE_INFINITY;
+  return natural
+    .filter((group) => !hidden.has(group.key))
+    .map((group, index) => ({ group, index }))
+    .sort(
+      (a, b) => compareRanks(rank(a.group), rank(b.group)) || a.index - b.index
+    )
+    .map(({ group }) => group);
+}
+
+/**
+ * The order and the folded groups a view gives its groups, from its overrides.
+ *
+ * @param overrides the overrides of the view.
+ * @returns the group layout.
+ */
+export function viewGroupLayout(
+  overrides: Pick<DatabaseViewOverrides, "stackOrder" | "hiddenStacks">
+): DatabaseGroupLayout {
+  return { order: overrides.stackOrder, hidden: overrides.hiddenStacks };
 }
 
 /**
@@ -231,6 +262,10 @@ function isLinkValue(value: unknown): value is DatabaseLinkValue {
     "id" in value &&
     !("mimetype" in value)
   );
+}
+
+function compareRanks(a: number, b: number): number {
+  return a === b ? 0 : a < b ? -1 : 1;
 }
 
 function groupComparator(field: DatabaseField) {

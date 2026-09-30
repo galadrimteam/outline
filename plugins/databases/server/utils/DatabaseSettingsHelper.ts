@@ -1,6 +1,7 @@
 import type {
   DatabaseField,
   DatabaseFieldMeta,
+  DatabaseGroupLayout,
   DatabaseSettings,
   DatabaseView,
   DatabaseViewOverrides,
@@ -57,6 +58,25 @@ export class DatabaseSettingsHelper {
       overrides,
       layout: overrides.layout ?? view.layout,
     };
+  }
+
+  /**
+   * Returns the order and the folded groups a view gives its groups (its
+   * `stackOrder` and `hiddenStacks`), for the engine to read the view's rows.
+   *
+   * @param settings the database's settings.
+   * @param viewId the view, if any.
+   * @returns the group layout, undefined when the view gives none.
+   */
+  public static groupLayout(
+    settings: DatabaseSettings | null | undefined,
+    viewId: string | undefined
+  ): DatabaseGroupLayout | undefined {
+    const overrides = viewId ? settings?.viewOverrides?.[viewId] : undefined;
+    if (!overrides?.stackOrder?.length && !overrides?.hiddenStacks?.length) {
+      return undefined;
+    }
+    return { order: overrides.stackOrder, hidden: overrides.hiddenStacks };
   }
 
   /**

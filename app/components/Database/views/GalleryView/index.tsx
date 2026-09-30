@@ -11,7 +11,11 @@ import type {
 } from "@shared/databases/types";
 import { borderRadius, ellipsis, s } from "@shared/styles";
 import type Database from "~/models/Database";
-import { groupPrefill, groupRecords } from "../../toolbar/grouping";
+import {
+  groupPrefill,
+  groupRecords,
+  viewGroupLayout,
+} from "../../toolbar/grouping";
 import type { RecordGroup } from "../../toolbar/grouping";
 import type { DatabaseViewProps } from "../../types";
 import {
@@ -89,18 +93,21 @@ export const GalleryView = observer(function GalleryView({
   return (
     <Wrapper>
       {groupField
-        ? groupRecords(query.records, groupField, groupLevel?.order).map(
-            (group) => (
-              <GallerySection
-                key={group.key}
-                database={database}
-                field={groupField}
-                group={group}
-              >
-                {renderCards(group.records, prefillFor(groupField, group))}
-              </GallerySection>
-            )
-          )
+        ? groupRecords(
+            query.records,
+            groupField,
+            groupLevel?.order,
+            viewGroupLayout(view.overrides)
+          ).map((group) => (
+            <GallerySection
+              key={group.key}
+              database={database}
+              field={groupField}
+              group={group}
+            >
+              {renderCards(group.records, prefillFor(groupField, group))}
+            </GallerySection>
+          ))
         : renderCards(query.records)}
       {!query.records.length && !canCreate && (
         <Empty>{t("No pages to show")}</Empty>
