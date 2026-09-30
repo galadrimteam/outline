@@ -3,8 +3,15 @@ import { difference } from "es-toolkit/compat";
 import type { FindOptions, WhereOptions } from "sequelize";
 import { Op } from "sequelize";
 import { v4 as uuidv4 } from "uuid";
-import { CommentStatusFilter, MentionType, IconType } from "@shared/types";
+import type { ProsemirrorData } from "@shared/types";
+import {
+  CommentStatusFilter,
+  MentionType,
+  IconType,
+  UserRole,
+} from "@shared/types";
 import { determineIconType } from "@shared/utils/icon";
+import { commentImporter } from "@server/commands/commentImporter";
 import { commentParser } from "@server/editor";
 import auth from "@server/middlewares/authentication";
 import { commentingEnabled } from "@server/middlewares/feature";
@@ -126,6 +133,75 @@ router.post(
 
     ctx.body = {
       data: presentComment(comment),
+      policies: presentPolicies(user, [comment]),
+    };
+  }
+);
+
+router.post(
+  "comments.import",
+  auth({ role: UserRole.Admin }),
+  validate(T.CommentsImportSchema),
+  transaction(),
+  async (ctx: APIContext<T.CommentsImportReq>) => {
+    const {
+      id,
+      documentId,
+      parentCommentId,
+      createdById,
+      createdAt,
+      text,
+      resolvedAt,
+      resolvedById,
+      anchorText,
+      anchorPrefix,
+      anchorSuffix,
+    } = ctx.input.body;
+    const { user } = ctx.state.auth;
+    const { transaction } = ctx.state;
+
+    if (anchorText) {
+      await Document.unscoped().findOne({
+        where: { id: documentId },
+        attributes: ["id"],
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+    }
+
+    const document = await Document.findByPk(documentId, {
+      userId: user.id,
+      transaction,
+      includeState: !!anchorText,
+    });
+    // not "comment": an import goes through when the team has commenting off
+    authorize(user, "read", document);
+
+    const data: ProsemirrorData | null | undefined = text
+      ? commentParser.parse(text).toJSON()
+      : ctx.input.body.data;
+    if (!data) {
+      throw ValidationError("One of data or text is required");
+    }
+
+    const { comment, created, anchored } = await commentImporter(ctx, {
+      id,
+      document,
+      parentCommentId,
+      createdById,
+      createdAt,
+      data,
+      resolvedAt,
+      resolvedById,
+      anchor: anchorText
+        ? { text: anchorText, prefix: anchorPrefix, suffix: anchorSuffix }
+        : null,
+    });
+
+    ctx.body = {
+      data: presentComment(comment),
+      created,
+      anchored,
       policies: presentPolicies(user, [comment]),
     };
   }

@@ -402,6 +402,9 @@ export type CommentEvent =
       modelId: string;
       documentId: string;
       actorId: string;
+      data?: {
+        source?: "import";
+      };
     })
   | CommentUpdateEvent
   | (BaseEvent<Comment> & {
