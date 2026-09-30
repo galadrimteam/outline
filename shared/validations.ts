@@ -69,8 +69,11 @@ export const CommentValidation = {
 };
 
 export const DocumentValidation = {
-  /** The maximum length of the document title */
-  maxTitleLength: 100,
+  /**
+   * The maximum length of the document title. galadrim: Notion has no such limit and the titles of migrated rows
+   * (user stories) reach 425 characters; 100 cut them.
+   */
+  maxTitleLength: 1000,
 
   /** The maximum length of the document summary */
   maxSummaryLength: 1000,

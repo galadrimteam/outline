@@ -10,6 +10,7 @@ import type {
   DatabaseGroupPoint,
   DatabaseHistoryEntry,
   DatabaseLayout,
+  DatabaseLookupOptions,
   DatabaseRecord,
   DatabaseRecordOrder,
   DatabaseRecordPosition,
@@ -503,6 +504,10 @@ export interface DatabaseFieldCreate {
   name: string;
   type: DatabaseFieldType;
   options?: DatabaseFieldOptions;
+  /** The link and the field a rollup or a lookup reads through. */
+  lookupOptions?: DatabaseLookupOptions;
+  /** A lookup: the field shows the looked-up values as they are. */
+  isLookup?: boolean;
   /** The view the field is added from, where it stays visible. */
   viewId?: string;
 }
@@ -520,6 +525,9 @@ export interface DatabaseFieldDuplicate {
 export interface DatabaseFieldConvert {
   type: DatabaseFieldType;
   options?: DatabaseFieldOptions;
+  /** The link and the field a rollup or a lookup reads through; kept from the field when not given. */
+  lookupOptions?: DatabaseLookupOptions;
+  isLookup?: boolean;
 }
 
 export interface DatabaseViewCreate {

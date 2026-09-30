@@ -8,6 +8,7 @@ import databaseRecordPages from "./api/databaseRecordPages";
 import databaseRecords from "./api/databaseRecords";
 import databases from "./api/databases";
 import databaseViews from "./api/databaseViews";
+import teableGateway from "./api/teableGateway";
 import teableHooks from "./api/teableHooks";
 import { DatabaseRecordAssignedEmail } from "./email/templates/DatabaseRecordAssignedEmail";
 import { DatabaseAutomationProcessor } from "./automations/DatabaseAutomationProcessor";
@@ -30,6 +31,7 @@ PluginManager.add([
   { type: Hook.API, value: databaseAutomations },
   { type: Hook.API, value: databaseForms },
   { type: Hook.API, value: databaseDuplicate },
+  { type: Hook.API, value: teableGateway },
   { type: Hook.Processor, value: DatabaseAutomationProcessor },
   { type: Hook.Processor, value: DatabaseRowTitleProcessor },
   { type: Hook.Processor, value: DatabaseChangeTitleProcessor },

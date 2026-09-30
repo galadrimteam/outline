@@ -506,9 +506,9 @@ export class OutlineEngine implements DatabaseEngine {
           type: input.type,
           description: null,
           options,
-          lookupOptions: null,
+          lookupOptions: input.lookupOptions ?? null,
           isPrimary: false,
-          isLookup: false,
+          isLookup: input.isLookup ?? false,
           order: this.fields.nextOrder(batch, tableId),
         };
         let field: EngineFieldRow;

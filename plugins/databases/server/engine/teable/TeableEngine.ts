@@ -458,6 +458,8 @@ export class TeableEngine implements DatabaseEngine {
         name: input.name,
         type: input.type,
         options: input.options,
+        lookupOptions: input.lookupOptions,
+        isLookup: input.isLookup,
         viewId: input.viewId,
       },
     });
@@ -492,7 +494,12 @@ export class TeableEngine implements DatabaseEngine {
     const field = await this.call<TeableField>(actor, ref.externalBaseId, {
       method: "PUT",
       path: `${tablePath(ref)}/field/${encode(fieldId)}/convert`,
-      body: { type: input.type, options: input.options },
+      body: {
+        type: input.type,
+        options: input.options,
+        lookupOptions: input.lookupOptions,
+        isLookup: input.isLookup,
+      },
     });
     return this.mapper.field(field);
   }

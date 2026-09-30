@@ -75,9 +75,10 @@ export class FieldConverter {
       type: input.type,
       description: from.description,
       options: given,
-      lookupOptions: keepsLookup ? from.lookupOptions : null,
+      lookupOptions:
+        input.lookupOptions ?? (keepsLookup ? from.lookupOptions : null),
       isPrimary: from.isPrimary,
-      isLookup: from.isLookup && input.type === from.type,
+      isLookup: input.isLookup ?? (from.isLookup && input.type === from.type),
       order: from.order,
     };
 
