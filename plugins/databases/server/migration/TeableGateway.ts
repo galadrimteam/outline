@@ -500,13 +500,21 @@ function keyById(
   }
   const result: Record<string, DatabaseCellValue> = {};
   for (const [name, value] of Object.entries(cells)) {
-    const field = fields.find((item) => item.name === name);
+    // Notion keeps « Module » with its trailing space; the engine trims field names.
+    const field =
+      fields.find((item) => item.name === name) ??
+      fields.find((item) => sameName(item.name, name));
     if (!field) {
       throw ValidationError(`Unknown field "${name}"`);
     }
     result[field.id] = value;
   }
   return result;
+}
+
+function sameName(a: string, b: string): boolean {
+  const normalize = (text: string) => text.trim().replace(/\s+/g, " ");
+  return normalize(a) === normalize(b);
 }
 
 function choiceNames(value: DatabaseCellValue | undefined): string[] {
