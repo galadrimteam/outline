@@ -93,6 +93,7 @@ export const BoardLanes = observer(function BoardLanes({
             return query ? (
               <LaneColumnHeader
                 key={column.key}
+                database={database}
                 view={view}
                 field={field}
                 column={column}

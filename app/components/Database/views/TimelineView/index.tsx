@@ -527,7 +527,7 @@ export const TimelineView = observer(function TimelineView({
                   onClick={handleCreate}
                 >
                   <PlusIcon size={18} />
-                  {t("New")}
+                  {t("New page")}
                 </NewRow>
               </Row>
             )}
