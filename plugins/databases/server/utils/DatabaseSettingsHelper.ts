@@ -201,6 +201,7 @@ function overrideKeys(
   overrides: NullableOverrides
 ): (keyof DatabaseViewOverrides)[] {
   const keys: (keyof DatabaseViewOverrides)[] = [
+    "icon",
     "layout",
     "subGroupFieldId",
     "stackOrder",

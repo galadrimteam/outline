@@ -10,7 +10,7 @@ import {
   DatabaseStatusGroup,
 } from "@shared/databases/types";
 import { BaseSchema } from "@server/routes/api/schema";
-import { zodShareIdType } from "@server/utils/zod";
+import { zodIconType, zodShareIdType } from "@server/utils/zod";
 
 /** An engine id (table, field, view, record): never trusted beyond its format. */
 const zEngineId = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, {
@@ -254,6 +254,7 @@ const zTimelineOverrides = z.object({
 });
 
 const zViewOverrides = z.object({
+  icon: zodIconType().optional(),
   layout: z.enum([DatabaseLayout.List, DatabaseLayout.Timeline]).optional(),
   subGroupFieldId: zIdOrEmpty,
   stackOrder: z.array(z.string().max(1000)).max(1000).optional(),
@@ -266,6 +267,7 @@ const zViewOverrides = z.object({
 
 /** Overrides of `databaseViews.update`: null (or "" for an id) removes a key. */
 const zViewOverridesPatch = z.object({
+  icon: zodIconType().nullish(),
   layout: z.enum([DatabaseLayout.List, DatabaseLayout.Timeline]).nullish(),
   subGroupFieldId: zIdOrUnset,
   stackOrder: z.array(z.string().max(1000)).max(1000).nullish(),

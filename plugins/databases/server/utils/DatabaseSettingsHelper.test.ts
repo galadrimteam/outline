@@ -89,6 +89,24 @@ describe("DatabaseSettingsHelper", () => {
     expect(emptied.viewOverrides).toEqual({});
   });
 
+  it("keeps and removes a view's icon", () => {
+    const settings = DatabaseSettingsHelper.mergeViewOverrides(
+      { viewOverrides: { viwA: { cardSize: "small" } } },
+      "viwA",
+      { icon: "map" }
+    );
+    expect(settings.viewOverrides).toEqual({
+      viwA: { cardSize: "small", icon: "map" },
+    });
+
+    const cleared = DatabaseSettingsHelper.mergeViewOverrides(
+      settings,
+      "viwA",
+      { icon: null }
+    );
+    expect(cleared.viewOverrides).toEqual({ viwA: { cardSize: "small" } });
+  });
+
   it("forgets a deleted field", () => {
     const settings = DatabaseSettingsHelper.withoutField(
       {
