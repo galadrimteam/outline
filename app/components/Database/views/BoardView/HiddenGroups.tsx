@@ -100,6 +100,7 @@ const Wrapper = styled.section`
 `;
 
 const Heading = styled.div`
+  ${borderBox}
   display: flex;
   align-items: center;
   min-height: 42px;

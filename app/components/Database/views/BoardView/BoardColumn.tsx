@@ -607,6 +607,7 @@ const Cell = styled.div<{ $width: number; $tint: string }>`
 `;
 
 const Header = styled.div<{ $tint: string }>`
+  ${borderBox}
   position: sticky;
   top: 0;
   z-index: 1;
