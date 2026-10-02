@@ -64,8 +64,11 @@ export const CollectionValidation = {
 };
 
 export const CommentValidation = {
-  /** The maximum length of a comment */
-  maxLength: 1000,
+  /**
+   * The maximum length of a comment. galadrim: 1000 refused comments written in Notion (the migration of MGE had four
+   * longer threads), and someone used to Notion hits it when writing a review.
+   */
+  maxLength: 10000,
 };
 
 export const DocumentValidation = {
