@@ -65,6 +65,7 @@ export function useBlockMenuActions(): BlockMenuActions {
         ? (color: string | null) => {
             const { view } = editor;
             highlightBlock(highlight, color)(view.state, view.dispatch);
+            view.focus();
           }
         : undefined,
     };
