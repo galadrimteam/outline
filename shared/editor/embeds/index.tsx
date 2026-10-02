@@ -751,7 +751,7 @@ const embeds: EmbedDescriptor[] = [
   new EmbedDescriptor({
     id: "embed",
     title: "Embed",
-    keywords: "iframe webpage",
+    keywords: "embed iframe webpage intégrer intégration integration site web",
     placeholder: "Paste a URL to embed",
     icon: <BrowserIcon />,
     defaultHidden: false,
