@@ -20,7 +20,7 @@ import { presentDatabase, presentPolicies } from "@server/presenters";
 import { QueryHelper } from "@server/storage/QueryHelper";
 import type { APIContext } from "@server/types";
 import { databaseCreator } from "../commands/databaseCreator";
-import { removeRowPropertyTables } from "../commands/rowPropertyTables";
+import { importedRowPagesCleaner } from "../commands/importedRowPagesCleaner";
 import { engineFor, refFor } from "../engine";
 import { engineOfTable } from "../utils/tableEngine";
 import env from "../env";
@@ -28,7 +28,6 @@ import { ConvertTeableEmbedsTask } from "../tasks/ConvertTeableEmbedsTask";
 import { MoveDatabaseEngineTask } from "../tasks/MoveDatabaseEngineTask";
 import { presentDatabaseForUser } from "../presenters/database";
 import { presentDatabaseSchema } from "../presenters/databaseSchema";
-import { actorFor } from "../utils/actor";
 import { DatabaseSettingsHelper } from "../utils/DatabaseSettingsHelper";
 import { loadDatabaseForRead } from "../utils/shareAccess";
 import {
@@ -304,19 +303,12 @@ router.post(
 
     const database = await loadDatabase(user, id, "update", { transaction });
     const linked = await databaseRowsLinker(ctx.context, { database, pairs });
-    // The properties panel now shows what the migration had written as a table in each page.
-    const { fields } = await engineFor(database).getSchema(
-      actorFor(user),
-      refFor(database)
-    );
+    // The properties panel now shows what the migration had written on top of each page.
     transaction.afterCommit(async () => {
-      await removeRowPropertyTables(
-        user,
-        database,
-        pairs.map((pair) => pair.documentId),
-        fields.map((field) => field.name)
-      ).catch((error) =>
-        Logger.warn("Could not remove the property tables of row pages", {
+      await importedRowPagesCleaner(user, database, {
+        documentIds: pairs.map((pair) => pair.documentId),
+      }).catch((error) =>
+        Logger.warn("Could not clean the row pages just linked", {
           databaseId: database.id,
           error: toError(error).message,
         })
@@ -324,6 +316,27 @@ router.post(
     });
 
     ctx.body = { data: { linked } };
+  }
+);
+
+router.post(
+  "databases.cleanRowPages",
+  rateLimiter(DatabaseRateLimit.Schema),
+  auth({ role: UserRole.Admin }),
+  validate(T.DatabasesCleanRowPagesSchema),
+  async (ctx: APIContext<T.DatabasesCleanRowPagesReq>) => {
+    const { user } = ctx.state.auth;
+    const { id, dryRun, offset, limit } = ctx.input.body;
+
+    const database = await loadDatabase(user, id, "update");
+
+    ctx.body = {
+      data: await importedRowPagesCleaner(user, database, {
+        dryRun,
+        offset,
+        limit,
+      }),
+    };
   }
 );
 

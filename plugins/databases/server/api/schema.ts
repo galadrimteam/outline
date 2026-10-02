@@ -449,6 +449,20 @@ export const DatabasesLinkRowsSchema = BaseSchema.extend({
 
 export type DatabasesLinkRowsReq = z.infer<typeof DatabasesLinkRowsSchema>;
 
+export const DatabasesCleanRowPagesSchema = BaseSchema.extend({
+  body: z.object({
+    id: z.uuid(),
+    dryRun: z.boolean().default(false),
+    /** Row pages are cleaned a page at a time, so that a call ends before the request times out. */
+    offset: z.number().int().min(0).default(0),
+    limit: z.number().int().min(1).max(500).default(100),
+  }),
+});
+
+export type DatabasesCleanRowPagesReq = z.infer<
+  typeof DatabasesCleanRowPagesSchema
+>;
+
 export const DatabasesConvertEmbedsSchema = BaseSchema.extend({
   body: z.object({
     documentId: z.uuid().optional(),
