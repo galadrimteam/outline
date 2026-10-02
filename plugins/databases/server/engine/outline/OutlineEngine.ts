@@ -546,7 +546,8 @@ export class OutlineEngine implements DatabaseEngine {
           order: this.fields.nextOrder(batch, tableId),
         };
         let field: EngineFieldRow;
-        if (input.type === DatabaseFieldType.Link) {
+        // A lookup of a relation reads the links of the linked rows: it links nothing itself.
+        if (input.type === DatabaseFieldType.Link && !draft.isLookup) {
           await this.reader.addLinkedTable(
             batch,
             before.table,
