@@ -200,6 +200,27 @@ function measureCaretRect(view: EditorView): DOMRect | undefined {
   }
 }
 
+/**
+ * The item to insert for a link given to an item that asked for one: an embed
+ * of it when an embed matches it, or whatever the item makes of it.
+ *
+ * @param item the item that asked for a link.
+ * @param href the link typed or pasted.
+ * @returns the item to insert, or undefined when the link will not do.
+ */
+function itemForLink(
+  item: MenuItem | EmbedDescriptor,
+  href: string
+): MenuItem | undefined {
+  if ("fromLink" in item && item.fromLink) {
+    return item.fromLink(href);
+  }
+  if ("matcher" in item && item.matcher(href)) {
+    return { name: "embed", attrs: { href } };
+  }
+  return undefined;
+}
+
 function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
   const { view, commands, props: editorProps } = useEditor();
   const { t } = useTranslation();
@@ -387,6 +408,10 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
 
       const attrs = typeof item.attrs === "function" ? undefined : item.attrs;
 
+      if ("fromLink" in item && item.fromLink) {
+        return triggerLinkInput(item);
+      }
+
       switch (item.name) {
         case "link": {
           insertNode({
@@ -454,20 +479,14 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
       event.preventDefault();
       event.stopPropagation();
 
-      const href = event.currentTarget.value;
-      const matches = "matcher" in insertItem && insertItem.matcher(href);
+      const linkItem = itemForLink(insertItem, event.currentTarget.value);
 
-      if (!matches) {
+      if (!linkItem) {
         toast.error(t("Sorry, that link won’t work for this embed type"));
         return;
       }
 
-      insertNode({
-        name: "embed",
-        attrs: {
-          href,
-        },
-      });
+      insertNode(linkItem);
     }
 
     if (event.key === "Escape") {
@@ -486,19 +505,16 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
       return;
     }
 
-    const href = event.clipboardData.getData("text/plain");
-    const matches = "matcher" in insertItem && insertItem.matcher(href);
+    const linkItem = itemForLink(
+      insertItem,
+      event.clipboardData.getData("text/plain")
+    );
 
-    if (matches) {
+    if (linkItem) {
       event.preventDefault();
       event.stopPropagation();
 
-      insertNode({
-        name: "embed",
-        attrs: {
-          href,
-        },
-      });
+      insertNode(linkItem);
     }
   };
 

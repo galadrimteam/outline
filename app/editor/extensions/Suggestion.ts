@@ -2,7 +2,7 @@ import { escapeRegExp } from "es-toolkit/compat";
 import { action, observable } from "mobx";
 import { InputRule } from "prosemirror-inputrules";
 import type { NodeType, Schema } from "prosemirror-model";
-import type { EditorState, Plugin } from "prosemirror-state";
+import type { Command, EditorState, Plugin } from "prosemirror-state";
 import Extension from "@shared/editor/lib/Extension";
 import type { ExtensionState } from "@shared/editor/plugins/SuggestionsMenuPlugin";
 import {
@@ -87,6 +87,38 @@ export default class Suggestion<
     return this.options.enabledInMarks ?? true;
   }
 
+  /**
+   * galadrim: a command, named after the extension, that types the trigger at
+   * the cursor and opens the menu, so that another menu can hand over to this
+   * one: the block menu's « Link to page » opens the document menu this way.
+   *
+   * @returns the command factory.
+   */
+  commands() {
+    return (): Command => (state, dispatch) => {
+      const triggers = Array.isArray(this.options.trigger)
+        ? this.options.trigger
+        : [this.options.trigger];
+      const trigger = triggers[0];
+      const { $from, from } = state.selection;
+      const before = $from.parent.textBetween(
+        Math.max(0, $from.parentOffset - 1),
+        $from.parentOffset,
+        undefined,
+        "\ufffc"
+      );
+      // The trigger only opens the menu after a space or at a line start, and
+      // typing on must keep matching.
+      const text = before && !/\s/.test(before) ? ` ${trigger}` : trigger;
+
+      if (dispatch) {
+        dispatch(state.tr.insertText(text, from, state.selection.to));
+        this.openAt(trigger, from + text.length - trigger.length);
+      }
+      return true;
+    };
+  }
+
   keys() {
     return {
       Space: action(() => {
@@ -155,4 +187,11 @@ export default class Suggestion<
   get isOpen(): boolean {
     return this.state.open;
   }
+
+  private openAt = action((trigger: string, triggerPos: number) => {
+    this.state.query = "";
+    this.state.trigger = trigger;
+    this.state.triggerPos = triggerPos;
+    this.state.open = true;
+  });
 }
