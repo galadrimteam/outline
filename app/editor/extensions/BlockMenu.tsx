@@ -14,7 +14,10 @@ export default class BlockMenuExtension extends Suggestion {
   get defaultOptions() {
     return {
       trigger: "/",
-      allowSpaces: false,
+      // galadrim: Notion's menu takes several words, such as « titre 2 » or
+      // « liste à puces », and SuggestionsMenu closes it once such a search
+      // finds nothing.
+      allowSpaces: true,
       requireSearchTerm: false,
       enabledInCode: false,
       enabledInMarks: false,

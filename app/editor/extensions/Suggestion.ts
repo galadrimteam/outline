@@ -57,7 +57,8 @@ export default class Suggestion<
 
     // A space is only meaningful once the search term is under way, so the
     // first character is always matched without one.
-    const termChars = `\\p{L}/\\p{M}\\d\\.\\-–_`;
+    // galadrim: apostrophes belong to words such as « aujourd'hui ».
+    const termChars = `\\p{L}/\\p{M}\\d\\.\\-–_'’`;
     const termPattern = this.options.allowSpaces
       ? `[${termChars}][${termChars}\\s]*`
       : `[${termChars}]+`;

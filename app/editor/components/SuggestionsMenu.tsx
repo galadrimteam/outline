@@ -1,5 +1,4 @@
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
-import commandScore from "command-score";
 import { capitalize, orderBy } from "es-toolkit/compat";
 import { TextSelection } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
@@ -13,6 +12,7 @@ import filterExcessSeparators from "@shared/editor/lib/filterExcessSeparators";
 import { findParentNode } from "@shared/editor/queries/findParentNode";
 import type { MenuItem } from "@shared/editor/types";
 import { toastNotice } from "~/editor/toastNotice";
+import { matchesMenuSearch, menuSearchScore } from "~/editor/menus/search";
 import { s } from "@shared/styles";
 import { getEventFiles } from "@shared/utils/files";
 import { AttachmentValidation } from "@shared/validations";
@@ -582,12 +582,8 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
       );
     }
 
-    const searchInput = search.toLowerCase();
-
     const matchesSearch = (item: MenuItem | EmbedDescriptor) =>
-      (item.name || "").toLocaleLowerCase().includes(searchInput) ||
-      (item.title || "").toLocaleLowerCase().includes(searchInput) ||
-      (item.keywords || "").toLocaleLowerCase().includes(searchInput);
+      matchesMenuSearch(item, search);
 
     // When searching, flatten matching children into the top-level list so
     // they are directly navigable with the keyboard. If all children match,
@@ -664,16 +660,31 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
               ? ((item.section.priority as number) ?? 0)
               : 0,
           priority: "priority" in item ? item.priority : 0,
-          score:
-            searchInput && item.title
-              ? commandScore(item.title, searchInput)
-              : 0,
+          score: search
+            ? menuSearchScore(item, search, {
+                embed: item instanceof EmbedDescriptor,
+              })
+            : 0,
         })),
         ["section", "priority", "score"],
         ["desc", "desc", "desc"]
       ).map(({ item }) => item)
     );
   }, [commands, props]);
+
+  // galadrim: a filterable menu knows all its items up front, so a search
+  // that has moved on to a second word and matches nothing is prose being
+  // typed after a « / »: let it through, as Notion does.
+  React.useEffect(() => {
+    if (
+      props.isActive &&
+      props.filterable &&
+      /\s/.test(props.search ?? "") &&
+      !filtered.some((item) => item.name !== "separator")
+    ) {
+      props.onClose();
+    }
+  }, [filtered, props]);
 
   const openSubmenu = React.useCallback(
     (index: number) => {
