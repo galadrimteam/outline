@@ -815,6 +815,34 @@ describe.each(stores)("OutlineEngine on %s", (_name, makeStore) => {
       });
     });
 
+    it("creates a lookup of a relation, which links nothing of its own", async () => {
+      const t = await linkedTables();
+      const lookup = await engine.createField(ada, t.projectsRef, {
+        name: "Projects of the tasks",
+        type: DatabaseFieldType.Link,
+        isLookup: true,
+        lookupOptions: {
+          foreignTableId: t.tasksRef.externalTableId,
+          linkFieldId: t.symmetricId,
+          lookupFieldId: t.project.id,
+        },
+      });
+      expect(lookup).toMatchObject({ isLookup: true, isComputed: true });
+      const taskFields = (await engine.getSchema(ada, t.tasksRef)).fields;
+      expect(
+        taskFields.filter((field) => field.type === DatabaseFieldType.Link)
+      ).toHaveLength(1);
+
+      const p1 = await engine.createRecord(ada, t.projectsRef, {
+        fields: { [t.projectName]: "P1" },
+      });
+      await engine.createRecord(ada, t.tasksRef, {
+        fields: { [t.taskName]: "T1", [t.project.id]: [{ id: p1.id }] },
+      });
+      const project = await engine.getRecord(ada, t.projectsRef, p1.id);
+      expect(linkedIds(project.fields[lookup.id])).toEqual([p1.id]);
+    });
+
     it("writes the symmetric side when a project takes a task another one had", async () => {
       const t = await linkedTables();
       const p1 = await engine.createRecord(ada, t.projectsRef, {
