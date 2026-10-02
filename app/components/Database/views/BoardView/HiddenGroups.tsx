@@ -9,6 +9,7 @@ import type { RecordQuery } from "~/stores/DatabaseRecordsStore";
 import type { BoardColumn } from "../../boardModel";
 import { EMPTY_STACK } from "../../boardModel";
 import { toneColors } from "../../colors";
+import { borderBox } from "./styles";
 
 interface Props {
   field: DatabaseField;
@@ -115,6 +116,7 @@ const ShowIcon = styled(EyeIcon)`
 `;
 
 const Row = styled.button`
+  ${borderBox}
   display: flex;
   align-items: center;
   gap: 8px;

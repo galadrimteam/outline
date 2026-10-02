@@ -9,6 +9,7 @@ import { s, hover } from "@shared/styles";
 import useStores from "~/hooks/useStores";
 import type Database from "~/models/Database";
 import { appendChoice, hasChoice } from "../../cells/choices";
+import { borderBox } from "./styles";
 
 interface Props {
   database: Database;
@@ -125,6 +126,7 @@ const Button = styled.button`
 `;
 
 const Input = styled.input`
+  ${borderBox}
   width: 100%;
   height: 28px;
   padding: 0 8px;
