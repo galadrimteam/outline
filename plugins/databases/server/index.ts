@@ -39,15 +39,16 @@ PluginManager.add([
   { type: Hook.Processor, value: DatabaseAnchorTitleProcessor },
   { type: Hook.Processor, value: DatabaseAssignmentNotificationsProcessor },
   { type: Hook.EmailTemplate, value: DatabaseRecordAssignedEmail },
+  // The migration keeps writing Teable embed URLs once Teable is gone: their
+  // tables live in the Outline engine, behind the gateway.
+  { type: Hook.Processor, value: ConvertImportedEmbedsProcessor },
+  { type: Hook.Task, value: ConvertTeableEmbedsTask },
 ]);
 
-// Teable's webhook, and the tools that read Teable: its embeds in imported
-// pages, and moving its bases into the Outline engine.
+// Teable's webhook, and moving its bases into the Outline engine.
 if (env.isTeableConfigured) {
   PluginManager.add([
     { type: Hook.API, value: teableHooks },
-    { type: Hook.Processor, value: ConvertImportedEmbedsProcessor },
-    { type: Hook.Task, value: ConvertTeableEmbedsTask },
     { type: Hook.Task, value: MoveDatabaseEngineTask },
   ]);
 }
