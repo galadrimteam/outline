@@ -54,15 +54,21 @@ export async function parseNaturalLanguageDate(
   }
 
   const chrono = await loadChrono();
-  const results = chrono.parse(trimmed, referenceDate, { forwardDate: true });
-  const result = results[0];
+  // galadrim: French is read too (« aujourd'hui », « demain », « lundi
+  // prochain »), as Notion's « @ » does, after English so that what English
+  // understands keeps its meaning. chrono's French only knows the straight
+  // apostrophe.
+  const text = trimmed.replace(/’/g, "'");
+  const result =
+    wholeMatch(
+      chrono.parse(text, referenceDate, { forwardDate: true }),
+      text
+    ) ??
+    wholeMatch(
+      chrono.fr.parse(text, referenceDate, { forwardDate: true }),
+      text
+    );
   if (!result) {
-    return null;
-  }
-
-  // Only accept matches that span (roughly) the whole input so that
-  // unrelated text typed after "@" does not accidentally resolve to a date.
-  if (result.text.trim().length < trimmed.length) {
     return null;
   }
 
@@ -81,4 +87,22 @@ export async function parseNaturalLanguageDate(
       : new Date(date.getFullYear(), date.getMonth(), date.getDate()),
     hasTime,
   };
+}
+
+/**
+ * The first parsed date when it spans (roughly) the whole input, so that
+ * unrelated text typed after "@" does not accidentally resolve to a date.
+ *
+ * @param results the dates chrono found in the input.
+ * @param input the input.
+ * @returns the date, or undefined.
+ */
+function wholeMatch(
+  results: Chrono.ParsedResult[],
+  input: string
+): Chrono.ParsedResult | undefined {
+  const result = results[0];
+  return result && result.text.trim().length >= input.length
+    ? result
+    : undefined;
 }

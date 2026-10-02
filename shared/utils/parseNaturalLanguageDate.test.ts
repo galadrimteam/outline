@@ -95,4 +95,37 @@ describe("parseNaturalLanguageDate", () => {
       hasTime: true,
     });
   });
+
+  it("parses French, with either apostrophe", async () => {
+    expect(await parseNaturalLanguageDate("aujourd'hui", reference)).toEqual({
+      date: new Date(2024, 0, 1),
+      hasTime: false,
+    });
+    expect(await parseNaturalLanguageDate("aujourd’hui", reference)).toEqual({
+      date: new Date(2024, 0, 1),
+      hasTime: false,
+    });
+    expect(await parseNaturalLanguageDate("demain", reference)).toEqual({
+      date: new Date(2024, 0, 2),
+      hasTime: false,
+    });
+    expect(await parseNaturalLanguageDate("hier", reference)).toEqual({
+      date: new Date(2023, 11, 31),
+      hasTime: false,
+    });
+    expect(await parseNaturalLanguageDate("dans 3 jours", reference)).toEqual({
+      date: new Date(2024, 0, 4),
+      hasTime: false,
+    });
+    expect(await parseNaturalLanguageDate("3 février", reference)).toEqual({
+      date: new Date(2024, 1, 3),
+      hasTime: false,
+    });
+  });
+
+  it("does not take a French word that only starts a date", async () => {
+    expect(await parseNaturalLanguageDate("demain matin tôt", reference)).toBe(
+      null
+    );
+  });
 });
