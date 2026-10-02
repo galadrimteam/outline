@@ -24,7 +24,12 @@ import { cellTitle } from "../../boardModel";
 import { compactPills } from "../../cells/components/ChoicePill";
 import { getCell } from "../../cells/registry";
 import { CommentCount } from "../../comments/CommentCount";
-import { CardHeading, recordCardColor } from "../GalleryView/cards";
+import {
+  CardHeading,
+  cardTitleFontSize,
+  cardTitleLineHeight,
+  recordCardColor,
+} from "../GalleryView/cards";
 
 /** Drag data of a card, read by the board's collision detection. */
 export interface CardDragData {
@@ -357,6 +362,9 @@ function coverOf(
   return image?.thumbnailUrl ?? image?.url;
 }
 
+/** Space above a card's title, in px. */
+const titleTop = 10;
+
 const coverHeights: Record<DatabaseCardSize, number> = {
   small: 96,
   medium: 136,
@@ -385,10 +393,14 @@ const MenuButton = styled.button`
   }
 `;
 
+// As tall as the title's first line, to centre the button on it as Notion does.
 const MenuAnchor = styled.div`
   position: absolute;
-  top: 6px;
+  top: ${titleTop}px;
   right: 6px;
+  display: flex;
+  align-items: center;
+  height: ${cardTitleFontSize * cardTitleLineHeight}px;
   opacity: 0;
   transition: opacity 100ms ease-in-out;
 
@@ -472,7 +484,7 @@ const Body = styled.div`
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 12px 12px;
+  padding: ${titleTop}px 12px 12px;
   min-width: 0;
 `;
 

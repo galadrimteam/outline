@@ -21,6 +21,12 @@ import { getCell } from "../../cells/registry";
 import { RowIcon } from "../../RowIcon";
 import { cardFields } from "../../toolbar/columns";
 
+/** Font size of the title of a board or gallery card, in px. */
+export const cardTitleFontSize = 15;
+
+/** Line height of the title of a board or gallery card, a multiple of its font size. */
+export const cardTitleLineHeight = 1.5;
+
 /**
  * Returns the title of a row: its primary field as text.
  *
@@ -316,9 +322,9 @@ const Heading = styled.div<{ $empty: boolean }>`
   align-items: flex-start;
   gap: 6px;
   min-width: 0;
-  font-size: 15px;
+  font-size: ${cardTitleFontSize}px;
   font-weight: 600;
-  line-height: 1.5;
+  line-height: ${cardTitleLineHeight};
   overflow-wrap: anywhere;
   color: ${(props) => (props.$empty ? props.theme.placeholder : props.theme.text)};
 `;
