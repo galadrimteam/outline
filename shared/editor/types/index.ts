@@ -74,6 +74,13 @@ export type MenuItem = {
   skipIcon?: boolean;
   disabled?: boolean;
   onClick?: () => void;
+  /**
+   * Asks for a link before anything is inserted, as an embed does, then
+   * returns the item to insert for that link, or undefined when it will not do.
+   */
+  fromLink?: (href: string) => MenuItem | undefined;
+  /** The placeholder of the link input opened by `fromLink`. */
+  placeholder?: string;
   /** Custom React content to render instead of a standard menu item */
   content?: React.ReactNode;
   /** Condition to check before preventing the submenu from closing */
