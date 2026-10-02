@@ -14,6 +14,7 @@ import { useEditor } from "./EditorContext";
 import type { Props as SuggestionsMenuProps } from "./SuggestionsMenu";
 import SuggestionsMenu from "./SuggestionsMenu";
 import SuggestionsMenuItem from "./SuggestionsMenuItem";
+import { useBlockMenuActions } from "./useBlockMenuActions";
 
 /**
  * Hook that returns a template menu item with children for inserting template
@@ -110,16 +111,17 @@ function BlockMenu(props: Props) {
   const { t } = useTranslation();
   const { elementRef } = useEditor();
   const templateMenuItem = useTemplateMenuItem();
+  const actions = useBlockMenuActions();
 
   const items = useMemo(() => {
-    const baseItems = getMenuItems(t, elementRef);
+    const baseItems = getMenuItems(t, elementRef, actions);
 
     if (!templateMenuItem) {
       return baseItems;
     }
 
     return [...baseItems, { name: "separator" } as MenuItem, templateMenuItem];
-  }, [t, elementRef, templateMenuItem]);
+  }, [t, elementRef, actions, templateMenuItem]);
 
   const renderMenuItem = useCallback<SuggestionsMenuProps["renderMenuItem"]>(
     (item, _index, options) => (

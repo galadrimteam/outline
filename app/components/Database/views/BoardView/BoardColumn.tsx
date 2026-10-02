@@ -29,6 +29,7 @@ import { toneColors } from "../../colors";
 import { SortableCard, StaticCard } from "./BoardCard";
 import { ColumnCalculationValue } from "./ColumnCalculationValue";
 import { NewCardForm } from "./NewCardForm";
+import { borderBox } from "./styles";
 
 /** Drag data of a column header. */
 export interface ColumnDragData {
@@ -270,7 +271,7 @@ export const CardList = observer(function CardList({
         !readOnly && (
           <NewPageButton
             onClick={handleAddBottom}
-            style={{ color: tone.dot, borderColor: tone.border }}
+            style={{ color: tone.dot, boxShadow: `0 0 0 1px ${tone.border}` }}
           >
             <PlusIcon size={18} />
             {t("New page")}
@@ -606,6 +607,7 @@ const Cell = styled.div<{ $width: number; $tint: string }>`
 `;
 
 const Header = styled.div<{ $tint: string }>`
+  ${borderBox}
   position: sticky;
   top: 0;
   z-index: 1;
@@ -703,6 +705,7 @@ const Cards = styled.div`
 `;
 
 const ColumnButton = styled.button`
+  ${borderBox}
   display: flex;
   align-items: center;
   gap: 4px;
@@ -733,6 +736,7 @@ const ColumnButton = styled.button`
 `;
 
 const NewPageButton = styled.button`
+  ${borderBox}
   display: flex;
   align-items: center;
   gap: 6px;
@@ -740,7 +744,7 @@ const NewPageButton = styled.button`
   width: 100%;
   height: 40px;
   padding: 0 10px;
-  border: 1px solid;
+  border: 0;
   border-radius: 10px;
   background: none;
   font: inherit;

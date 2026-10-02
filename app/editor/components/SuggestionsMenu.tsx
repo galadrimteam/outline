@@ -1,5 +1,4 @@
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
-import commandScore from "command-score";
 import { capitalize, orderBy } from "es-toolkit/compat";
 import { TextSelection } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
@@ -13,6 +12,7 @@ import filterExcessSeparators from "@shared/editor/lib/filterExcessSeparators";
 import { findParentNode } from "@shared/editor/queries/findParentNode";
 import type { MenuItem } from "@shared/editor/types";
 import { toastNotice } from "~/editor/toastNotice";
+import { matchesMenuSearch, menuSearchScore } from "~/editor/menus/search";
 import { s } from "@shared/styles";
 import { getEventFiles } from "@shared/utils/files";
 import { AttachmentValidation } from "@shared/validations";
@@ -198,6 +198,27 @@ function measureCaretRect(view: EditorView): DOMRect | undefined {
     Logger.warn("Unable to calculate caret position", { err });
     return undefined;
   }
+}
+
+/**
+ * The item to insert for a link given to an item that asked for one: an embed
+ * of it when an embed matches it, or whatever the item makes of it.
+ *
+ * @param item the item that asked for a link.
+ * @param href the link typed or pasted.
+ * @returns the item to insert, or undefined when the link will not do.
+ */
+function itemForLink(
+  item: MenuItem | EmbedDescriptor,
+  href: string
+): MenuItem | undefined {
+  if ("fromLink" in item && item.fromLink) {
+    return item.fromLink(href);
+  }
+  if ("matcher" in item && item.matcher(href)) {
+    return { name: "embed", attrs: { href } };
+  }
+  return undefined;
 }
 
 function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
@@ -387,6 +408,10 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
 
       const attrs = typeof item.attrs === "function" ? undefined : item.attrs;
 
+      if ("fromLink" in item && item.fromLink) {
+        return triggerLinkInput(item);
+      }
+
       switch (item.name) {
         case "link": {
           insertNode({
@@ -454,20 +479,14 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
       event.preventDefault();
       event.stopPropagation();
 
-      const href = event.currentTarget.value;
-      const matches = "matcher" in insertItem && insertItem.matcher(href);
+      const linkItem = itemForLink(insertItem, event.currentTarget.value);
 
-      if (!matches) {
+      if (!linkItem) {
         toast.error(t("Sorry, that link won’t work for this embed type"));
         return;
       }
 
-      insertNode({
-        name: "embed",
-        attrs: {
-          href,
-        },
-      });
+      insertNode(linkItem);
     }
 
     if (event.key === "Escape") {
@@ -486,19 +505,16 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
       return;
     }
 
-    const href = event.clipboardData.getData("text/plain");
-    const matches = "matcher" in insertItem && insertItem.matcher(href);
+    const linkItem = itemForLink(
+      insertItem,
+      event.clipboardData.getData("text/plain")
+    );
 
-    if (matches) {
+    if (linkItem) {
       event.preventDefault();
       event.stopPropagation();
 
-      insertNode({
-        name: "embed",
-        attrs: {
-          href,
-        },
-      });
+      insertNode(linkItem);
     }
   };
 
@@ -582,12 +598,8 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
       );
     }
 
-    const searchInput = search.toLowerCase();
-
     const matchesSearch = (item: MenuItem | EmbedDescriptor) =>
-      (item.name || "").toLocaleLowerCase().includes(searchInput) ||
-      (item.title || "").toLocaleLowerCase().includes(searchInput) ||
-      (item.keywords || "").toLocaleLowerCase().includes(searchInput);
+      matchesMenuSearch(item, search);
 
     // When searching, flatten matching children into the top-level list so
     // they are directly navigable with the keyboard. If all children match,
@@ -664,16 +676,31 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
               ? ((item.section.priority as number) ?? 0)
               : 0,
           priority: "priority" in item ? item.priority : 0,
-          score:
-            searchInput && item.title
-              ? commandScore(item.title, searchInput)
-              : 0,
+          score: search
+            ? menuSearchScore(item, search, {
+                embed: item instanceof EmbedDescriptor,
+              })
+            : 0,
         })),
         ["section", "priority", "score"],
         ["desc", "desc", "desc"]
       ).map(({ item }) => item)
     );
   }, [commands, props]);
+
+  // galadrim: a filterable menu knows all its items up front, so a search
+  // that has moved on to a second word and matches nothing is prose being
+  // typed after a « / »: let it through, as Notion does.
+  React.useEffect(() => {
+    if (
+      props.isActive &&
+      props.filterable &&
+      /\s/.test(props.search ?? "") &&
+      !filtered.some((item) => item.name !== "separator")
+    ) {
+      props.onClose();
+    }
+  }, [filtered, props]);
 
   const openSubmenu = React.useCallback(
     (index: number) => {
