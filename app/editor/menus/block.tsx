@@ -111,7 +111,7 @@ export default function blockMenuItems(
       title: t("Link to page"),
       icon: <GoToIcon />,
       keywords:
-        "link to page lien vers une page mention mentionner existing existante document doc",
+        "link to page lien vers une page la mention mentionner existing existante document doc",
     },
     {
       name: "separator",
@@ -336,7 +336,7 @@ export default function blockMenuItems(
       title: t("Big toggle heading"),
       icon: <Heading1Icon />,
       keywords:
-        "toggle heading 1 titre 1 à bascule bascule h1 collapsible collapse fold accordion details expand",
+        "toggle heading 1 titre 1 à bascule titre de bascule h1 collapsible collapse fold accordion details expand",
       attrs: { level: 1 },
     },
     {
@@ -344,7 +344,7 @@ export default function blockMenuItems(
       title: t("Medium toggle heading"),
       icon: <Heading2Icon />,
       keywords:
-        "toggle heading 2 titre 2 à bascule bascule h2 collapsible collapse fold accordion details expand",
+        "toggle heading 2 titre 2 à bascule titre de bascule h2 collapsible collapse fold accordion details expand",
       attrs: { level: 2 },
     },
     {
@@ -352,7 +352,7 @@ export default function blockMenuItems(
       title: t("Small toggle heading"),
       icon: <Heading3Icon />,
       keywords:
-        "toggle heading 3 titre 3 à bascule bascule h3 collapsible collapse fold accordion details expand",
+        "toggle heading 3 titre 3 à bascule titre de bascule h3 collapsible collapse fold accordion details expand",
       attrs: { level: 3 },
     },
     {
@@ -360,7 +360,7 @@ export default function blockMenuItems(
       title: t("Extra small toggle heading"),
       icon: <Heading4Icon />,
       keywords:
-        "toggle heading 4 titre 4 à bascule bascule h4 collapsible collapse fold accordion details expand",
+        "toggle heading 4 titre 4 à bascule titre de bascule h4 collapsible collapse fold accordion details expand",
       attrs: { level: 4 },
     },
     {

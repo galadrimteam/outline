@@ -26,11 +26,16 @@ export function matchesMenuSearch(
   if (!words.length) {
     return true;
   }
+  // A dash standing between words, as in « Base de données - intégrée », is
+  // not something to find, unless it is all that was typed (« --- »).
+  const meaningful = words.filter((word) => /[\p{L}\p{N}]/u.test(word));
 
   const haystack = normalizeSearchText(
     [item.name, item.title, item.keywords].filter(Boolean).join(" ")
   );
-  return words.every((word) => haystack.includes(word));
+  return (meaningful.length ? meaningful : words).every((word) =>
+    haystack.includes(word)
+  );
 }
 
 /**

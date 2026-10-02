@@ -25,6 +25,12 @@ describe("matchesMenuSearch", () => {
     expect(matchesMenuSearch(item, "ul")).toBe(true);
   });
 
+  it("passes over a dash between words, unless it is the whole search", () => {
+    expect(matchesMenuSearch(item, "liste - puces")).toBe(true);
+    expect(matchesMenuSearch(item, "---")).toBe(false);
+    expect(matchesMenuSearch({ keywords: "divider ---" }, "---")).toBe(true);
+  });
+
   it("fails when one word is missing", () => {
     expect(matchesMenuSearch(item, "liste numérotée")).toBe(false);
   });
