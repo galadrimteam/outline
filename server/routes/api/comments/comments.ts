@@ -184,7 +184,7 @@ router.post(
       throw ValidationError("One of data or text is required");
     }
 
-    const { comment, created, anchored } = await commentImporter(ctx, {
+    const { comment, ...outcome } = await commentImporter(ctx, {
       id,
       document,
       parentCommentId,
@@ -200,8 +200,7 @@ router.post(
 
     ctx.body = {
       data: presentComment(comment),
-      created,
-      anchored,
+      ...outcome,
       policies: presentPolicies(user, [comment]),
     };
   }

@@ -188,9 +188,7 @@ export const DatabaseProperties = observer(function DatabaseProperties_({
 });
 
 const Wrapper = styled.section`
-  margin: 4px 0 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid ${s("divider")};
+  margin: 4px 0 0;
 `;
 
 const Back = styled(Link)`

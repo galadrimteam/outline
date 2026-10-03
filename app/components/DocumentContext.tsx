@@ -43,6 +43,20 @@ class DocumentContext {
     return this.headings.some((heading) => !heading.inTable);
   }
 
+  /**
+   * The ids of the comment threads anchored to the content of the document, kept up to date as
+   * it is edited, or undefined until an editor holds the document.
+   */
+  @computed
+  get anchoredCommentIds(): ReadonlySet<string> | undefined {
+    if (!this.editorDoc) {
+      return undefined;
+    }
+    return new Set(
+      ProsemirrorHelper.getComments(this.editorDoc).map((mark) => mark.id)
+    );
+  }
+
   /** Statistics for the text content of the document, kept up to date as it is edited */
   @computed
   get stats(): TextStats {
