@@ -1,6 +1,7 @@
 import { observer } from "mobx-react";
 import {
   CollapsedIcon,
+  CommentIcon,
   HistoryIcon,
   PlusIcon,
   SettingsIcon,
@@ -10,15 +11,19 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import styled, { css } from "styled-components";
 import type { DatabaseCellInput, DatabaseField } from "@shared/databases/types";
+import useShare from "@shared/hooks/useShare";
 import { s } from "@shared/styles";
 import { AddFieldButton } from "~/components/Database/fields/AddFieldButton";
 import { CustomizePageMenu } from "~/components/Database/fields/CustomizePageMenu";
 import {
+  pageDiscussions,
   pageFields,
   splitPageProperties,
 } from "~/components/Database/fields/pageLayout";
 import { PropertyRow } from "~/components/Database/fields/PropertyRow";
 import { PropertyHistory } from "~/components/Database/history/PropertyHistory";
+import useCurrentTeam from "~/hooks/useCurrentTeam";
+import usePolicy from "~/hooks/usePolicy";
 import useStores from "~/hooks/useStores";
 import type Document from "~/models/Document";
 
@@ -33,7 +38,8 @@ interface Props {
  * The properties of a database row, under the title of its page, like Notion: one line per
  * property edited in place, the properties hidden by the page layout behind « N more properties »
  * (or, with pinned properties, every other one behind « Show details »), then, on hover, "Add a
- * property", "Customize page" and the history. Nothing names the database above them, as in Notion:
+ * property", "Customize page", the history and, when the page discussions are minimal, "Add a
+ * comment" (Notion's entry above the title). Nothing names the database above them, as in Notion:
  * the breadcrumb leads to it. Values follow the database live.
  *
  * @param props the row page and whether it is read-only.
@@ -44,7 +50,10 @@ export const DatabaseProperties = observer(function DatabaseProperties_({
   readOnly,
 }: Props) {
   const { t } = useTranslation();
-  const { databases, databaseRecords } = useStores();
+  const { databases, databaseRecords, ui } = useStores();
+  const team = useCurrentTeam({ rejectOnEmpty: false });
+  const { isShare } = useShare();
+  const can = usePolicy(document);
   const [showHidden, setShowHidden] = React.useState(false);
   const [showHistory, setShowHistory] = React.useState(false);
   const databaseId = document.databaseId ?? "";
@@ -73,6 +82,11 @@ export const DatabaseProperties = observer(function DatabaseProperties_({
     [databaseId, databaseRecords, recordId]
   );
 
+  const handleAddComment = React.useCallback(
+    () => ui.setPageCommentsRequest(document.id),
+    [document.id, ui]
+  );
+
   const handleChangeFields = React.useCallback(
     (values: Record<string, DatabaseCellInput>) => {
       databaseRecords
@@ -97,6 +111,11 @@ export const DatabaseProperties = observer(function DatabaseProperties_({
   );
   const { shown, hidden, pinned } = splitPageProperties(fields, record, layout);
   const collapsed = hidden.length > 0 && !showHidden;
+  const canAddComment =
+    !!can.comment &&
+    !!team?.commentingEnabled &&
+    !isShare &&
+    pageDiscussions(layout) === "minimal";
 
   const renderRow = (field: DatabaseField, stacked: boolean) => (
     <PropertyRow
@@ -163,6 +182,12 @@ export const DatabaseProperties = observer(function DatabaseProperties_({
           <HistoryIcon size={18} />
           {t("Property history")}
         </Action>
+        {canAddComment && (
+          <Action type="button" $onHover onClick={handleAddComment}>
+            <CommentIcon size={18} />
+            {t("Add a comment")}
+          </Action>
+        )}
       </Actions>
 
       {showHistory && (

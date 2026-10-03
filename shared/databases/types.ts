@@ -500,6 +500,12 @@ export interface DatabasePageTab {
   visibleFieldIds?: string[];
 }
 
+/**
+ * Notion's « Page discussions » of row pages: the discussions under the properties with the form
+ * that starts one (expanded), only the discussions there are (minimal, Notion's default), or none.
+ */
+export type DatabasePageDiscussions = "expanded" | "minimal" | "off";
+
 /** Settings Outline keeps on a database (column `databases.settings`). */
 export interface DatabaseSettings {
   viewOverrides?: Record<string, DatabaseViewOverrides>;
@@ -527,6 +533,8 @@ export interface DatabaseSettings {
      * and edited times): in the database, never on its row pages.
      */
     omittedFieldIds?: string[];
+    /** The discussions under the properties, "minimal" when unset. */
+    discussions?: DatabasePageDiscussions;
   };
   /** The field holding a row's emoji (the migration writes one called « Icon »). */
   iconFieldId?: string;

@@ -1,5 +1,6 @@
 import type {
   DatabaseField,
+  DatabasePageDiscussions,
   DatabaseRecord,
   DatabaseSettings,
   DatabaseView,
@@ -60,6 +61,19 @@ export function pageFields(
     (field) =>
       !field.isPrimary && field.id !== iconFieldId && !left.has(field.id)
   );
+}
+
+/**
+ * How the discussions of a page show under its title: the « Page discussions » of its database
+ * for a row page, else as Notion shows those of any page, only when there are some.
+ *
+ * @param layout the page layout of the database of a row page, undefined for another page.
+ * @returns the setting.
+ */
+export function pageDiscussions(
+  layout: PageLayout | undefined
+): DatabasePageDiscussions {
+  return layout?.discussions ?? "minimal";
 }
 
 /**

@@ -484,6 +484,7 @@ describe("#databases.update", () => {
             hideEmpty: true,
             fieldOrder: ["fldStatusAAAAAAAAAA", "fldIconAAAAAAAAAAAA"],
             pinnedFieldIds: ["fldStatusAAAAAAAAAA"],
+            discussions: "expanded",
           },
           fieldMeta: {
             fldStatusAAAAAAAAAA: { icon: "💵" },
@@ -506,6 +507,7 @@ describe("#databases.update", () => {
         hideEmpty: true,
         fieldOrder: ["fldStatusAAAAAAAAAA", "fldIconAAAAAAAAAAAA"],
         pinnedFieldIds: ["fldStatusAAAAAAAAAA"],
+        discussions: "expanded",
       },
       fieldMeta: {
         fldStatusAAAAAAAAAA: { icon: "💵" },

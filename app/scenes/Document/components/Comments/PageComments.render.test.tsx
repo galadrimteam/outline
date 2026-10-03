@@ -6,6 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "styled-components";
 import { vi } from "vitest";
+import type { DatabasePageDiscussions } from "@shared/databases/types";
 import { light } from "@shared/styles/theme";
 import { ProsemirrorHelper } from "@shared/utils/ProsemirrorHelper";
 import {
@@ -24,6 +25,7 @@ const documentId = "00000000-0000-4000-8000-0000000000a4";
 const open = "00000000-0000-4000-8000-0000000000b1";
 const resolved = "00000000-0000-4000-8000-0000000000b2";
 const anchored = "00000000-0000-4000-8000-0000000000b3";
+const databaseId = "00000000-0000-4000-8000-0000000000a5";
 
 const schema = new Schema({
   nodes: {
@@ -41,7 +43,7 @@ const doc = schema.node("doc", null, [
   ]),
 ]);
 
-function WithEditor({ showEmpty }: { showEmpty?: boolean }) {
+function WithEditor() {
   const context = useDocumentContext();
   useEffect(() => {
     const editor = {
@@ -56,9 +58,7 @@ function WithEditor({ showEmpty }: { showEmpty?: boolean }) {
     context.setEditor(editor as unknown as Editor);
   }, [context]);
   const document = stores.documents.get(documentId);
-  return document ? (
-    <PageComments document={document} showEmpty={showEmpty} />
-  ) : null;
+  return document ? <PageComments document={document} /> : null;
 }
 
 const comment = (
@@ -98,11 +98,12 @@ describe("PageComments", () => {
       addEventListener() {},
       removeEventListener() {},
     })) as unknown as typeof window.matchMedia;
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
     stores.comments.clear();
-    stores.users.add({ id: me, name: "Maceo" });
+    stores.users.add({ id: me, name: "Maceo", language: "fr_FR" });
     stores.users.add({ id: thomas, name: "Thomas" });
     stores.auth.add({ id: teamId, name: "Galadrim", preferences: {} });
-    stores.documents.add({ id: documentId, title: "Ticket" });
+    stores.documents.remove(documentId);
     runInAction(() => {
       stores.auth.currentUserId = me;
       stores.auth.currentTeamId = teamId;
@@ -125,7 +126,28 @@ describe("PageComments", () => {
     });
   }
 
-  async function render(showEmpty?: boolean) {
+  /** A plain page, or a row of a database with these « Page discussions ». */
+  function page(discussions?: DatabasePageDiscussions | "unset") {
+    if (!discussions) {
+      stores.documents.add({ id: documentId, title: "Ticket" });
+      return;
+    }
+    stores.databases.add({
+      id: databaseId,
+      title: "Suivi",
+      settings: {
+        pageLayout: discussions === "unset" ? {} : { discussions },
+      },
+    });
+    stores.documents.add({
+      id: documentId,
+      title: "Ticket",
+      databaseId,
+      databaseRecordId: "rec1",
+    });
+  }
+
+  async function render() {
     await act(async () => {
       root.render(
         <Provider rootStore={stores}>
@@ -133,7 +155,7 @@ describe("PageComments", () => {
             <ThemeProvider theme={light}>
               <ActionContextProvider>
                 <DocumentContextProvider>
-                  <WithEditor showEmpty={showEmpty} />
+                  <WithEditor />
                 </DocumentContextProvider>
               </ActionContextProvider>
             </ThemeProvider>
@@ -145,8 +167,12 @@ describe("PageComments", () => {
 
   const section = () => container.querySelector("section");
   const threads = () => container.querySelectorAll("[data-comment-thread]");
+  const lastIsForm = () =>
+    section()?.lastElementChild?.tagName === "FORM" &&
+    !section()?.lastElementChild?.closest("[data-comment-thread]");
 
   it("shows the open threads of the page, not the resolved nor the anchored ones", async () => {
+    page("expanded");
     allow(true);
     comment(open, thomas, "2025-11-13T09:20:21.340Z");
     comment(resolved, me, "2025-10-23T15:10:51.180Z", {
@@ -154,15 +180,25 @@ describe("PageComments", () => {
       resolvedById: me,
     });
     comment(anchored, me, "2025-10-24T13:59:24.948Z");
-    await render(true);
+    await render();
 
     expect(section()?.getAttribute("aria-label")).toBe("Comments");
     expect(threads()).toHaveLength(1);
     expect(threads()[0].textContent).toContain("Thomas");
-    expect(section()?.lastElementChild?.tagName).toBe("FORM");
-    expect(section()?.lastElementChild?.closest("[data-comment-thread]")).toBe(
-      null
-    );
+    expect(lastIsForm()).toBe(true);
+  });
+
+  it("dates a comment by its day, as Notion's « 13/11/2025 »", async () => {
+    page();
+    allow(true);
+    comment(open, thomas, "2025-11-13T09:20:21.340Z");
+    await render();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    expect(threads()[0].textContent).toContain("13/11/2025");
+    expect(threads()[0].textContent).not.toContain("il y a");
   });
 
   const thread = (replies: number) => {
@@ -177,27 +213,31 @@ describe("PageComments", () => {
     }
   };
 
-  it("shows a thread of two replies in full", async () => {
+  it("shows a thread of two replies in full, every comment with its author", async () => {
+    page();
     allow(true);
     thread(2);
-    await render(true);
+    await render();
 
     expect(threads()[0].textContent).not.toContain("Show");
+    expect(threads()[0].textContent?.match(/Thomas/g)).toHaveLength(2);
   });
 
   it("folds a thread from its third reply on to its first and last comments, like Notion", async () => {
+    page();
     allow(true);
     thread(3);
-    await render(true);
+    await render();
 
     expect(threads()).toHaveLength(1);
     expect(threads()[0].textContent).toContain("Show 2");
   });
 
   it("replies in place: a click opens the reply form, not the sidebar", async () => {
+    page("expanded");
     allow(true);
     comment(open, thomas, "2025-11-13T09:20:21.340Z");
-    await render(true);
+    await render();
     const thread = threads()[0];
     expect(thread.querySelectorAll("form")).toHaveLength(1);
 
@@ -209,52 +249,76 @@ describe("PageComments", () => {
     expect(stores.ui.rightSidebar).toBe(null);
   });
 
-  it("offers to start a discussion on a database row that has none", async () => {
+  it("offers to start a discussion on a row whose database shows them expanded", async () => {
+    page("expanded");
     allow(true);
-    await render(true);
+    await render();
 
     expect(threads()).toHaveLength(0);
-    expect(section()?.querySelector("form")).not.toBe(null);
+    expect(lastIsForm()).toBe(true);
+  });
+
+  it("shows only the discussions there are on a row whose database keeps them minimal, Notion's default", async () => {
+    page("unset");
+    allow(true);
+    await render();
+    expect(section()).toBe(null);
+
+    comment(open, thomas, "2025-11-13T09:20:21.340Z");
+    await render();
+    expect(threads()).toHaveLength(1);
+    expect(lastIsForm()).toBe(false);
+  });
+
+  it("shows nothing on a row whose database turns them off", async () => {
+    page("off");
+    allow(true);
+    comment(open, thomas, "2025-11-13T09:20:21.340Z");
+    await render();
+
+    expect(section()).toBe(null);
   });
 
   it("shows nothing on a plain page without discussion, nor to a reader who cannot comment", async () => {
+    page();
     allow(true);
-    await render(false);
+    await render();
     expect(section()).toBe(null);
 
+    page("expanded");
     allow(false);
-    await render(true);
+    await render();
     expect(section()).toBe(null);
   });
 
-  it("comes into view with its form focused when the page is asked to", async () => {
+  it("shows the form, focused and in view, when the page is asked to", async () => {
+    page("unset");
     allow(true);
-    comment(open, thomas, "2025-11-13T09:20:21.340Z");
-    const scrolled = vi.fn();
-    window.HTMLElement.prototype.scrollIntoView = scrolled;
-    await render(true);
-    expect(scrolled).not.toHaveBeenCalled();
+    await render();
+    expect(section()).toBe(null);
 
     await act(async () => {
       stores.ui.setPageCommentsRequest("rec-other");
     });
-    expect(scrolled).not.toHaveBeenCalled();
+    expect(section()).toBe(null);
 
     await act(async () => {
       stores.ui.setPageCommentsRequest(documentId);
     });
-    expect(scrolled).toHaveBeenCalledTimes(1);
+    expect(lastIsForm()).toBe(true);
+    expect(window.HTMLElement.prototype.scrollIntoView).toHaveBeenCalledTimes(
+      1
+    );
     expect(stores.ui.pageCommentsRequest).toBe(null);
   });
 
   it("shows the threads but no form to a reader who cannot comment", async () => {
+    page("expanded");
     allow(false);
     comment(open, thomas, "2025-11-13T09:20:21.340Z");
-    await render(true);
+    await render();
 
     expect(threads()).toHaveLength(1);
-    expect(
-      section()?.lastElementChild?.closest("[data-comment-thread]")
-    ).not.toBe(null);
+    expect(lastIsForm()).toBe(false);
   });
 });

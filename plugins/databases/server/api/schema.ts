@@ -327,6 +327,7 @@ const zSettingsPatch = z.object({
       fieldOrder: z.array(zEngineId).max(500).optional(),
       pinnedFieldIds: z.array(zEngineId).max(500).optional(),
       omittedFieldIds: z.array(zEngineId).max(500).optional(),
+      discussions: z.enum(["expanded", "minimal", "off"]).optional(),
     })
     .nullish(),
   iconFieldId: zEngineId.nullish(),

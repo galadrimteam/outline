@@ -246,7 +246,7 @@ function DocumentEditor(props: Props, ref: React.ForwardedRef<SharedEditor>) {
           {isDatabaseRow && (
             <DatabaseProperties document={document} readOnly={!!readOnly} />
           )}
-          <PageComments document={document} showEmpty={isDatabaseRow} />
+          <PageComments document={document} />
         </PageHeader>
       )}
       {/* galadrim: no meta line under the title (last update, task count,
