@@ -123,7 +123,7 @@ export const DatabaseToolbar = observer(function DatabaseToolbar({
   return (
     <Bar role="group" aria-label={t("View options")}>
       {(filterDirty || sortDirty) && (
-        <Draft data-sticky>
+        <Draft>
           <DraftButton type="button" onClick={handleReset}>
             {t("Reset")}
           </DraftButton>
@@ -166,6 +166,7 @@ export const DatabaseToolbar = observer(function DatabaseToolbar({
       {canSave && layoutSupportsGrouping(view.layout) && (
         <ToolbarPopover
           label={isBoard ? t("Group by") : t("Group")}
+          openRequest={block?.groupRequest}
           active={isGrouped}
           icon={<GroupByIcon size={20} />}
           width={400}

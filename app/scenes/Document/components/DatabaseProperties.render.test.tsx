@@ -146,9 +146,15 @@ describe("DatabaseProperties", () => {
     expect(text).not.toContain("Nom");
     expect(text).toContain("Add a property");
     expect(text).toContain("Customize page");
+  });
+
+  it("draws property lines 38 px high, as Notion", async () => {
+    await render({}, false);
+    const value = container.querySelector("[data-cell-host]");
+    expect(value && getComputedStyle(value).minHeight).toBe("38px");
     expect(
-      container.querySelector(`a[href='/db/${databaseId}']`)
-    ).not.toBeNull();
+      value?.parentElement && getComputedStyle(value.parentElement).minHeight
+    ).toBe("38px");
   });
 
   it("hides empty properties behind a toggle, read-only for readers", async () => {
@@ -173,7 +179,11 @@ describe("DatabaseProperties", () => {
     expect(text).not.toContain("Statut");
   });
 
-  it("leaves the link to the database to the breadcrumb when it leads there", async () => {
+  it("does not name the database above the properties, the breadcrumb leads to it", async () => {
+    await render({}, false);
+    expect(container.querySelector(`a[href='/db/${databaseId}']`)).toBeNull();
+    expect(container.textContent).not.toContain("Suivi");
+
     await render({}, false, "60000000-0000-4000-8000-000000000003");
     expect(container.querySelector(`a[href='/db/${databaseId}']`)).toBeNull();
   });

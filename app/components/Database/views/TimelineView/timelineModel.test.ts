@@ -3,15 +3,18 @@ import type { DatabaseField, DatabaseRecord } from "@shared/databases/types";
 import { DatabaseFieldType } from "@shared/databases/types";
 import { dayKey } from "../CalendarView/calendarModel";
 import {
+  ALL_VISIBLE,
   barGeometry,
   dayToX,
   dependencyPath,
   dragSpan,
+  hiddenBarEnds,
   PX_PER_DAY,
   showsTimelineTable,
   spanFields,
   timelineRange,
   timelineScale,
+  visibleSpan,
   xToDay,
 } from "./timelineModel";
 
@@ -177,5 +180,45 @@ describe("dependencyPath", () => {
     expect(dependencyPath({ x: 100, y: 10 }, { x: 50, y: 50 })).toContain(
       "V 30"
     );
+  });
+});
+
+describe("visibleSpan", () => {
+  it("keeps the whole days in sight", () => {
+    expect(visibleSpan(5107, 1070, 28)).toEqual({ left: 5124, right: 6160 });
+    expect(visibleSpan(5124, 1036, 28)).toEqual({ left: 5124, right: 6160 });
+  });
+});
+
+describe("hiddenBarEnds", () => {
+  const visible = { left: 280, right: 1120 };
+
+  it("tells a bar that starts before the part in sight", () => {
+    expect(hiddenBarEnds({ left: 0, width: 100 }, visible)).toEqual({
+      start: true,
+      end: false,
+    });
+    expect(hiddenBarEnds({ left: 252, width: 2000 }, visible)).toEqual({
+      start: true,
+      end: true,
+    });
+  });
+
+  it("tells a bar that goes past the right edge", () => {
+    expect(hiddenBarEnds({ left: 1100, width: 56 }, visible)).toEqual({
+      start: false,
+      end: true,
+    });
+    expect(hiddenBarEnds({ left: 280, width: 840 }, visible)).toEqual({
+      start: false,
+      end: false,
+    });
+  });
+
+  it("hides nothing before the timeline is measured", () => {
+    expect(hiddenBarEnds({ left: -500, width: 9000 }, ALL_VISIBLE)).toEqual({
+      start: false,
+      end: false,
+    });
   });
 });

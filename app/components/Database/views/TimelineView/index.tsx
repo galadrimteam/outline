@@ -23,8 +23,10 @@ import { Popover, PopoverTrigger } from "~/components/primitives/Popover";
 import Tooltip from "~/components/Tooltip";
 import useStores from "~/hooks/useStores";
 import type Database from "~/models/Database";
+import { isEmptyCell } from "~/stores/DatabaseRecordsStore";
 import { isLinkItem, toArray } from "../../cells/format";
 import { getCell } from "../../cells/registry";
+import { PeopleChips, peopleOf } from "../../cells/UserCell";
 import { MenuItem, MenuLabel, MenuPanel } from "../../fields/components";
 import { CompactSelect } from "../../toolbar/components";
 import type { RecordGroup } from "../../toolbar/grouping";
@@ -34,6 +36,7 @@ import type { DatabaseViewProps } from "../../types";
 import type { DaySpan } from "../CalendarView/calendarModel";
 import { defaultDateField } from "../../newViewDefaults";
 import { recordSpan } from "../CalendarView/calendarModel";
+import { useElementWidth } from "../../useElementWidth";
 import { useDateLocale } from "../CalendarView/useDateLocale";
 import { GroupLabel } from "../GroupLabel";
 import {
@@ -43,18 +46,21 @@ import {
   recordTitle,
   visibleCardFields,
 } from "../GalleryView/cards";
-import type { BarDragMode, BarGeometry } from "./timelineModel";
+import type { BarDragMode, BarGeometry, VisibleSpan } from "./timelineModel";
 import {
+  ALL_VISIBLE,
   barGeometry,
   dayToX,
   dependencyPath,
   dragSpan,
+  hiddenBarEnds,
   PX_PER_DAY,
   STEP_DAYS,
   showsTimelineTable,
   spanFields,
   timelineRange,
   timelineScale,
+  visibleSpan,
   xToDay,
 } from "./timelineModel";
 
@@ -113,7 +119,9 @@ export const TimelineView = observer(function TimelineView({
   const [focus, setFocus] = React.useState<{ day: Date; request: number }>();
   const [collapsed, setCollapsed] = React.useState<Set<string>>(new Set());
   const [preview, setPreview] = React.useState<{ id: string; span: DaySpan }>();
+  const [visible, setVisible] = React.useState<VisibleSpan>(ALL_VISIBLE);
   const scrollerRef = React.useRef<HTMLDivElement>(null);
+  const scrollerWidth = useElementWidth(scrollerRef);
   const markerId = `timeline-arrow-${React.useId().replace(/:/g, "")}`;
 
   React.useEffect(() => {
@@ -136,7 +144,8 @@ export const TimelineView = observer(function TimelineView({
     getCell(startField.type).isEditable(startField) &&
     (!endField || getCell(endField.type).isEditable(endField));
   const px = PX_PER_DAY[zoom];
-  const tableFields = visibleCardFields(database, view).slice(0, 2);
+  const labelFields = visibleCardFields(database, view);
+  const tableFields = labelFields.slice(0, 2);
   const tableWidth = showTable
     ? TITLE_WIDTH + tableFields.length * COLUMN_WIDTH
     : 0;
@@ -232,6 +241,25 @@ export const TimelineView = observer(function TimelineView({
     [tableWidth]
   );
 
+  const measureVisible = React.useCallback(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) {
+      return;
+    }
+    const next = visibleSpan(scroller.scrollLeft, visibleWidth(scroller), px);
+    setVisible((current) =>
+      current.left === next.left && current.right === next.right
+        ? current
+        : next
+    );
+  }, [px, visibleWidth]);
+
+  React.useLayoutEffect(measureVisible);
+
+  const handleReveal = React.useCallback((x: number) => {
+    scrollerRef.current?.scrollTo({ left: Math.max(0, x), behavior: "smooth" });
+  }, []);
+
   const centerOn = React.useCallback(
     (day: Date) => {
       const scroller = scrollerRef.current;
@@ -306,12 +334,14 @@ export const TimelineView = observer(function TimelineView({
     [canConfigure, update, settings]
   );
 
+  // A timeline drawn hidden, as in a folded toggle, has no width to centre
+  // today in: it does so once it shows.
   React.useLayoutEffect(() => {
-    if (!scrolledOnce.current && query.isLoaded) {
+    if (!scrolledOnce.current && query.isLoaded && scrollerWidth > 0) {
       scrolledOnce.current = true;
       scrollToToday();
     }
-  }, [zoom, query.isLoaded, scrollToToday]);
+  }, [zoom, query.isLoaded, scrollerWidth, scrollToToday]);
 
   const handleToggleTable = React.useCallback(() => {
     const next = !showTable;
@@ -498,7 +528,7 @@ export const TimelineView = observer(function TimelineView({
           </IconButton>
         </Tooltip>
       </Controls>
-      <Scroller ref={scrollerRef}>
+      <Scroller ref={scrollerRef} onScroll={measureVisible}>
         <Canvas style={{ width: tableWidth + timelineWidth }}>
           <HeaderRow style={{ height: HEADER_HEIGHT }}>
             {showTable && (
@@ -615,9 +645,13 @@ export const TimelineView = observer(function TimelineView({
                     canEdit={canEdit}
                     hasEnd={!!endField}
                     locale={locale}
+                    visible={visible}
+                    pinLeft={tableWidth}
+                    labelFields={labelFields}
                     onPreview={handlePreview}
                     onCommit={handleCommit}
                     onOpen={onOpenRecord}
+                    onReveal={handleReveal}
                   />
                 </Row>
               )
@@ -791,9 +825,17 @@ interface TrackProps {
   canEdit: boolean;
   hasEnd: boolean;
   locale: ReturnType<typeof useDateLocale>;
+  /** The part of the timeline in sight. */
+  visible: VisibleSpan;
+  /** Where the part in sight starts in the scroller: the width of the side table. */
+  pinLeft: number;
+  /** The properties the view shows, drawn after the title as on Notion's bars. */
+  labelFields: DatabaseField[];
   onPreview: (recordId: string, span: DaySpan | undefined) => void;
   onCommit: (record: DatabaseRecord, span: DaySpan) => void;
   onOpen: (recordId: string) => void;
+  /** Scrolls the timeline to a place of the track. */
+  onReveal: (x: number) => void;
 }
 
 const Track = observer(function Track({
@@ -809,9 +851,13 @@ const Track = observer(function Track({
   canEdit,
   hasEnd,
   locale,
+  visible,
+  pinLeft,
+  labelFields,
   onPreview,
   onCommit,
   onOpen,
+  onReveal,
 }: TrackProps) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -917,6 +963,12 @@ const Track = observer(function Track({
     onCommit(record, dragSpan(savedSpan, mode, step));
   };
 
+  // The label drawn beside or over the edge of a bar opens the row as the bar does, as in Notion.
+  const handleLabelClick = (ev: React.MouseEvent<HTMLElement>) => {
+    ev.stopPropagation();
+    onOpen(record.id);
+  };
+
   const geometry: BarGeometry | undefined = span
     ? barGeometry(span, rangeStart, px)
     : undefined;
@@ -929,7 +981,13 @@ const Track = observer(function Track({
       }`
     : title;
   const color = recordColor(database, view, record, theme);
-  const titleInside = !!geometry && geometry.width >= 90;
+  const hidden = geometry
+    ? hiddenBarEnds(geometry, visible)
+    : { start: false, end: false };
+  const titleInside = !!geometry && geometry.width >= 90 && !hidden.start;
+  const labelContent = (
+    <BarLabel database={database} record={record} fields={labelFields} />
+  );
 
   return (
     <TrackArea
@@ -979,11 +1037,7 @@ const Track = observer(function Track({
               onPointerDown={handlePointerDown("start")}
             />
           )}
-          {titleInside && (
-            <BarTitle>
-              <RecordTitle database={database} record={record} />
-            </BarTitle>
-          )}
+          {titleInside && <BarTitle>{labelContent}</BarTitle>}
           {canEdit && hasEnd && (
             <Handle
               $side="end"
@@ -993,15 +1047,98 @@ const Track = observer(function Track({
           )}
         </Bar>
       )}
-      {geometry && !titleInside && (
+      {geometry && !titleInside && !hidden.start && (
         <OutsideTitle
           aria-hidden
           style={{ left: geometry.left + Math.max(geometry.width, 6) + 6 }}
+          onClick={handleLabelClick}
         >
-          <RecordTitle database={database} record={record} />
+          {labelContent}
         </OutsideTitle>
       )}
+      {geometry && hidden.start && (
+        <StartLane style={{ left: geometry.left }}>
+          <PinnedLabel style={{ left: pinLeft + 6 }} onClick={handleLabelClick}>
+            <EdgeButton
+              type="button"
+              aria-label={t("Go to the start")}
+              onClick={(event) => {
+                event.stopPropagation();
+                onReveal(geometry.left - px);
+              }}
+            >
+              <BackIcon size={14} />
+            </EdgeButton>
+            <PinnedText>{labelContent}</PinnedText>
+          </PinnedLabel>
+        </StartLane>
+      )}
+      {geometry && hidden.end && (
+        <EndLane style={{ width: geometry.left + geometry.width }}>
+          <EdgeButton
+            type="button"
+            aria-label={t("Go to the end")}
+            $pinned="end"
+            onClick={(event) => {
+              event.stopPropagation();
+              onReveal(
+                geometry.left +
+                  geometry.width +
+                  px -
+                  (visible.right - visible.left)
+              );
+            }}
+          >
+            <NextIcon size={14} />
+          </EdgeButton>
+        </EndLane>
+      )}
     </TrackArea>
+  );
+});
+
+interface BarLabelProps {
+  database: Database;
+  record: DatabaseRecord;
+  /** The properties the view shows. */
+  fields: DatabaseField[];
+}
+
+/**
+ * What a bar shows, as on Notion's: the row's icon and title, then the
+ * properties the view shows that have a value, people as avatars alone.
+ */
+const BarLabel = observer(function BarLabel({
+  database,
+  record,
+  fields,
+}: BarLabelProps) {
+  return (
+    <>
+      <RecordTitle database={database} record={record} />
+      {fields
+        .filter((field) => !isEmptyCell(record.fields[field.id]))
+        .map((field) => {
+          const { Renderer } = getCell(field.type);
+          const value = record.fields[field.id];
+          const people = peopleOf(value);
+          return (
+            <LabelProperty key={field.id}>
+              {people.length ? (
+                <PeopleChips people={people} variant="table" avatarsOnly />
+              ) : (
+                <Renderer
+                  field={field}
+                  value={value}
+                  database={database}
+                  record={record}
+                  variant="table"
+                />
+              )}
+            </LabelProperty>
+          );
+        })}
+    </>
   );
 });
 
@@ -1412,8 +1549,90 @@ const OutsideTitle = styled.span`
   max-width: 320px;
   font-size: 13px;
   color: ${s("textSecondary")};
-  pointer-events: none;
+  cursor: var(--pointer);
   ${ellipsis()}
+`;
+
+const LabelProperty = styled.span`
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: 8px;
+  vertical-align: middle;
+  font-weight: 400;
+`;
+
+// From the bar's start to the end of the track, so that its label can stay at
+// the left edge for as long as the row is in sight.
+const StartLane = styled.div`
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  height: ${ROW_HEIGHT}px;
+  pointer-events: none;
+`;
+
+const PinnedLabel = styled.div`
+  position: sticky;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 480px;
+  height: 100%;
+  cursor: var(--pointer);
+  pointer-events: auto;
+`;
+
+const PinnedText = styled.span`
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: ${s("text")};
+  ${ellipsis()}
+`;
+
+// From the start of the track to the bar's end, so that its button can stay at
+// the right edge while the end is out of sight.
+const EndLane = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: ${ROW_HEIGHT}px;
+  pointer-events: none;
+`;
+
+const EdgeButton = styled.button<{ $pinned?: "end" }>`
+  ${(props) =>
+    props.$pinned === "end" &&
+    css`
+      position: sticky;
+      right: 6px;
+    `}
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  ${borderRadius(4)}
+  background: ${s("background")};
+  box-shadow: 0 0 0 1px ${s("divider")};
+  color: ${s("textTertiary")};
+  cursor: var(--pointer);
+  pointer-events: auto;
+
+  &:hover,
+  &:focus-visible {
+    background: ${s("listItemHoverBackground")};
+    color: ${s("text")};
+    outline: none;
+  }
 `;
 
 const GroupLine = styled.div`

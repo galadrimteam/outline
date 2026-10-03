@@ -1,5 +1,9 @@
 import { DatabaseFieldType, DatabaseLayout } from "@shared/databases/types";
-import type { DatabaseField, DatabaseView } from "@shared/databases/types";
+import type {
+  DatabaseField,
+  DatabaseSettings,
+  DatabaseView,
+} from "@shared/databases/types";
 import { DatabaseSettingsHelper } from "./DatabaseSettingsHelper";
 
 const view = (id: string): DatabaseView => ({
@@ -117,6 +121,33 @@ describe("DatabaseSettingsHelper", () => {
     );
   });
 
+  it("lets a timeline read the rows of the groups it folds, for « No date »", () => {
+    const settings: DatabaseSettings = {
+      viewOverrides: {
+        viwTimeline: {
+          layout: DatabaseLayout.Timeline,
+          stackOrder: ["S1", ""],
+          hiddenStacks: [""],
+        },
+        viwFolded: {
+          layout: DatabaseLayout.Timeline,
+          hiddenStacks: [""],
+        },
+        viwList: { layout: DatabaseLayout.List, hiddenStacks: [""] },
+      },
+    };
+    expect(DatabaseSettingsHelper.groupLayout(settings, "viwTimeline")).toEqual(
+      { order: ["S1", ""], hidden: undefined }
+    );
+    expect(DatabaseSettingsHelper.groupLayout(settings, "viwFolded")).toBe(
+      undefined
+    );
+    expect(DatabaseSettingsHelper.groupLayout(settings, "viwList")).toEqual({
+      order: undefined,
+      hidden: [""],
+    });
+  });
+
   it("keeps a board's calculation and an inline load limit", () => {
     const settings = DatabaseSettingsHelper.mergeViewOverrides({}, "viwA", {
       groupCalculation: { func: "sum", fieldId: "fldEstimate" },
@@ -166,6 +197,7 @@ describe("DatabaseSettingsHelper", () => {
           hideEmpty: true,
           fieldOrder: ["fldB", "fldA"],
           pinnedFieldIds: ["fldA"],
+          omittedFieldIds: ["fldB", "fldA"],
         },
         subItemFieldId: "fldA",
       },
@@ -179,6 +211,7 @@ describe("DatabaseSettingsHelper", () => {
     expect(settings.pageLayout?.hideEmpty).toBe(true);
     expect(settings.pageLayout?.fieldOrder).toEqual(["fldB"]);
     expect(settings.pageLayout?.pinnedFieldIds).toEqual([]);
+    expect(settings.pageLayout?.omittedFieldIds).toEqual(["fldB"]);
   });
 
   it("merges the page layout key by key, its tabs kept", () => {

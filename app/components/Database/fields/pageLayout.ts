@@ -1,5 +1,6 @@
 import type {
   DatabaseField,
+  DatabasePageDiscussions,
   DatabaseRecord,
   DatabaseSettings,
   DatabaseView,
@@ -27,38 +28,52 @@ export interface PageProperties {
 
 /**
  * The properties listed on a row page, without the title and the icon, which the page header
- * shows, nor the end field of a date range, which shows with its start as one property. They
- * follow the page order of the layout (Notion's own page order), then the order of the database's
- * first table for the properties it does not list.
+ * shows, nor the end field of a date range, which shows with its start as one property, nor the
+ * columns the layout omits. They follow the page order of the layout (Notion's own page order),
+ * then the order of the database's first table for the properties it does not list.
  *
  * @param fields the database fields.
  * @param views the database views.
  * @param iconFieldId the field holding the row emoji.
- * @param fieldOrder the page order of the layout, if any.
+ * @param layout the page layout of the database, if any.
  * @returns the properties in order.
  */
 export function pageFields(
   fields: DatabaseField[],
   views: DatabaseView[],
   iconFieldId?: string,
-  fieldOrder?: string[]
+  layout?: PageLayout
 ): DatabaseField[] {
   const ordered = [...views].sort((a, b) => a.order - b.order);
   const reference =
     ordered.find((view) => view.layout === DatabaseLayout.Table) ?? ordered[0];
   const sorted = byPageOrder(
     reference ? orderedFields(fields, reference) : fields,
-    fieldOrder
+    layout?.fieldOrder
   );
-  const rangeEnds = new Set(
-    fields.flatMap((field) =>
+  const left = new Set([
+    ...fields.flatMap((field) =>
       field.meta?.endFieldId ? [field.meta.endFieldId] : []
-    )
-  );
+    ),
+    ...(layout?.omittedFieldIds ?? []),
+  ]);
   return sorted.filter(
     (field) =>
-      !field.isPrimary && field.id !== iconFieldId && !rangeEnds.has(field.id)
+      !field.isPrimary && field.id !== iconFieldId && !left.has(field.id)
   );
+}
+
+/**
+ * How the discussions of a page show under its title: the « Page discussions » of its database
+ * for a row page, else as Notion shows those of any page, only when there are some.
+ *
+ * @param layout the page layout of the database of a row page, undefined for another page.
+ * @returns the setting.
+ */
+export function pageDiscussions(
+  layout: PageLayout | undefined
+): DatabasePageDiscussions {
+  return layout?.discussions ?? "minimal";
 }
 
 /**
@@ -126,11 +141,11 @@ export function splitPageProperties(
   layout: PageLayout | undefined
 ): PageProperties {
   const byId = new Map(fields.map((field) => [field.id, field]));
-  const pinned = (layout?.pinnedFieldIds ?? []).flatMap((id) => {
-    const field = byId.get(id);
-    return field ? [field] : [];
-  });
-  if (pinned.length) {
+  if (layout?.pinnedFieldIds) {
+    const pinned = layout.pinnedFieldIds.flatMap((id) => {
+      const field = byId.get(id);
+      return field ? [field] : [];
+    });
     return {
       shown: pinned,
       hidden: fields.filter((field) => !pinned.includes(field)),

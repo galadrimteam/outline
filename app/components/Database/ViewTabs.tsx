@@ -43,6 +43,7 @@ import { PanelAction } from "./toolbar/components";
 import { useIsWrapped } from "./useIsWrapped";
 import { useTabStripMetrics } from "./useTabStripMetrics";
 import { ViewIcon } from "./ViewIcon";
+import { ViewsMenu } from "./ViewsMenu";
 import { splitTabs, stripMinimum } from "./viewTabsOverflow";
 
 interface Props {
@@ -108,7 +109,8 @@ export function layoutName(
 /**
  * The view tabs of a database block: switch views, add one, and for editors
  * rename, duplicate, delete (click the active tab or right-click) and reorder
- * them by dragging.
+ * them by dragging. The tabs that do not fit wait behind « N more… », Notion's
+ * menu of every view with a search field and « New view ».
  */
 export const ViewTabs = observer(function ViewTabs({
   database,
@@ -287,20 +289,13 @@ export const ViewTabs = observer(function ViewTabs({
   const actionsRef = React.useRef<HTMLDivElement>(null);
   const isWrapped = useIsWrapped(barRef, stripRef, actionsRef);
 
-  const moreAction = useMenuAction(
-    hiddenViews.map((view) =>
-      createAction({
-        id: `view-${view.id}`,
-        name: view.name || t("Untitled"),
-        section: "Database",
-        icon: <ViewIcon view={view} />,
-        perform: () => onSelect(view.id),
-      })
-    )
+  const nameOfLayout = React.useCallback(
+    (layout: DatabaseLayout) => layoutName(layout, t),
+    [t]
   );
 
   return (
-    <Bar ref={barRef} data-database-chrome>
+    <Bar ref={barRef}>
       <Strip
         ref={stripRef}
         style={{ minWidth: `min(100%, ${minStripWidth}px)` }}
@@ -352,11 +347,18 @@ export const ViewTabs = observer(function ViewTabs({
               </Tabs>
             </DndContext>
             {hiddenViews.length > 0 && (
-              <DropdownMenu action={moreAction} ariaLabel={t("More views")}>
-                <MoreButton type="button">
+              <ViewsMenu
+                views={views}
+                activeViewId={activeViewId}
+                layouts={creatableLayouts}
+                layoutName={nameOfLayout}
+                onSelect={onSelect}
+                onCreate={readOnly ? undefined : handleCreate}
+              >
+                <MoreButton type="button" aria-label={t("More views")}>
                   {t("{{ count }} more…", { count: hiddenViews.length })}
                 </MoreButton>
-              </DropdownMenu>
+              </ViewsMenu>
             )}
           </>
         )}
@@ -580,16 +582,13 @@ const TAB_GAP = 4;
 const ADD_WIDTH = 28;
 
 // Like Notion, no rule under the tabs; the toolbar wraps under them when both
-// do not fit. The block may fade the tabs and the toolbar in on hover through
-// --database-tabs-opacity and --database-actions-opacity.
+// do not fit.
 const Bar = styled.div`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   column-gap: 8px;
   min-width: 0;
-  opacity: var(--database-tabs-opacity, 1);
-  transition: opacity 100ms ease-in-out;
 `;
 
 const Strip = styled.div`
@@ -768,8 +767,6 @@ const Actions = styled.div<{ $isWrapped: boolean }>`
   max-width: 100%;
   margin-left: auto;
   padding: ${(props) => (props.$isWrapped ? "6px 0 2px" : "4px 0")};
-  opacity: var(--database-actions-opacity, 1);
-  transition: opacity 100ms ease-in-out;
 `;
 
 const ViewIconPicker = styled(IconPicker)`

@@ -35,17 +35,28 @@ import { cellValueToText } from "../../cells/format";
 import { getCell } from "../../cells/registry";
 import { orderPatch, orderedFields } from "../../toolbar/columns";
 import type { DatabaseViewProps } from "../../types";
+import { usePeekedRecordId } from "../../rowPeek";
+import { useElementWidth } from "../../useElementWidth";
 import { GroupAddRow, GroupHeaderRow, PositionedLine } from "./GroupRows";
-import { GUTTER_WIDTH, moveId, tableColumns, tableRowLayout } from "./layout";
+import {
+  GUTTER_WIDTH,
+  fitFrozenColumns,
+  moveId,
+  tableColumns,
+  tableRowLayout,
+} from "./layout";
 import { moveCell, navigationKey } from "./navigation";
 import type { AddDisplayRow, GroupPathItem, RecordDisplayRow } from "./rows";
 import { buildDisplayRows, dropSide, pathChange, pathPrefill } from "./rows";
 import { hasSubItems, parentTitles, subItemsOf } from "./subItems";
 import { SelectionBar } from "./SelectionBar";
+import { nextSelection } from "./selection";
 import {
   Body,
   Grid,
+  HEADER_HEIGHT,
   NewButton,
+  OpenLine,
   Scroller,
   SpanningContent,
   SpanningLine,
@@ -107,6 +118,7 @@ export const TableView = observer(function TableView_({
 }: TableViewProps) {
   const { t } = useTranslation();
   const { databaseRecords, databases, dialogs } = useStores();
+  const scrollerRef = React.useRef<HTMLDivElement>(null);
   const gridRef = React.useRef<HTMLDivElement>(null);
   const bodyRef = React.useRef<HTMLDivElement>(null);
   const editingRef = React.useRef(false);
@@ -126,15 +138,18 @@ export const TableView = observer(function TableView_({
   const [drop, setDrop] = React.useState<DropTarget | null>(null);
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
   const [scrolled, setScrolled] = React.useState(false);
+  const peekedId = usePeekedRecordId(database.id);
 
   React.useLayoutEffect(() => {
     editingRef.current = editing;
   }, [editing]);
 
   const fields = database.fields;
+  const scrollerWidth = useElementWidth(scrollerRef);
   const columns = React.useMemo(
-    () => tableColumns(fields ?? [], view, widths),
-    [fields, view, widths]
+    () =>
+      fitFrozenColumns(tableColumns(fields ?? [], view, widths), scrollerWidth),
+    [fields, view, widths, scrollerWidth]
   );
   const layout = tableRowLayout(view.options.rowHeight, columns);
   const template = `${GUTTER_WIDTH}px ${columns
@@ -327,8 +342,11 @@ export const TableView = observer(function TableView_({
       if (row?.type === "group") {
         return 41;
       }
-      if (row?.type === "add" || row?.type === "columns") {
+      if (row?.type === "add") {
         return 35;
+      }
+      if (row?.type === "columns") {
+        return HEADER_HEIGHT + 1;
       }
       if (row?.type === "calculations") {
         return 35 + GROUP_GAP;
@@ -415,14 +433,19 @@ export const TableView = observer(function TableView_({
   );
 
   const handleCreate = React.useCallback(
-    async (path: GroupPathItem[] = []) => {
+    async (path: GroupPathItem[] = [], afterId?: string) => {
       if (!onCreateRecord) {
         return;
       }
       const before = new Set(query.recordIds);
       const prefill = pathPrefill(path, fieldById);
       try {
-        await onCreateRecord(Object.keys(prefill).length ? prefill : undefined);
+        await onCreateRecord(
+          Object.keys(prefill).length ? prefill : undefined,
+          afterId && draggable
+            ? { viewId: view.id, anchorId: afterId, position: "after" }
+            : undefined
+        );
       } catch (err) {
         showError(err);
         return;
@@ -435,12 +458,20 @@ export const TableView = observer(function TableView_({
         setEditing(true);
       }
     },
-    [database, fieldById, onCreateRecord, query, showError]
+    [database, draggable, fieldById, onCreateRecord, query, showError, view.id]
   );
 
   const handleCreateInGroup = React.useCallback(
     (row: AddDisplayRow) => void handleCreate(row.path),
     [handleCreate]
+  );
+
+  const handleInsertBelow = React.useCallback(
+    (recordId: string) => {
+      const path = recordRows.find((row) => row.record.id === recordId)?.path;
+      void handleCreate(path, recordId);
+    },
+    [handleCreate, recordRows]
   );
 
   const handleToggleSubItems = React.useCallback((recordId: string) => {
@@ -485,20 +516,31 @@ export const TableView = observer(function TableView_({
       event.stopPropagation();
       const anchor = lastToggled.current;
       lastToggled.current = recordId;
-      setSelected((current) => {
-        if (event.shiftKey && anchor) {
-          const ids = recordRows.map((row) => row.record.id);
-          const from = ids.indexOf(anchor);
-          const to = ids.indexOf(recordId);
-          if (from !== -1 && to !== -1) {
-            const range = ids.slice(Math.min(from, to), Math.max(from, to) + 1);
-            return Array.from(new Set([...current, ...range]));
-          }
-        }
-        return current.includes(recordId)
-          ? current.filter((id) => id !== recordId)
-          : [...current, recordId];
-      });
+      setSelected((current) =>
+        nextSelection(current, recordId, {
+          ids: recordRows.map((row) => row.record.id),
+          anchor,
+          extend: event.shiftKey,
+          toggle: true,
+        })
+      );
+    },
+    [recordRows]
+  );
+
+  const handleSelectRow = React.useCallback(
+    (recordId: string, event: React.MouseEvent | React.KeyboardEvent) => {
+      event.stopPropagation();
+      const anchor = lastToggled.current;
+      lastToggled.current = recordId;
+      setSelected((current) =>
+        nextSelection(current, recordId, {
+          ids: recordRows.map((row) => row.record.id),
+          anchor,
+          extend: event.shiftKey,
+          toggle: event.metaKey || event.ctrlKey,
+        })
+      );
     },
     [recordRows]
   );
@@ -869,7 +911,11 @@ export const TableView = observer(function TableView_({
           onClear={() => setSelected([])}
         />
       )}
-      <Scroller data-scrolled={scrolled || undefined} onScroll={handleScroll}>
+      <Scroller
+        ref={scrollerRef}
+        data-scrolled={scrolled || undefined}
+        onScroll={handleScroll}
+      >
         <Grid
           ref={gridRef}
           role="grid"
@@ -969,6 +1015,8 @@ export const TableView = observer(function TableView_({
                     readOnly={readOnly}
                     draggable={draggable && row.level === 0}
                     isSelected={selectedIds.includes(row.record.id)}
+                    isPeeked={peekedId === row.record.id}
+                    selecting={!readOnly && selectedIds.length > 0}
                     activeFieldId={
                       active?.recordId === row.record.id
                         ? active.fieldId
@@ -986,6 +1034,8 @@ export const TableView = observer(function TableView_({
                     subItems={rowSubItems(row)}
                     measureElement={virtualizer.measureElement}
                     onToggleSelected={handleToggleSelected}
+                    onSelectRow={handleSelectRow}
+                    onInsertBelow={canCreate ? handleInsertBelow : undefined}
                     onActivate={handleActivate}
                     onChange={handleChange}
                     onChangeFields={handleChangeFields}
@@ -1023,14 +1073,14 @@ export const TableView = observer(function TableView_({
             </SpanningLine>
           )}
           {!grouped && canCreate && (
-            <SpanningLine $template={template}>
+            <OpenLine $template={template}>
               <SpanningContent>
                 <NewButton type="button" onClick={() => void handleCreate()}>
                   <PlusIcon size={18} />
                   {t("New page")}
                 </NewButton>
               </SpanningContent>
-            </SpanningLine>
+            </OpenLine>
           )}
           {calculationsInGroups ? null : renderFooter(results)}
         </Grid>

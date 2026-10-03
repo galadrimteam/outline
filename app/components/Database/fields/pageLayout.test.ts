@@ -1,6 +1,7 @@
 import { DatabaseFieldType, DatabaseLayout } from "@shared/databases/types";
 import { makeField, makeView } from "../views/TableView/testFixtures";
 import {
+  pageDiscussions,
   pageFields,
   propertyVisibility,
   splitPageProperties,
@@ -46,11 +47,20 @@ describe("pageFields", () => {
       },
     });
     expect(
-      pageFields([title, icon, status, notes, priority], [table], "icon", [
-        "status",
-        "notes",
-      ]).map((field) => field.id)
+      pageFields([title, icon, status, notes, priority], [table], "icon", {
+        fieldOrder: ["status", "notes"],
+      }).map((field) => field.id)
     ).toEqual(["status", "notes", "priority"]);
+  });
+
+  it("leaves out the columns the layout omits, hidden ones too", () => {
+    const notion = makeField({ id: "notion" });
+    expect(
+      pageFields([title, status, notes, notion], [], undefined, {
+        hiddenFieldIds: ["notes", "notion"],
+        omittedFieldIds: ["notion"],
+      }).map((field) => field.id)
+    ).toEqual(["status", "notes"]);
   });
 
   it("shows a date range as one property, its start", () => {
@@ -116,5 +126,23 @@ describe("splitPageProperties", () => {
       "status",
     ]);
     expect(split.hidden.map((field) => field.id)).toEqual(["notes"]);
+  });
+
+  it("folds every property behind details when the layout pins none", () => {
+    const split = splitPageProperties([status, notes], record, {
+      pinnedFieldIds: [],
+    });
+    expect(split.pinned).toBe(true);
+    expect(split.shown).toEqual([]);
+    expect(split.hidden.map((field) => field.id)).toEqual(["status", "notes"]);
+  });
+});
+
+describe("pageDiscussions", () => {
+  it("keeps the discussions of a page minimal unless its database says otherwise, as Notion", () => {
+    expect(pageDiscussions(undefined)).toBe("minimal");
+    expect(pageDiscussions({})).toBe("minimal");
+    expect(pageDiscussions({ discussions: "expanded" })).toBe("expanded");
+    expect(pageDiscussions({ discussions: "off" })).toBe("off");
   });
 });

@@ -1,27 +1,27 @@
 import { blockChrome } from "./blockChrome";
 
 describe("blockChrome", () => {
-  it("keeps the tabs and toolbar of a full-page database in sight, without a name", () => {
+  it("draws no name on a full-page database", () => {
     expect(
       blockChrome({ fullPage: true, hideTitle: false, viewCount: 1 })
-    ).toEqual({ showHeading: false, headingAbove: false, reveal: "always" });
+    ).toEqual({ showHeading: false, headingAbove: false });
   });
 
   it("puts the name in place of the tab of a single view", () => {
     expect(
       blockChrome({ fullPage: false, hideTitle: false, viewCount: 1 })
-    ).toEqual({ showHeading: true, headingAbove: false, reveal: "actions" });
+    ).toEqual({ showHeading: true, headingAbove: false });
   });
 
   it("gives the name its own row above several tabs", () => {
     expect(
       blockChrome({ fullPage: false, hideTitle: false, viewCount: 3 })
-    ).toEqual({ showHeading: true, headingAbove: true, reveal: "actions" });
+    ).toEqual({ showHeading: true, headingAbove: true });
   });
 
-  it("shows the tabs of a block without a name on hover only", () => {
+  it("draws the tabs alone of a block without a name", () => {
     expect(
       blockChrome({ fullPage: false, hideTitle: true, viewCount: 2 })
-    ).toEqual({ showHeading: false, headingAbove: false, reveal: "all" });
+    ).toEqual({ showHeading: false, headingAbove: false });
   });
 });

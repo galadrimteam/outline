@@ -1425,16 +1425,17 @@ ${
   padding: 12px;
   margin: 8px 0;
 
-  a {
+  /* A database the notice holds keeps its own links and paragraphs. */
+  a:not(.component-database *) {
     color: ${props.theme.text};
     text-decoration: underline;
   }
 
-  p:first-child {
+  p:first-child:not(.component-database *) {
     margin-top: 0;
   }
 
-  p:last-child {
+  p:last-child:not(.component-database *) {
     margin-bottom: 0;
   }
 }

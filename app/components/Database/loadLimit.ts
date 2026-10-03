@@ -4,9 +4,13 @@ import { DatabaseLayout } from "@shared/databases/types";
 /** Layouts that end with « Load more » instead of loading as the reader scrolls. */
 const pagedLayouts = new Set([DatabaseLayout.List, DatabaseLayout.Gallery]);
 
+/** Notion's load limit of a gallery inside a page whose view names none. */
+const GALLERY_LOAD_LIMIT = 25;
+
 /**
- * The number of rows a view loads before « Load more »: Notion's load limit,
- * which only applies to a database shown inside a page.
+ * The number of rows a view loads before « Load more » (in each group when
+ * grouped): Notion's load limit, which only applies to a database shown
+ * inside a page, 25 cards for a gallery that names none.
  *
  * @param view the view.
  * @param fullPage whether the database fills its page.
@@ -19,5 +23,8 @@ export function viewPageSize(
   if (fullPage || !pagedLayouts.has(view.layout)) {
     return undefined;
   }
-  return view.overrides.loadLimit;
+  return (
+    view.overrides.loadLimit ??
+    (view.layout === DatabaseLayout.Gallery ? GALLERY_LOAD_LIMIT : undefined)
+  );
 }

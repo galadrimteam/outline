@@ -17,6 +17,10 @@ export interface DatabaseBlockContextValue {
   onViewCreated: (view: DatabaseView) => void;
   /** The last request to filter on a property, eg « Filter » in a column menu. */
   filterRequest: FilterRequest | undefined;
+  /** The last request to open the grouping of the view, eg « Edit groups » in a column menu. */
+  groupRequest?: number;
+  /** Opens the grouping of the view. */
+  onEditGroups?: () => void;
 }
 
 /** Provided by `DatabaseBlock` around its toolbar and view. */

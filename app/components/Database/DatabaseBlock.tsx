@@ -15,7 +15,11 @@ import { useTranslation } from "react-i18next";
 import { useHistory } from "react-router-dom";
 import { toast } from "sonner";
 import styled, { css } from "styled-components";
-import type { DatabaseCellInput, DatabaseView } from "@shared/databases/types";
+import type {
+  DatabaseCellInput,
+  DatabaseRecordOrder,
+  DatabaseView,
+} from "@shared/databases/types";
 import { appendFilterNode, createFilterItem } from "@shared/databases/filters";
 import { DatabaseLayout } from "@shared/databases/types";
 import type { DatabaseAttrs } from "@shared/editor/nodes/Database";
@@ -35,13 +39,12 @@ import useMobile from "~/hooks/useMobile";
 import useStores from "~/hooks/useStores";
 import type Database from "~/models/Database";
 import { AuthorizationError, NotFoundError } from "~/utils/errors";
-import browserHistory from "~/utils/history";
 import lazyWithRetry from "~/utils/lazyWithRetry";
 import { databasePath } from "~/utils/routeHelpers";
-import { openRouteInSplit } from "~/utils/splitView";
-import type { BlockReveal } from "./blockChrome";
+import type { SplitViewPane } from "~/utils/splitView";
 import { blockChrome } from "./blockChrome";
 import { boardColumns, isStackable, stackValue } from "./boardModel";
+import { openRowPeek } from "./rowPeek";
 import type { FilterRequest } from "./DatabaseBlockContext";
 import { DatabaseBlockContext } from "./DatabaseBlockContext";
 import { DatabaseHeader } from "./DatabaseHeader";
@@ -65,6 +68,8 @@ import type { TableViewProps } from "./views/TableView";
 import { subItemsOf, topLevelFilter } from "./views/TableView/subItems";
 import { useActiveView } from "./useActiveView";
 import { useDatabaseTitleSync } from "./useDatabaseTitleSync";
+import { BLEED_VARIABLE } from "./views/bleed";
+import { useRightBleed } from "./useRightBleed";
 import { ViewTabs } from "./ViewTabs";
 
 const BoardView = lazyWithRetry(() =>
@@ -115,6 +120,7 @@ export const DatabaseBlock = observer(function DatabaseBlock(
           title={attrs.title}
           isEditable={props.isEditable}
           isSelected={props.isSelected}
+          isInPageFlow={isInPageFlow(props)}
           actions={actions}
         />
       ) : (
@@ -129,6 +135,28 @@ export const DatabaseBlock = observer(function DatabaseBlock(
 });
 
 type UpdateAttrs = (patch: Partial<DatabaseAttrs>) => void;
+
+/** The blocks that leave a database in the flow of the page's text. */
+const FLOW_CONTAINERS = new Set(["container_toggle"]);
+
+/**
+ * Whether the block sits in the flow of the page's text, possibly in a
+ * toggle, rather than in a box such as a callout: only then may it run right
+ * of the text, as Notion's wide databases do.
+ */
+function isInPageFlow({ view, getPos }: ComponentProps): boolean {
+  try {
+    const $pos = view.state.doc.resolve(getPos());
+    for (let depth = $pos.depth; depth > 0; depth--) {
+      if (!FLOW_CONTAINERS.has($pos.node(depth).type.name)) {
+        return false;
+      }
+    }
+    return true;
+  } catch (_err) {
+    return false;
+  }
+}
 
 interface NodeActions {
   /** Writes attributes of the block's node. */
@@ -316,6 +344,8 @@ interface FrameProps {
   title: string | null;
   isEditable: boolean;
   isSelected: boolean;
+  /** Whether the block may run right of the text column (see `isInPageFlow`). */
+  isInPageFlow: boolean;
   actions: NodeActions;
 }
 
@@ -348,10 +378,13 @@ const DatabaseFrame = observer(function DatabaseFrame({
   title,
   isEditable,
   isSelected,
+  isInPageFlow,
   actions,
 }: FrameProps) {
   const { updateAttrs } = actions;
   const editor = useEditor();
+  const [frame, setFrame] = React.useState<HTMLDivElement | null>(null);
+  const bleed = useRightBleed(frame, isInPageFlow);
   const { t } = useTranslation();
   const { databases, policies } = useStores();
   const share = useDatabaseShare();
@@ -447,7 +480,12 @@ const DatabaseFrame = observer(function DatabaseFrame({
     />
   );
   return (
-    <Frame $fullPage={fullPage} $selected={isSelected} $reveal={chrome.reveal}>
+    <Frame
+      ref={setFrame}
+      $fullPage={fullPage}
+      $selected={isSelected}
+      style={{ [BLEED_VARIABLE]: `${bleed}px` } as React.CSSProperties}
+    >
       {activeView ? (
         <LoadedView
           database={database}
@@ -514,7 +552,7 @@ const LoadedView = observer(function LoadedView({
 }: LoadedViewProps) {
   const share = useDatabaseShare();
   const { t } = useTranslation();
-  const { databaseRecords } = useStores();
+  const { databaseRecords, ui } = useStores();
   const history = useHistory();
   const { pane } = useSplitView();
   const isMobile = useMobile();
@@ -535,8 +573,8 @@ const LoadedView = observer(function LoadedView({
     }
   }, [query, view.layout]);
 
-  const handleOpenRecord = React.useCallback(
-    async (recordId: string) => {
+  const openRecordPage = React.useCallback(
+    async (recordId: string): Promise<SplitViewPane | undefined> => {
       try {
         const document = await databaseRecords.open(database.id, recordId);
         const path = share.rowPath(document.path);
@@ -547,11 +585,13 @@ const LoadedView = observer(function LoadedView({
           isMobile
         ) {
           history.push(path);
-        } else {
-          openRouteInSplit(browserHistory, path);
+          return pane;
         }
+        openRowPeek(ui, path);
+        return "secondary";
       } catch (_err) {
         toast.error(t("Couldn’t open the page"));
+        return undefined;
       }
     },
     [
@@ -563,7 +603,15 @@ const LoadedView = observer(function LoadedView({
       history,
       share,
       t,
+      ui,
     ]
+  );
+
+  const handleOpenRecord = React.useCallback(
+    async (recordId: string) => {
+      await openRecordPage(recordId);
+    },
+    [openRecordPage]
   );
 
   const handleOpen = React.useCallback(
@@ -572,9 +620,12 @@ const LoadedView = observer(function LoadedView({
   );
 
   const handleCreateRecord = React.useCallback(
-    async (fields?: Record<string, DatabaseCellInput>) => {
+    async (
+      fields?: Record<string, DatabaseCellInput>,
+      order?: DatabaseRecordOrder
+    ) => {
       try {
-        await databaseRecords.create(database.id, fields ?? {});
+        await databaseRecords.create(database.id, fields ?? {}, order);
       } catch (err) {
         toast.error(t("Couldn’t create the row"));
         throw err;
@@ -596,6 +647,11 @@ const LoadedView = observer(function LoadedView({
   }, [databaseRecords, database, view, handleOpenRecord, t]);
 
   const [filterRequest, setFilterRequest] = React.useState<FilterRequest>();
+  const [groupRequest, setGroupRequest] = React.useState<number>();
+  const handleEditGroups = React.useCallback(
+    () => setGroupRequest(Date.now()),
+    []
+  );
 
   const handleFilter = React.useCallback(
     (fieldId: string) => {
@@ -627,8 +683,13 @@ const LoadedView = observer(function LoadedView({
   );
 
   const context = React.useMemo(
-    () => ({ onViewCreated, filterRequest }),
-    [onViewCreated, filterRequest]
+    () => ({
+      onViewCreated,
+      filterRequest,
+      groupRequest,
+      onEditGroups: handleEditGroups,
+    }),
+    [onViewCreated, filterRequest, groupRequest, handleEditGroups]
   );
 
   const viewProps: TableViewProps = {
@@ -644,7 +705,7 @@ const LoadedView = observer(function LoadedView({
   return (
     <DatabaseBlockContext.Provider value={context}>
       {headingAbove && (
-        <HeaderRow data-database-chrome>
+        <HeaderRow>
           {heading}
           {options}
         </HeaderRow>
@@ -895,7 +956,7 @@ function SearchBox({
   }
 
   return (
-    <SearchField data-sticky>
+    <SearchField>
       <SearchIcon size={18} />
       <SearchInput
         ref={inputRef}
@@ -959,7 +1020,6 @@ const OptionsAnchor = styled.div<{ $floating: boolean }>`
 const Frame = styled.div<{
   $fullPage: boolean;
   $selected?: boolean;
-  $reveal?: BlockReveal;
   /** Framed, for the states that are not a database yet: picker, errors. */
   $boxed?: boolean;
 }>`
@@ -985,26 +1045,6 @@ const Frame = styled.div<{
       border-radius: 12px;
     `}
 
-  ${(props) =>
-    (props.$reveal === "actions" || props.$reveal === "all") &&
-    css`
-      --database-actions-opacity: 0;
-      --database-tabs-opacity: ${props.$reveal === "all" ? 0 : 1};
-
-      &:hover,
-      &:focus-within,
-      &:has([data-database-chrome] [data-state="open"]),
-      &:has([data-sticky]) {
-        --database-actions-opacity: 1;
-        --database-tabs-opacity: 1;
-      }
-
-      @media (hover: none) {
-        --database-actions-opacity: 1;
-        --database-tabs-opacity: 1;
-      }
-    `}
-
   &:hover ${OptionsAnchor} {
     opacity: 1;
   }
@@ -1012,8 +1052,6 @@ const Frame = styled.div<{
   ${(props) =>
     props.$selected &&
     css`
-      --database-actions-opacity: 1;
-      --database-tabs-opacity: 1;
       outline: 2px solid ${props.theme.selected};
       outline-offset: 4px;
       border-radius: 4px;

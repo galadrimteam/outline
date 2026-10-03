@@ -25,12 +25,13 @@ import {
 } from "../GalleryView/cards";
 import { CommentCount } from "../../comments/CommentCount";
 import { IconGlyph, useRowIcon } from "../../RowIcon";
+import { useAllRecords } from "../useAllRecords";
 
 /**
  * Notion-like list: one compact line per row, its page icon and title on the
  * left, the visible properties on the right; grouped in sections when the
  * view is grouped. Inline in a page, it shows the view's load limit of rows
- * before « Load more ».
+ * (of each group when grouped) before « Load more ».
  *
  * @param props the database, the view, its rows and the callbacks.
  * @returns the list.
@@ -50,6 +51,7 @@ export const ListView = observer(function ListView({
     ? database.fieldById(groupLevel.fieldId)
     : undefined;
   const canCreate = !readOnly && !!onCreateRecord;
+  const rowsLeft = useAllRecords(query, !!groupField);
 
   React.useEffect(() => {
     void query.fetch();
@@ -66,6 +68,7 @@ export const ListView = observer(function ListView({
           database={database}
           record={record}
           fields={fields}
+          readOnly={readOnly}
           onOpen={onOpenRecord}
         />
       ))}
@@ -94,11 +97,14 @@ export const ListView = observer(function ListView({
                 database={database}
                 field={groupField}
                 group={group}
+                limit={query.params.pageSize}
               >
-                {renderRows(
-                  group.records,
-                  value === undefined ? undefined : { [groupField.id]: value }
-                )}
+                {(records) =>
+                  renderRows(
+                    records,
+                    value === undefined ? undefined : { [groupField.id]: value }
+                  )
+                }
               </GallerySection>
             );
           })
@@ -106,7 +112,7 @@ export const ListView = observer(function ListView({
       {query.isLoaded && !query.records.length && !canCreate && (
         <Empty>{t("No pages to show")}</Empty>
       )}
-      {query.hasMore && (
+      {query.hasMore && (!groupField || rowsLeft) && (
         <LoadMore
           type="button"
           disabled={query.isLoading}
@@ -123,6 +129,7 @@ interface RowProps {
   database: Database;
   record: DatabaseRecord;
   fields: DatabaseField[];
+  readOnly: boolean;
   onOpen: (recordId: string) => void;
 }
 
@@ -130,6 +137,7 @@ const ListRow = observer(function ListRow({
   database,
   record,
   fields,
+  readOnly,
   onOpen,
 }: RowProps) {
   const icon = useRowIcon(database, record);
@@ -152,6 +160,7 @@ const ListRow = observer(function ListRow({
             database={database}
             record={record}
             fields={fields}
+            readOnly={readOnly}
             inline
           />
           <CommentCount

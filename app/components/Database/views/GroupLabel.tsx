@@ -20,7 +20,7 @@ interface Props {
  * The title of a group of rows, as Notion writes it: the value drawn like a
  * card cell (a coloured option, a person, a linked page), a checkbox followed
  * by the property name for a checkbox, « No Property » for the rows without a
- * value.
+ * value, nothing for the rows a formula leaves empty.
  *
  * @param props the property and the value of the group.
  * @returns the title.
@@ -41,7 +41,9 @@ export const GroupLabel = observer(function GroupLabel({
     );
   }
   if (isEmptyGroupValue(value)) {
-    return <NoValue>{t("No {{ name }}", { name: field.name })}</NoValue>;
+    return field.type === DatabaseFieldType.Formula ? null : (
+      <NoValue>{t("No {{ name }}", { name: field.name })}</NoValue>
+    );
   }
   const { Renderer } = getCell(field.type);
   return (

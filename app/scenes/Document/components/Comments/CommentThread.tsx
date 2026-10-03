@@ -1,6 +1,6 @@
 import { m } from "framer-motion";
 import { observer } from "mobx-react";
-import { darken } from "polished";
+import { darken, transparentize } from "polished";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import scrollIntoView from "scroll-into-view-if-needed";
@@ -40,6 +40,14 @@ type Props = {
   collapseThreshold?: number;
   /** Number of replies to display when collapsed */
   collapseNumDisplayed?: number;
+  /** Called when the thread is clicked, focuses it in the comments sidebar by default */
+  onFocus?: () => void;
+  /** Called on a click outside the focused thread, unfocuses it in the sidebar by default */
+  onBlur?: () => void;
+  /** galadrim: drawn in the page as Notion's page discussions, see CommentThreadItem. */
+  inPage?: boolean;
+  /** galadrim: the passage the thread is anchored to, when no editor holds its page. */
+  anchorText?: string;
 };
 
 function CommentThread({
@@ -49,6 +57,10 @@ function CommentThread({
   focused,
   collapseThreshold = 5,
   collapseNumDisplayed = 3,
+  onFocus,
+  onBlur,
+  inPage,
+  anchorText,
 }: Props) {
   const [scrollOnMount] = React.useState(focused && !window.location.hash);
   // Whether to play the entrance animation, captured once at mount so that
@@ -79,7 +91,9 @@ function CommentThread({
     ProsemirrorHelper.getAnchorTextForComment(
       editor?.getComments() ?? [],
       thread.id
-    ) ?? thread.pendingAnchor?.anchorText;
+    ) ??
+    anchorText ??
+    thread.pendingAnchor?.anchorText;
 
   const commentsInThread = comments
     .inThread(thread.id)
@@ -108,7 +122,11 @@ function CommentThread({
       !target.closest("." + EditorStyleHelper.commentGutter) &&
       event.defaultPrevented === false
     ) {
-      setFocusedCommentId(null);
+      if (onBlur) {
+        onBlur();
+      } else {
+        setFocusedCommentId(null);
+      }
     }
   });
 
@@ -117,7 +135,11 @@ function CommentThread({
   }, [editor, thread.id]);
 
   const handleClickThread = () => {
-    setFocusedCommentId(thread.id);
+    if (onFocus) {
+      onFocus();
+    } else {
+      setFocusedCommentId(thread.id);
+    }
   };
 
   const handleClickExpand = (ev: React.SyntheticEvent) => {
@@ -159,14 +181,16 @@ function CommentThread({
     const overflow = users.length - limit;
 
     return (
-      <ShowMore onClick={handleClickExpand} key="show-more">
+      <ShowMore onClick={handleClickExpand} key="show-more" $inPage={inPage}>
         {t("Show {{ count }} reply", { count })}
-        <Facepile
-          users={users}
-          limit={limit}
-          overflow={overflow}
-          size={AvatarSize.Medium}
-        />
+        {!inPage && (
+          <Facepile
+            users={users}
+            limit={limit}
+            overflow={overflow}
+            size={AvatarSize.Medium}
+          />
+        )}
       </ShowMore>
     );
   };
@@ -234,6 +258,7 @@ function CommentThread({
       transition={{ layout: { duration: 0.2, ease: "easeOut" } }}
       $focused={focused}
       $recessed={recessed}
+      $inPage={inPage}
       onClick={handleClickThread}
     >
       {/* The entrance transform lives on an inner element so it does not
@@ -277,6 +302,7 @@ function CommentThread({
               forceEdit={editingCommentIds.has(comment.id)}
               onEditStart={() => handleCommentEditStart(comment.id)}
               onEditEnd={() => handleCommentEditEnd(comment.id)}
+              inPage={inPage}
             />
           );
         })}
@@ -296,12 +322,14 @@ function CommentThread({
                   commentsInThread.length === 0 ? highlightedText : undefined
                 }
                 onUpArrowAtStart={handleUpArrowAtStart}
+                inPage={inPage}
               />
             </Fade>
           )}
         </ResizingHeightContainer>
       </ThreadInner>
-      {!focused && !recessed && !draft && canReply && (
+      {/* In the page a click on the thread opens its reply form, as in Notion. */}
+      {!focused && !recessed && !draft && canReply && !inPage && (
         <Reply onClick={setAutoFocusOn}>{t("Reply")}…</Reply>
       )}
     </Thread>
@@ -329,7 +357,7 @@ const Reply = styled.button`
   `}
 `;
 
-const ShowMore = styled.div`
+const ShowMore = styled.div<{ $inPage?: boolean }>`
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -349,15 +377,48 @@ const ShowMore = styled.div`
   * {
     border-color: ${(props) => darken(0.015, props.theme.backgroundSecondary)};
   }
+
+  /* Notion's « Show 3 replies »: grey text on the line of the thread. */
+  ${(props) =>
+    props.$inPage &&
+    css`
+      position: relative;
+      justify-content: flex-start;
+      margin: 0 0 0 34px;
+      padding: 0 0 16px;
+      line-height: 24px;
+      font-size: 14px;
+      color: ${transparentize(0.5, props.theme.text)};
+
+      &,
+      &: ${hover} {
+        background: none;
+      }
+
+      &: ${hover} {
+        color: ${props.theme.text};
+      }
+
+      &::before {
+        content: "";
+        position: absolute;
+        inset-inline-start: -22.5px;
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        background: ${transparentize(0.88, props.theme.text)};
+      }
+    `}
 `;
 
 const Thread = styled(m.div)<{
   $focused: boolean;
   $recessed: boolean;
+  $inPage?: boolean;
 }>`
-  margin: 12px 12px 32px;
-  margin-inline-end: 18px;
-  margin-inline-start: 12px;
+  margin: ${(props) => (props.$inPage ? "0 0 16px" : "12px 12px 32px")};
+  margin-inline-end: ${(props) => (props.$inPage ? 0 : 18)}px;
+  margin-inline-start: ${(props) => (props.$inPage ? 0 : 12)}px;
   position: relative;
   transition: opacity 100ms ease-out;
 

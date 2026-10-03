@@ -12,6 +12,7 @@ import { s } from "@shared/styles";
 import useStores from "~/hooks/useStores";
 import type Database from "~/models/Database";
 import type UsersStore from "~/stores/UsersStore";
+import { cellHostProps } from "../cells/components/EditorPopover";
 import { getCell } from "../cells/registry";
 
 interface Props {
@@ -78,6 +79,7 @@ export const CellValueField = observer(function CellValueField_({
 
   return (
     <Box
+      {...cellHostProps}
       role="button"
       aria-label={label}
       tabIndex={editing ? undefined : 0}

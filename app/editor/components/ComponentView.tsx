@@ -213,7 +213,8 @@ export default class ComponentView {
     return {
       node: this.node,
       view: this.view,
-      isSelected: this.isSelected,
+      // galadrim: see the editor's hasBeenFocused, which draws it on first focus.
+      isSelected: this.isSelected && this.editor.hasBeenFocused,
       isEditable: this.view.editable,
       getPos: this.getPos,
       decorations: this.decorations,

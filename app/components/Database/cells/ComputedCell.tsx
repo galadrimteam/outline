@@ -7,10 +7,12 @@ import { CellText, EmptyValue } from "./components/styles";
 import { cellValueToText, toArray } from "./format";
 import { useCellLocale } from "./hooks";
 import type { CellDefinition, CellRendererProps } from "./types";
+import { PeopleChips, peopleOf } from "./UserCell";
 
 /**
  * Values the engine computes (formula, rollup, auto number, created or modified time), drawn after
- * their value type: checkboxes for booleans, formatted numbers and dates, text otherwise.
+ * their value type: checkboxes for booleans, formatted numbers and dates, people as a person
+ * property draws them, text otherwise.
  */
 export const computedCell: CellDefinition = {
   Renderer: ComputedRenderer,
@@ -39,6 +41,11 @@ function ComputedRenderer({ field, value, variant, wrap }: CellRendererProps) {
         ))}
       </Row>
     );
+  }
+
+  const people = peopleOf(value);
+  if (people.length) {
+    return <PeopleChips people={people} variant={variant} wrap={wrap} />;
   }
 
   const text = cellValueToText(field, value, locale);

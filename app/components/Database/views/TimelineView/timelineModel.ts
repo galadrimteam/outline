@@ -162,6 +162,54 @@ export function barGeometry(
   };
 }
 
+/** The part of the timeline in sight, in pixels from its first day. */
+export interface VisibleSpan {
+  left: number;
+  right: number;
+}
+
+/** Everything in sight, before the timeline is measured. */
+export const ALL_VISIBLE: VisibleSpan = { left: -Infinity, right: Infinity };
+
+/**
+ * The part of a timeline in sight, in whole days, so that it only changes when a day comes into
+ * or goes out of sight: bars start and end on day boundaries.
+ *
+ * @param scrollLeft how far the timeline is scrolled.
+ * @param width the width of the timeline in sight, without the side table.
+ * @param pxPerDay the width of a day.
+ * @returns the first and last pixels of the days in sight.
+ */
+export function visibleSpan(
+  scrollLeft: number,
+  width: number,
+  pxPerDay: number
+): VisibleSpan {
+  return {
+    left: Math.ceil(scrollLeft / pxPerDay) * pxPerDay,
+    right: Math.floor((scrollLeft + width) / pxPerDay) * pxPerDay,
+  };
+}
+
+/**
+ * Which ends of a bar are out of sight. As in Notion, a bar that starts before the part in sight
+ * keeps its label at the left edge with a button back to its start, and one that goes past the
+ * right edge gets a button to its end.
+ *
+ * @param bar where the bar is drawn.
+ * @param visible the part of the timeline in sight.
+ * @returns whether its start and its end are hidden.
+ */
+export function hiddenBarEnds(
+  bar: BarGeometry,
+  visible: VisibleSpan
+): { start: boolean; end: boolean } {
+  return {
+    start: bar.left < visible.left,
+    end: bar.left + bar.width > visible.right,
+  };
+}
+
 /**
  * Applies a drag to a span: moving shifts both ends, resizing moves one end
  * without crossing the other.

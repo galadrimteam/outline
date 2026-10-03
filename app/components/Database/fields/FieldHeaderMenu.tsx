@@ -22,9 +22,14 @@ import type {
 } from "@shared/databases/types";
 import { DatabaseLayout } from "@shared/databases/types";
 import ConfirmationDialog from "~/components/ConfirmationDialog";
-import { Popover, PopoverTrigger } from "~/components/primitives/Popover";
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverTrigger,
+} from "~/components/primitives/Popover";
 import useStores from "~/hooks/useStores";
 import type Database from "~/models/Database";
+import { dropPlacement, useDropAnchor } from "../dropPlacement";
 import { visibilityPatch } from "../toolbar/columns";
 import { FilterIcon } from "../toolbar/icons";
 import { viewDrafts } from "../toolbar/viewDrafts";
@@ -94,6 +99,8 @@ export const FieldHeaderMenu = observer(function FieldHeaderMenu_({
 }: Props) {
   const { t } = useTranslation();
   const stores = useStores();
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+  const { anchorRef, size: trigger } = useDropAnchor(triggerRef, open);
   const [panel, setPanel] = React.useState<Panel>("main");
   const [name, setName] = React.useState(field.name);
   const [description, setDescription] = React.useState(field.description ?? "");
@@ -275,11 +282,11 @@ export const FieldHeaderMenu = observer(function FieldHeaderMenu_({
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger>{children}</PopoverTrigger>
+      <PopoverTrigger ref={triggerRef}>{children}</PopoverTrigger>
+      <PopoverAnchor virtualRef={anchorRef} />
       <MenuPanel
         aria-label={t("Property menu")}
-        side="bottom"
-        align="start"
+        {...dropPlacement(trigger, trigger.height)}
         width={260}
         shrink
         onKeyDown={stop}

@@ -1,3 +1,4 @@
+import { schema } from "@shared/test/editor";
 import type { ProsemirrorData } from "@shared/types";
 import {
   convertTeableEmbeds,
@@ -349,6 +350,39 @@ describe("convertTeableEmbeds", () => {
     });
     expect(output.content?.[1]).toBe(inText);
     expect(output.content?.[2]).toBe(input.content?.[2]);
+  });
+
+  it("puts the database of an embed a callout held inside its notice, where the schema accepts it", () => {
+    const notice: ProsemirrorData = {
+      type: "container_notice",
+      attrs: { style: "default", icon: "📝" },
+      content: [
+        heading("Liste des devis"),
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: framed,
+              marks: [{ type: "link", attrs: { href: framed } }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const { doc: output, converted } = convertTeableEmbeds(
+      doc(notice, paragraph("Suite")),
+      () => ({ databaseId: "db-1" }),
+      ids()
+    );
+
+    expect(converted).toBe(1);
+    expect(output.content?.[0].content?.[1]).toMatchObject({
+      type: "database",
+      attrs: { databaseId: "db-1", fullPage: false },
+    });
+    expect(() => schema.nodeFromJSON(output).check()).not.toThrow();
   });
 
   it("returns the document itself when nothing resolves", () => {

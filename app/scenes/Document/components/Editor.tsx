@@ -10,6 +10,7 @@ import { richExtensions, withComments } from "@shared/editor/nodes";
 import { getLangFor } from "@shared/utils/language";
 import { DocumentPreference } from "@shared/types";
 import { colorPalette } from "@shared/constants";
+import { s } from "@shared/styles";
 import Comment from "~/models/Comment";
 import Document from "~/models/Document";
 import type Template from "~/models/Template";
@@ -32,6 +33,8 @@ import useStores from "~/hooks/useStores";
 import { decodeURIComponentSafe } from "~/utils/urls";
 import MultiplayerEditor from "./AsyncMultiplayerEditor";
 import { isDatabasePage } from "~/components/Database/databasePage";
+import { isRowPeek } from "~/components/Database/rowPeek";
+import { PageComments } from "./Comments/PageComments";
 import { DatabaseProperties } from "./DatabaseProperties";
 import DocumentTitle from "./DocumentTitle";
 import { RowPageTabs } from "./RowPageTabs";
@@ -88,6 +91,10 @@ function DocumentEditor(props: Props, ref: React.ForwardedRef<SharedEditor>) {
   } = props;
   const can = usePolicy(document);
   const commentingEnabled = !!team?.commentingEnabled;
+  const isDatabaseRow =
+    document instanceof Document &&
+    !!document.databaseId &&
+    !!document.databaseRecordId;
 
   const iconColor = document.color ?? (first(colorPalette) as string);
   const childRef = React.useRef<HTMLDivElement>(null);
@@ -226,17 +233,22 @@ function DocumentEditor(props: Props, ref: React.ForwardedRef<SharedEditor>) {
         databasePage={
           document instanceof Document && isDatabasePage(document.data)
         }
+        databaseRow={isDatabaseRow}
+        compact={document instanceof Document && isRowPeek(pane, document)}
         onChangeTitle={onChangeTitle}
         onChangeIcon={onChangeIcon}
         onGoToNextInput={handleGoToNextInput}
         onBlur={handleBlur}
         placeholder={t("Untitled")}
       />
-      {document instanceof Document &&
-        document.databaseId &&
-        document.databaseRecordId && (
-          <DatabaseProperties document={document} readOnly={!!readOnly} />
-        )}
+      {document instanceof Document && (
+        <PageHeader>
+          {isDatabaseRow && (
+            <DatabaseProperties document={document} readOnly={!!readOnly} />
+          )}
+          <PageComments document={document} />
+        </PageHeader>
+      )}
       {/* galadrim: no meta line under the title (last update, task count,
           "Comment", "Viewed by"), a Notion page has nothing there. The header
           shows when the document was edited and links to its history, comments
@@ -297,6 +309,17 @@ function DocumentEditor(props: Props, ref: React.ForwardedRef<SharedEditor>) {
     </Flex>
   );
 }
+
+/** What sits between the title and the body: the properties of a row, the page's discussions. */
+const PageHeader = styled.div`
+  margin: 0 0 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid ${s("divider")};
+
+  &:empty {
+    display: none;
+  }
+`;
 
 const SharedMeta = styled(Text)`
   margin: -12px 0 2em 0;

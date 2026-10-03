@@ -1,6 +1,11 @@
 import type { Job } from "bull";
 import { DatabaseLayout, DatabaseStatusGroup } from "@shared/databases/types";
-import { Database, DatabaseAutomation, Document } from "@server/models";
+import {
+  Collection,
+  Database,
+  DatabaseAutomation,
+  Document,
+} from "@server/models";
 import { BaseTask } from "@server/queues/tasks/base/BaseTask";
 import {
   buildAdmin,
@@ -24,6 +29,11 @@ import { setDatabaseEngineMoverFactory } from "../tasks/MoveDatabaseEngineTask";
 import { OutlineAttachmentFileStore } from "../utils/DatabaseFileStore";
 
 const server = getTestServer();
+
+const wholeTitle =
+  "ETQJU, dans un document, je peux mentionner un autre document par nom ou référence et afficher ce document sur le côté";
+const cutTitle = `${wholeTitle.slice(0, 97)}…`;
+const importedRowText = `**${wholeTitle}**\n\n| Propriété | Valeur |\n|---|---|\n| Status | En pause |\n\nLe corps`;
 
 let engine: FakeEngine;
 
@@ -474,8 +484,12 @@ describe("#databases.update", () => {
             hideEmpty: true,
             fieldOrder: ["fldStatusAAAAAAAAAA", "fldIconAAAAAAAAAAAA"],
             pinnedFieldIds: ["fldStatusAAAAAAAAAA"],
+            discussions: "expanded",
           },
-          fieldMeta: { fldStatusAAAAAAAAAA: { icon: "💵" } },
+          fieldMeta: {
+            fldStatusAAAAAAAAAA: { icon: "💵" },
+            fldCreatorAAAAAAAAA: { standsFor: "createdBy" },
+          },
           subItemFieldId: "fldSubItems",
         },
       },
@@ -493,8 +507,12 @@ describe("#databases.update", () => {
         hideEmpty: true,
         fieldOrder: ["fldStatusAAAAAAAAAA", "fldIconAAAAAAAAAAAA"],
         pinnedFieldIds: ["fldStatusAAAAAAAAAA"],
+        discussions: "expanded",
       },
-      fieldMeta: { fldStatusAAAAAAAAAA: { icon: "💵" } },
+      fieldMeta: {
+        fldStatusAAAAAAAAAA: { icon: "💵" },
+        fldCreatorAAAAAAAAA: { standsFor: "createdBy" },
+      },
       subItemFieldId: "fldSubItems",
     });
   });
@@ -562,6 +580,53 @@ describe("#databases.update", () => {
     });
 
     expect(res.status).toEqual(400);
+  });
+
+  it("puts the row pages in the sidebar and takes them out again", async () => {
+    const user = await buildUser();
+    const collection = await buildCollection({
+      teamId: user.teamId,
+      userId: user.id,
+    });
+    const home = await buildDocument({
+      teamId: user.teamId,
+      userId: user.id,
+      collectionId: collection.id,
+    });
+    const database = await buildDatabase({
+      teamId: user.teamId,
+      documentId: home.id,
+    });
+    const row = await buildDocument({
+      teamId: user.teamId,
+      userId: user.id,
+      collectionId: collection.id,
+      parentDocumentId: home.id,
+      databaseId: database.id,
+      databaseRecordId: "recOne",
+    });
+    const tree = async () =>
+      (
+        await Collection.findByPk(collection.id, {
+          includeDocumentStructure: true,
+          rejectOnEmpty: true,
+        })
+      ).getDocumentTree(home.id)?.children ?? [];
+    expect(await tree()).toEqual([]);
+
+    const on = await server.post("/api/databases.update", user, {
+      body: { id: database.id, settings: { rowsInSidebar: true } },
+    });
+    expect(on.status).toEqual(200);
+    expect((await on.json()).data.settings.rowsInSidebar).toEqual(true);
+    expect((await tree()).map((node) => node.id)).toEqual([row.id]);
+
+    const off = await server.post("/api/databases.update", user, {
+      body: { id: database.id, settings: { rowsInSidebar: false } },
+    });
+    expect(off.status).toEqual(200);
+    expect((await off.json()).data.settings.rowsInSidebar).toBeUndefined();
+    expect(await tree()).toEqual([]);
   });
 
   it("forbids a viewer", async () => {
@@ -694,6 +759,107 @@ describe("#databases.linkRows", () => {
     expect(linked?.databaseId).toEqual(database.id);
     expect(linked?.databaseRecordId).toEqual("recOne");
   });
+
+  it("cleans the pages it links, already linked ones too", async () => {
+    const admin = await buildAdmin();
+    const collection = await buildCollection({
+      teamId: admin.teamId,
+      userId: admin.id,
+    });
+    const database = await buildDatabase({
+      teamId: admin.teamId,
+      collectionId: collection.id,
+    });
+    engine.addRecord("recOne", { fldName: wholeTitle });
+    const page = await buildDocument({
+      teamId: admin.teamId,
+      userId: admin.id,
+      collectionId: collection.id,
+      title: cutTitle,
+      text: importedRowText,
+    });
+    const link = () =>
+      server.post("/api/databases.linkRows", admin, {
+        body: {
+          id: database.id,
+          pairs: [{ recordId: "recOne", documentId: page.id }],
+        },
+      });
+
+    expect((await link()).status).toEqual(200);
+    await vi.waitFor(async () => {
+      const cleaned = await Document.findByPk(page.id);
+      expect(cleaned?.title).toEqual(wholeTitle);
+      expect(cleaned?.text.trim()).toEqual("Le corps");
+    });
+    expect((await link()).status).toEqual(200);
+  });
+});
+
+describe("#databases.cleanRowPages", () => {
+  it("requires an admin", async () => {
+    const user = await buildUser();
+    const database = await buildDatabase({ teamId: user.teamId });
+    const res = await server.post("/api/databases.cleanRowPages", user, {
+      body: { id: database.id, dryRun: true },
+    });
+    expect(res.status).toEqual(403);
+  });
+
+  it("refuses a database of another team", async () => {
+    const admin = await buildAdmin();
+    const database = await buildDatabase();
+    const res = await server.post("/api/databases.cleanRowPages", admin, {
+      body: { id: database.id, dryRun: true },
+    });
+    expect(res.status).toEqual(403);
+  });
+
+  it("counts on a dry run, then cleans the rows already linked", async () => {
+    const admin = await buildAdmin();
+    const collection = await buildCollection({
+      teamId: admin.teamId,
+      userId: admin.id,
+    });
+    const database = await buildDatabase({
+      teamId: admin.teamId,
+      collectionId: collection.id,
+    });
+    engine.addRecord("recOne", { fldName: wholeTitle });
+    const page = await buildDocument({
+      teamId: admin.teamId,
+      userId: admin.id,
+      collectionId: collection.id,
+      databaseId: database.id,
+      databaseRecordId: "recOne",
+      title: cutTitle,
+      text: importedRowText,
+    });
+    const clean = async (dryRun: boolean) =>
+      (
+        await (
+          await server.post("/api/databases.cleanRowPages", admin, {
+            body: { id: database.id, dryRun },
+          })
+        ).json()
+      ).data;
+
+    const counted = {
+      pages: 1,
+      titles: 1,
+      tables: 1,
+      failed: 0,
+      documentIds: [page.id],
+      next: null,
+    };
+    expect(await clean(true)).toEqual(counted);
+    expect((await Document.findByPk(page.id))?.title).toEqual(cutTitle);
+    expect(await clean(false)).toEqual(counted);
+    const cleaned = await Document.findByPk(page.id);
+    expect(cleaned?.title).toEqual(wholeTitle);
+    expect(cleaned?.text.trim()).toEqual("Le corps");
+    expect(await clean(false)).toMatchObject({ titles: 0, tables: 0 });
+  });
 });
 
 describe("#databases.convertEmbeds", () => {
@@ -719,6 +885,60 @@ describe("#databases.convertEmbeds", () => {
 
     expect(res.status).toEqual(200);
     expect(body.data).toMatchObject({ convertedEmbeds: 0, failed: 0 });
+  });
+});
+
+describe("#databases.fixImportedTitles", () => {
+  it("requires an admin", async () => {
+    const user = await buildUser();
+    const res = await server.post("/api/databases.fixImportedTitles", user, {
+      body: { dryRun: true },
+    });
+    expect(res.status).toEqual(403);
+  });
+
+  it("lists the databases it would give back their Notion name", async () => {
+    const admin = await buildAdmin();
+    const collection = await buildCollection({
+      teamId: admin.teamId,
+      userId: admin.id,
+    });
+    const database = await buildDatabase({
+      teamId: admin.teamId,
+      collectionId: collection.id,
+      title: "Delisle",
+    });
+    const content = {
+      type: "doc",
+      content: [
+        {
+          type: "database",
+          attrs: { databaseId: database.id, fullPage: false, title: "Delisle" },
+        },
+      ],
+    };
+    await buildDocument({
+      teamId: admin.teamId,
+      userId: admin.id,
+      collectionId: collection.id,
+      title: "Delisle",
+      content,
+    });
+    vi.spyOn(engine, "describeTable").mockResolvedValue({ name: "Points" });
+
+    const res = await server.post("/api/databases.fixImportedTitles", admin, {
+      body: { collectionId: collection.id, dryRun: true },
+    });
+    const body = await res.json();
+
+    expect(res.status).toEqual(200);
+    expect(body.data).toEqual({
+      databases: 1,
+      renamed: [{ id: database.id, from: "Delisle", to: "Points" }],
+      rewritten: 0,
+      failed: 0,
+    });
+    expect((await database.reload()).title).toEqual("Delisle");
   });
 });
 

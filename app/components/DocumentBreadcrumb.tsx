@@ -7,6 +7,7 @@ import styled from "styled-components";
 import Icon from "@shared/components/Icon";
 import { ellipsis } from "@shared/styles";
 import type Collection from "~/models/Collection";
+import type Database from "~/models/Database";
 import type Document from "~/models/Document";
 import Breadcrumb from "~/components/Breadcrumb";
 import Tooltip from "~/components/Tooltip";
@@ -86,17 +87,20 @@ type BreadcrumbNode = {
  * after the collection. Upstream lists the ancestors only; the top bar of a
  * Notion page ends with the page itself, which `includeCurrent` adds using the
  * live title and icon of the document rather than those of the collection
- * structure, which lag behind while the title is being edited.
+ * structure, which lag behind while the title is being edited, preceded by the
+ * database of a row page when one is given.
  *
  * @param document - the document to compute the breadcrumb for.
  * @param includeCurrent - whether the document itself is the last item.
+ * @param database - the database of a row page, see `rowDatabaseNode`.
  * @returns the nodes to render, outermost first.
  */
 export function documentBreadcrumbNodes(
   document: Pick<Document, "id" | "title" | "url" | "icon" | "color"> & {
     pathTo: BreadcrumbNode[];
   },
-  includeCurrent = false
+  includeCurrent = false,
+  database?: BreadcrumbNode
 ): BreadcrumbNode[] {
   const { pathTo } = document;
 
@@ -111,6 +115,7 @@ export function documentBreadcrumbNodes(
 
   return [
     ...ancestors,
+    ...(database ? [database] : []),
     {
       id: document.id,
       title: document.title,
@@ -119,6 +124,38 @@ export function documentBreadcrumbNodes(
       color: document.color ?? undefined,
     },
   ];
+}
+
+/**
+ * galadrim: the breadcrumb item of the database of a row page, as Notion's top
+ * bar names the database before its row. Left out when the row page sits under
+ * the home page of its database, which the path already shows.
+ *
+ * @param document - the page, a database row or not.
+ * @param database - its database, once loaded.
+ * @param untitled - the title of a database without one.
+ * @returns the item, or undefined when there is none to add.
+ */
+export function rowDatabaseNode(
+  document: Pick<Document, "databaseId" | "parentDocumentId">,
+  database:
+    | Pick<Database, "id" | "title" | "icon" | "url" | "documentId">
+    | undefined,
+  untitled: string
+): BreadcrumbNode | undefined {
+  if (
+    !database ||
+    database.id !== document.databaseId ||
+    (!!database.documentId && database.documentId === document.parentDocumentId)
+  ) {
+    return undefined;
+  }
+  return {
+    id: database.id,
+    title: database.title || untitled,
+    url: database.url || `/db/${database.id}`,
+    icon: database.icon ?? undefined,
+  };
 }
 
 type Props = {
@@ -143,7 +180,7 @@ function DocumentBreadcrumb(
   { document, children, onlyText, maxDepth, showCurrent }: Props,
   ref: React.RefObject<HTMLDivElement> | null
 ) {
-  const { collections } = useStores();
+  const { collections, databases } = useStores();
   const { t } = useTranslation();
   const sidebarContext = useLocationSidebarContext();
   const collection = document.collectionId
@@ -157,7 +194,14 @@ function DocumentBreadcrumb(
     document.loadRelations({ withoutPolicies: true }).catch(() => undefined);
   }, [document]);
 
-  const path = documentBreadcrumbNodes(document, showCurrent);
+  const database = showCurrent
+    ? rowDatabaseNode(
+        document,
+        document.databaseId ? databases.get(document.databaseId) : undefined,
+        t("Untitled database")
+      )
+    : undefined;
+  const path = documentBreadcrumbNodes(document, showCurrent, database);
 
   const actions = React.useMemo(() => {
     if (depth === 0) {

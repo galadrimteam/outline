@@ -20,6 +20,15 @@ const paragraph = (value: string): ProsemirrorData => ({
   type: "paragraph",
   content: value ? [text(value)] : [],
 });
+const image = (layoutClass?: string): ProsemirrorData => ({
+  type: "paragraph",
+  content: [
+    {
+      type: "image",
+      attrs: { src: "https://example.com/cover.png", layoutClass },
+    },
+  ],
+});
 const page = (...content: ProsemirrorData[]): ProsemirrorData => ({
   type: "doc",
   content,
@@ -78,5 +87,46 @@ describe("withoutPropertyTable", () => {
         fields
       )
     ).toBeNull();
+  });
+
+  it("removes the table under the page's cover and any empty paragraph", () => {
+    const content = page(
+      image("full-width"),
+      paragraph(""),
+      paragraph(""),
+      paragraph(""),
+      table([
+        ["Propriété", "Valeur"],
+        ["Statut", "En cours"],
+      ])
+    );
+    expect(withoutPropertyTable(content, fields)).toEqual(
+      page(image("full-width"), paragraph(""), paragraph(""), paragraph(""))
+    );
+  });
+
+  it("keeps a table under an image someone put there", () => {
+    expect(
+      withoutPropertyTable(
+        page(
+          image(),
+          table([
+            ["Propriété", "Valeur"],
+            ["Statut", "x"],
+          ])
+        ),
+        fields
+      )
+    ).toBeNull();
+  });
+
+  it("matches names whatever their Unicode form or surrounding spaces", () => {
+    const content = page(
+      table([
+        ["Propriété", "Valeur"],
+        ["Cre\u0301e\u0301e par", "Ada"],
+      ])
+    );
+    expect(withoutPropertyTable(content, ["Créée par "])).toEqual(page());
   });
 });

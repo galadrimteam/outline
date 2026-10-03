@@ -14,7 +14,10 @@ import { DatabaseFieldType, DatabaseLayout } from "@shared/databases/types";
 import { light } from "@shared/styles/theme";
 import { ActionContextProvider } from "~/hooks/useActionContext";
 import stores from "~/stores";
+import type { RecordQueryParams } from "~/stores/DatabaseRecordsStore";
 import { client } from "~/utils/ApiClient";
+import { rowCommentCounts } from "../../comments/rowCommentCounts";
+import { DatabaseBlockContext } from "../../DatabaseBlockContext";
 import { DatabaseToolbar } from "../../toolbar/DatabaseToolbar";
 import type { DatabaseViewProps } from "../../types";
 import { BoardView } from "../BoardView";
@@ -162,6 +165,18 @@ describe("database views", () => {
       addEventListener() {},
       removeEventListener() {},
     })) as unknown as typeof window.matchMedia;
+    // jsdom's selector engine throws on the board's `:has()` rules once a Radix popover, whose
+    // ids hold colons, is open; browsers do not.
+    const computedStyle = window.getComputedStyle.bind(window);
+    vi.spyOn(window, "getComputedStyle").mockImplementation(
+      (element, pseudo) => {
+        try {
+          return computedStyle(element, pseudo);
+        } catch {
+          return document.createElement("div").style;
+        }
+      }
+    );
     vi.mocked(client.post).mockReset();
     vi.mocked(client.post).mockResolvedValue({
       data: records,
@@ -175,11 +190,16 @@ describe("database views", () => {
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
+    vi.restoreAllMocks();
   });
 
   async function render(
     View: React.ComponentType<DatabaseViewProps>,
-    view: DatabaseView
+    view: DatabaseView,
+    handlers: {
+      onOpenRecord?: (recordId: string) => void;
+    } = {},
+    params: RecordQueryParams = {}
   ) {
     const database = stores.databases.add({
       id: databaseId,
@@ -192,7 +212,7 @@ describe("database views", () => {
       fields,
       views: [view],
     });
-    const query = stores.databaseRecords.query(databaseId, view.id, {});
+    const query = stores.databaseRecords.query(databaseId, view.id, params);
     await act(async () => {
       root.render(
         <Provider rootStore={stores}>
@@ -205,14 +225,21 @@ describe("database views", () => {
                   query={query}
                   readOnly={false}
                 />
-                <View
-                  database={database}
-                  view={view}
-                  query={query}
-                  readOnly={false}
-                  onOpenRecord={() => undefined}
-                  onCreateRecord={async () => undefined}
-                />
+                <DatabaseBlockContext.Provider
+                  value={{
+                    onViewCreated: () => undefined,
+                    filterRequest: undefined,
+                  }}
+                >
+                  <View
+                    database={database}
+                    view={view}
+                    query={query}
+                    readOnly={false}
+                    onOpenRecord={handlers.onOpenRecord ?? (() => undefined)}
+                    onCreateRecord={async () => undefined}
+                  />
+                </DatabaseBlockContext.Provider>
               </ActionContextProvider>
             </ThemeProvider>
           </MemoryRouter>
@@ -263,6 +290,95 @@ describe("database views", () => {
     ).toEqual(["true", "false"]);
   });
 
+  it("leaves the group of the rows a formula leaves empty untitled, as Notion", async () => {
+    const formula = field({
+      id: "quality",
+      name: "Q Estim",
+      type: DatabaseFieldType.Formula,
+      isComputed: true,
+    });
+    fields.push(formula);
+    try {
+      vi.mocked(client.post).mockResolvedValue({
+        data: [
+          { id: "recA", fields: { name: "Sans qualité" } },
+          { id: "recB", fields: { name: "Juste", quality: "RAS" } },
+        ],
+        pagination: { offset: 0, limit: 100, total: 2 },
+      });
+      await render(
+        GalleryView,
+        makeView({
+          id: "viwFormula",
+          type: "gallery",
+          layout: DatabaseLayout.Gallery,
+          group: [{ fieldId: "quality", order: "asc" }],
+        })
+      );
+      const titles = Array.from(container.querySelectorAll("section")).map(
+        (section) => section.querySelector("button")?.textContent
+      );
+      expect(titles).toEqual(["1", "RAS1"]);
+    } finally {
+      fields.pop();
+    }
+  });
+
+  it("pages each group of a gallery on its own and counts all its rows", async () => {
+    const many: DatabaseRecord[] = [
+      ...Array.from({ length: 30 }, (_, index) => ({
+        id: `recTodo${index}`,
+        fields: { name: `À faire ${index}`, status: "À faire" },
+      })),
+      { id: "recDone", fields: { name: "Fini", status: "Terminé" } },
+    ];
+    vi.mocked(client.post).mockImplementation(
+      async (path: string, body?: object) => {
+        const { offset = 0, limit = 100 } = (body ?? {}) as {
+          offset?: number;
+          limit?: number;
+        };
+        return path === "/databaseRecords.list"
+          ? {
+              data: many.slice(offset, offset + limit),
+              pagination: { offset, limit, total: many.length },
+            }
+          : { data: {} };
+      }
+    );
+    await render(
+      GalleryView,
+      makeView({
+        id: "viwPaged",
+        type: "gallery",
+        layout: DatabaseLayout.Gallery,
+        group: [{ fieldId: "status", order: "asc" }],
+      }),
+      {},
+      { pageSize: 25 }
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    const sections = Array.from(container.querySelectorAll("section"));
+    expect(sections).toHaveLength(2);
+    const cards = (section: Element) =>
+      section.querySelectorAll("[role='button'][aria-label]").length;
+    expect(sections[0].querySelector("button")?.textContent).toContain("30");
+    expect(cards(sections[0])).toBe(25);
+    expect(cards(sections[1])).toBe(1);
+    const more = Array.from(sections[0].querySelectorAll("button")).find(
+      (button) => button.textContent === "Load more"
+    );
+    expect(more).toBeTruthy();
+    await act(async () => {
+      more?.click();
+    });
+    expect(cards(sections[0])).toBe(30);
+    expect(container.textContent?.match(/Load more/g) ?? []).toHaveLength(0);
+  });
+
   it("draws gallery cards with the icon of their page and the colour of their option", async () => {
     await render(
       GalleryView,
@@ -280,6 +396,75 @@ describe("database views", () => {
     expect(card?.textContent).toContain("Maquettes");
     expect(card?.style.background).toBe("rgb(237, 243, 236)");
     expect(container.textContent).toContain("🧱");
+  });
+
+  const checkboxesOf = (card: Element | undefined) =>
+    Array.from(card?.querySelectorAll("[aria-checked]") ?? []).map(
+      (box) =>
+        `${box.getAttribute("aria-checked")} ${box.parentElement?.textContent}`
+    );
+
+  it("draws a checkbox on gallery cards with its property name, checked or not, as Notion", async () => {
+    await render(
+      GalleryView,
+      makeView({
+        type: "gallery",
+        layout: DatabaseLayout.Gallery,
+        columnMeta: { done: { order: 1, visible: true } },
+      })
+    );
+    const card = (title: string) =>
+      Array.from(container.querySelectorAll("[role='button']")).find((node) =>
+        node.querySelector("div")?.textContent?.includes(title)
+      );
+    expect(checkboxesOf(card("Maquettes"))).toEqual(["true Inclus"]);
+    expect(checkboxesOf(card("Intégration"))).toEqual(["false Inclus"]);
+  });
+
+  it("draws a checkbox on board cards with its property name, checked or not, as Notion", async () => {
+    await render(
+      BoardView,
+      makeView({
+        type: "kanban",
+        layout: DatabaseLayout.Board,
+        options: { stackFieldId: "status" },
+        columnMeta: { done: { order: 1, visible: true } },
+      })
+    );
+    await settle();
+    expect(checkboxesOf(cardOf("Maquettes"))).toEqual(["true Inclus"]);
+    expect(checkboxesOf(cardOf("Intégration"))).toEqual(["false Inclus"]);
+  });
+
+  it("puts Notion's page glyph before the title of a written page without an icon, nothing before a row without a page", async () => {
+    const rows: DatabaseRecord[] = [
+      {
+        id: "recWritten",
+        fields: { name: "Écrite", status: "À faire" },
+        documentId: "50000000-0000-4000-8000-000000000009",
+      },
+      { id: "recBlank", fields: { name: "Vierge", status: "À faire" } },
+    ];
+    vi.mocked(client.post).mockResolvedValue({
+      data: rows,
+      pagination: { offset: 0, limit: 100, total: rows.length },
+    });
+    await render(
+      GalleryView,
+      makeView({
+        id: "viwGlyph",
+        type: "gallery",
+        layout: DatabaseLayout.Gallery,
+      })
+    );
+    const heading = (title: string) =>
+      Array.from(container.querySelectorAll("[role='button'] > div")).find(
+        (node) => node.textContent?.includes(title)
+      )?.firstElementChild;
+    expect(
+      heading("Écrite")?.querySelector("[aria-hidden] svg")
+    ).not.toBeNull();
+    expect(heading("Vierge")?.querySelector("svg")).toBeNull();
   });
 
   it("draws a list", async () => {
@@ -330,6 +515,240 @@ describe("database views", () => {
     expect(container.textContent).toContain("New page");
   });
 
+  const boardView = () =>
+    makeView({
+      type: "kanban",
+      layout: DatabaseLayout.Board,
+      options: { stackFieldId: "status" },
+      columnMeta: { status: { order: 1, visible: true } },
+    });
+
+  const settle = () =>
+    act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+
+  const cardOf = (title: string) =>
+    Array.from(
+      container.querySelectorAll<HTMLElement>("[role='button'][aria-label]")
+    ).find((card) => card.getAttribute("aria-label") === title);
+
+  it("edits only the property clicked on a board card, without opening the row", async () => {
+    const opened: string[] = [];
+    await render(BoardView, boardView(), {
+      onOpenRecord: (id) => opened.push(id),
+    });
+    await settle();
+
+    const property = cardOf("Maquettes")?.querySelector<HTMLElement>(
+      "[role='button'][aria-label='Statut']"
+    );
+    expect(property).toBeTruthy();
+    await act(async () => {
+      property?.click();
+    });
+    expect(
+      document.querySelector("[aria-label='Edit options'] input")
+    ).not.toBeNull();
+    expect(opened).toEqual([]);
+
+    await act(async () => {
+      cardOf("Intégration")?.click();
+    });
+    expect(opened).toEqual(["rec2"]);
+  });
+
+  it("offers Notion's group actions in a column's menu, the calculation hidden from there", async () => {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+    await render(
+      BoardView,
+      makeView({
+        type: "kanban",
+        layout: DatabaseLayout.Board,
+        options: { stackFieldId: "status" },
+        overrides: { stackOrder: ["Terminé"], hiddenStacks: ["", "À faire"] },
+      })
+    );
+    await settle();
+    const trigger = container.querySelector<HTMLElement>(
+      "[aria-label='Group options']"
+    );
+    await act(async () => {
+      trigger?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
+      );
+    });
+    const items = Array.from(
+      document.querySelectorAll<HTMLElement>("[role='menuitem']")
+    );
+    expect(items.map((item) => item.textContent)).toEqual([
+      "Hide calculation",
+      "Hide group",
+    ]);
+
+    vi.mocked(client.post).mockClear();
+    await act(async () => {
+      items[0].click();
+    });
+    expect(
+      vi
+        .mocked(client.post)
+        .mock.calls.some(
+          ([path, body]) =>
+            path === "/databaseViews.update" &&
+            JSON.stringify(body).includes('"groupCalculation":{"func":"none"}')
+        )
+    ).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it("lists the empty properties of a new card as Notion's « Add … », not the one its column gives", async () => {
+    await render(
+      BoardView,
+      makeView({
+        type: "kanban",
+        layout: DatabaseLayout.Board,
+        options: { stackFieldId: "status" },
+        columnMeta: {
+          status: { order: 1, visible: true },
+          estimate: { order: 2, visible: true },
+        },
+        overrides: { stackOrder: ["Terminé"], hiddenStacks: ["", "À faire"] },
+      })
+    );
+    await settle();
+    const newPage = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "New page"
+    );
+    await act(async () => {
+      newPage?.click();
+    });
+
+    expect(
+      container.querySelector("textarea[aria-label='Card name']")
+    ).not.toBeNull();
+    expect(container.textContent).toContain("Add Estimation");
+    expect(container.textContent).not.toContain("Add Statut");
+  });
+
+  it("types a card's title in place from its ✎, without opening the row", async () => {
+    const opened: string[] = [];
+    await render(BoardView, boardView(), {
+      onOpenRecord: (id) => opened.push(id),
+    });
+    await settle();
+
+    const rename = cardOf("Maquettes")?.querySelector<HTMLElement>(
+      "button[aria-label='Rename']"
+    );
+    expect(rename).toBeTruthy();
+    await act(async () => {
+      rename?.click();
+    });
+    const input = cardOf("Maquettes")?.querySelector<HTMLTextAreaElement>(
+      "textarea[aria-label='Card name']"
+    );
+    expect(input?.value).toBe("Maquettes");
+    expect(document.activeElement).toBe(input);
+    expect(
+      cardOf("Maquettes")?.querySelector("button[aria-label='Rename']")
+    ).toBeNull();
+
+    vi.mocked(client.post).mockClear();
+    vi.mocked(client.post).mockImplementation(async (path: string) =>
+      path === "/databaseRecords.update"
+        ? { data: { ...records[0], fields: { ...records[0].fields } } }
+        : {
+            data: records,
+            pagination: { offset: 0, limit: 50, total: records.length },
+          }
+    );
+    await act(async () => {
+      if (input) {
+        Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          "value"
+        )?.set?.call(input, "Maquettes v2");
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
+        );
+      }
+    });
+
+    expect(
+      vi
+        .mocked(client.post)
+        .mock.calls.some(
+          ([path, body]) =>
+            path === "/databaseRecords.update" &&
+            JSON.stringify(body).includes('"name":"Maquettes v2"')
+        )
+    ).toBe(true);
+    expect(container.querySelector("textarea[aria-label='Card name']")).toBe(
+      null
+    );
+    expect(opened).toEqual([]);
+  });
+
+  it("opens the comments of a card's row on the spot from its comment count", async () => {
+    rowCommentCounts.invalidate(databaseId);
+    vi.mocked(client.post).mockImplementation(async (path: string) => {
+      if (path === "/databaseRecords.open") {
+        throw new Error("the popover's content is tested on its own");
+      }
+      return path === "/databaseRecords.commentCounts"
+        ? { data: { rec1: 2 } }
+        : {
+            data: records,
+            pagination: { offset: 0, limit: 50, total: records.length },
+          };
+    });
+    const opened: string[] = [];
+    await render(BoardView, boardView(), {
+      onOpenRecord: (id) => opened.push(id),
+    });
+    await settle();
+
+    const count = cardOf("Maquettes")?.querySelector<HTMLElement>(
+      "button[aria-label^='2 comment']"
+    );
+    expect(count?.textContent).toBe("2");
+    await act(async () => {
+      count?.click();
+    });
+    expect(
+      document.querySelector("[role='dialog'][aria-label='Comments']")
+    ).not.toBeNull();
+    expect(opened).toEqual([]);
+  });
+
+  it("edits the property clicked on a gallery card", async () => {
+    const opened: string[] = [];
+    await render(
+      GalleryView,
+      makeView({ type: "gallery", layout: DatabaseLayout.Gallery }),
+      { onOpenRecord: (id) => opened.push(id) }
+    );
+    const property = container.querySelector<HTMLElement>(
+      "[role='button'][aria-label='Statut']"
+    );
+    await act(async () => {
+      property?.click();
+    });
+    expect(
+      document.querySelector("[aria-label='Edit options'] input")
+    ).not.toBeNull();
+    expect(opened).toEqual([]);
+  });
+
   it("draws a month calendar with dated rows only", async () => {
     await render(
       CalendarView,
@@ -368,5 +787,118 @@ describe("database views", () => {
     expect(container.querySelector("[aria-label='Show table']")).not.toBeNull();
     expect(container.querySelector("[aria-label='Previous']")).not.toBeNull();
     expect(container.querySelector("[aria-label='Next']")).not.toBeNull();
+  });
+
+  it("keeps the label of a bar that starts before the part in sight at the left edge, as Notion", async () => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
+    const scrollTo = vi.fn();
+    Element.prototype.scrollTo = scrollTo;
+    await render(
+      TimelineView,
+      makeView({
+        overrides: {
+          layout: DatabaseLayout.Timeline,
+          timeline: { startFieldId: "start", endFieldId: "end", zoom: "week" },
+        },
+      })
+    );
+    expect(
+      container.querySelector("[aria-label='Go to the start']")
+    ).toBeNull();
+
+    const bar = container.querySelector<HTMLElement>(
+      "[aria-label^='Maquettes,']"
+    );
+    const scroller = container.querySelector("[aria-busy]")?.lastElementChild;
+    await act(async () => {
+      if (scroller && bar) {
+        scroller.scrollLeft = parseFloat(bar.style.left) + 2 * 64;
+        scroller.dispatchEvent(new Event("scroll"));
+      }
+    });
+    const back = container.querySelector<HTMLElement>(
+      "[aria-label='Go to the start']"
+    );
+    expect(back).not.toBeNull();
+    expect(back?.parentElement?.textContent).toContain("Maquettes");
+    expect(
+      container.querySelectorAll("[aria-label='Go to the end']").length
+    ).toBeGreaterThan(0);
+
+    act(() => back?.click());
+    expect(scrollTo).toHaveBeenCalledWith({
+      left: parseFloat(bar?.style.left ?? "0") - 64,
+      behavior: "smooth",
+    });
+  });
+
+  it("opens a row from the label kept at the left edge, not from its ‹", async () => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
+    Element.prototype.scrollTo = vi.fn();
+    const opened: string[] = [];
+    await render(
+      TimelineView,
+      makeView({
+        overrides: {
+          layout: DatabaseLayout.Timeline,
+          timeline: { startFieldId: "start", endFieldId: "end", zoom: "week" },
+        },
+      }),
+      { onOpenRecord: (id) => opened.push(id) }
+    );
+    const bar = container.querySelector<HTMLElement>(
+      "[aria-label^='Maquettes,']"
+    );
+    const scroller = container.querySelector("[aria-busy]")?.lastElementChild;
+    await act(async () => {
+      if (scroller && bar) {
+        scroller.scrollLeft = parseFloat(bar.style.left) + 2 * 64;
+        scroller.dispatchEvent(new Event("scroll"));
+      }
+    });
+    const back = container.querySelector<HTMLElement>(
+      "[aria-label='Go to the start']"
+    );
+
+    act(() => back?.click());
+    expect(opened).toEqual([]);
+    act(() => back?.parentElement?.click());
+    expect(opened).toEqual(["rec1"]);
+  });
+
+  it("centres on today once a timeline drawn hidden, as in a folded toggle, shows", async () => {
+    let width = 0;
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(
+      () => width
+    );
+    const resized: Array<() => void> = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: () => void) {
+          resized.push(callback);
+        }
+        observe() {}
+        disconnect() {}
+      }
+    );
+    await render(
+      TimelineView,
+      makeView({
+        overrides: {
+          layout: DatabaseLayout.Timeline,
+          timeline: { startFieldId: "start", endFieldId: "end", zoom: "week" },
+        },
+      })
+    );
+    const scroller = container.querySelector("[aria-busy]")?.lastElementChild;
+    expect(scroller?.scrollLeft).toBe(0);
+
+    width = 400;
+    await act(async () => {
+      resized.forEach((callback) => callback());
+    });
+    expect(scroller?.scrollLeft).toBeGreaterThan(0);
+    vi.unstubAllGlobals();
   });
 });

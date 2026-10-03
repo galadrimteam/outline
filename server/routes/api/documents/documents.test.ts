@@ -979,6 +979,40 @@ describe("#documents.list", () => {
     ).toEqual(database.id);
   });
 
+  it("should list the row pages a database keeps in the tree among the children of a document", async () => {
+    const user = await buildUser();
+    const collection = await buildCollection({
+      userId: user.id,
+      teamId: user.teamId,
+    });
+    const parent = await buildDocument({
+      userId: user.id,
+      teamId: user.teamId,
+      collectionId: collection.id,
+    });
+    const database = await buildDatabase({
+      teamId: user.teamId,
+      documentId: parent.id,
+      settings: { rowsInSidebar: true },
+    });
+    const row = await buildDocument({
+      userId: user.id,
+      teamId: user.teamId,
+      collectionId: collection.id,
+      parentDocumentId: parent.id,
+      databaseId: database.id,
+      databaseRecordId: "rec1",
+    });
+
+    const res = await server.post("/api/documents.list", user, {
+      body: { parentDocumentId: parent.id },
+    });
+    expect(res.status).toEqual(200);
+    expect((await res.json()).data.map((d: { id: string }) => d.id)).toEqual([
+      row.id,
+    ]);
+  });
+
   it("should not return draft documents", async () => {
     const user = await buildUser();
     await buildDraftDocument({
@@ -6258,8 +6292,7 @@ describe("#documents.create", () => {
     const res = await server.post("/api/documents.create", user, {
       body: {
         collectionId: collection.id,
-        title:
-          "This is a really long title that is not acceptable to Outline because it is so ridiculously long that we need to have a limit somewhere",
+        title: "x".repeat(DocumentValidation.maxTitleLength + 1),
         text: " ",
       },
     });

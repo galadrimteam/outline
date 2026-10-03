@@ -56,6 +56,19 @@ export function isUserOrLinkType(type: DatabaseFieldType): boolean {
 }
 
 /**
+ * Whether each cell of a field is one box, checked or not: a checkbox, or a
+ * formula giving true or false.
+ *
+ * @param field the field.
+ * @returns true for single boolean values.
+ */
+export function isSingleBoolean(
+  field: Pick<QueryField, "cellValueType" | "isMultipleCellValue">
+): boolean {
+  return field.cellValueType === "boolean" && !field.isMultipleCellValue;
+}
+
+/**
  * Whether a field's cells are computed rather than written.
  *
  * @param field the field.

@@ -64,6 +64,8 @@ export interface DatabaseSelectChoice {
 export interface DatabaseFieldFormatting {
   type?: "decimal" | "percent" | "currency";
   precision?: number;
+  /** Whether thousands are separated (« 2 775 »); false shows « 2775 », as Notion's « Number ». */
+  grouping?: boolean;
   symbol?: string;
   date?: string;
   time?: string;
@@ -109,6 +111,11 @@ export interface DatabaseFieldMeta {
   endFieldId?: string;
   /** The icon shown instead of the type icon: an emoji, an icon name or a custom emoji id. */
   icon?: string;
+  /**
+   * The computed type this field holds the imported values of: Notion's « Created by » and « Last
+   * edited by » come in as person fields, as the engine fills those types from its own rows.
+   */
+  standsFor?: DatabaseFieldType.CreatedBy | DatabaseFieldType.LastModifiedBy;
 }
 
 /** Where a lookup field or a rollup reads: through a link of its table, a field of the linked table. */
@@ -495,6 +502,12 @@ export interface DatabasePageTab {
   visibleFieldIds?: string[];
 }
 
+/**
+ * Notion's « Page discussions » of row pages: the discussions under the properties with the form
+ * that starts one (expanded), only the discussions there are (minimal, Notion's default), or none.
+ */
+export type DatabasePageDiscussions = "expanded" | "minimal" | "off";
+
 /** Settings Outline keeps on a database (column `databases.settings`). */
 export interface DatabaseSettings {
   viewOverrides?: Record<string, DatabaseViewOverrides>;
@@ -514,9 +527,16 @@ export interface DatabaseSettings {
     fieldOrder?: string[];
     /**
      * Notion's page layout with pinned properties: only these show on row pages, in this order,
-     * every other one behind « Show details ».
+     * every other one behind « Show details ». An empty list folds them all.
      */
     pinnedFieldIds?: string[];
+    /**
+     * Columns the migration keeps for its own use (a row's Notion link, Notion's frozen created
+     * and edited times): in the database, never on its row pages.
+     */
+    omittedFieldIds?: string[];
+    /** The discussions under the properties, "minimal" when unset. */
+    discussions?: DatabasePageDiscussions;
   };
   /** The field holding a row's emoji (the migration writes one called « Icon »). */
   iconFieldId?: string;
@@ -525,6 +545,12 @@ export interface DatabaseSettings {
    * symmetric field holds each row's parent.
    */
   subItemFieldId?: string;
+  /**
+   * The row pages keep their place in the collection's tree, with their sub-pages, like other
+   * pages: for a database whose rows are spaces of their own (a project and its pages). Without
+   * it, row pages are reached through the database only, as Notion's sidebar never lists rows.
+   */
+  rowsInSidebar?: boolean;
 }
 
 /** Websocket event sent to the readers of a database when its data changes. */

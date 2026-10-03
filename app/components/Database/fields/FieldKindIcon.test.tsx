@@ -46,4 +46,39 @@ describe("FieldKindIcon", () => {
     expect(formula).toContain("<svg");
     expect(link).not.toEqual(formula);
   });
+
+  it("draws the clock of Notion's created time on the formula standing for it", () => {
+    const clock = renderToString(
+      <FieldKindIcon field={field({ type: DatabaseFieldType.CreatedTime })} />
+    );
+    const created = renderToString(
+      <FieldKindIcon
+        field={field({
+          type: DatabaseFieldType.Formula,
+          cellValueType: "dateTime",
+          options: { expression: "IF(CREATED_TIME() > X, CREATED_TIME(), Y)" },
+        })}
+      />
+    );
+    expect(created).toEqual(clock);
+  });
+
+  it("draws Notion's created-by icon on the person field standing for it", () => {
+    const createdBy = renderToString(
+      <FieldKindIcon field={field({ type: DatabaseFieldType.CreatedBy })} />
+    );
+    const person = renderToString(
+      <FieldKindIcon field={field({ type: DatabaseFieldType.User })} />
+    );
+    const imported = renderToString(
+      <FieldKindIcon
+        field={field({
+          type: DatabaseFieldType.User,
+          meta: { standsFor: DatabaseFieldType.CreatedBy },
+        })}
+      />
+    );
+    expect(imported).toEqual(createdBy);
+    expect(imported).not.toEqual(person);
+  });
 });

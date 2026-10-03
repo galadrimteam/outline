@@ -69,9 +69,11 @@ export function parseDatabaseHref(
 }
 
 /**
- * A markdown-it rule that turns a top-level paragraph holding nothing but a
- * link to `/db/<uuid>` into a `database` token, the markdown form of a
- * database block. The link text is kept as the block's title.
+ * A markdown-it rule that turns a paragraph holding nothing but a link to
+ * `/db/<uuid>` into a `database` token, the markdown form of a database block,
+ * where such a block may sit: at the top level or directly in a notice (a
+ * Notion callout holding a database). The link text is kept as the block's
+ * title.
  *
  * @param md the markdown-it instance.
  */
@@ -84,7 +86,7 @@ export default function databases(md: MarkdownIt) {
         tokens[i].type !== "inline" ||
         !isParagraphOpen(tokens[i - 1]) ||
         !isParagraphClose(tokens[i + 1]) ||
-        tokens[i - 1].level !== 0
+        !holdsDatabases(tokens, i - 1)
       ) {
         continue;
       }
@@ -126,6 +128,26 @@ export default function databases(md: MarkdownIt) {
 /** Encodes a query value, parentheses included, as they would end the markdown link. */
 function encodeParam(value: string) {
   return encodeURIComponent(value).replace(/\(/g, "%28").replace(/\)/g, "%29");
+}
+
+/**
+ * Whether the paragraph opened at `index` sits where the schema accepts a
+ * database block: at the top level, or as a direct child of a notice.
+ */
+function holdsDatabases(tokens: Token[], index: number) {
+  const { level } = tokens[index];
+  if (level === 0) {
+    return true;
+  }
+  if (level !== 1) {
+    return false;
+  }
+  for (let i = index - 1; i >= 0; i--) {
+    if (tokens[i].level === 0 && tokens[i].nesting === 1) {
+      return tokens[i].type === "container_notice_open";
+    }
+  }
+  return false;
 }
 
 function isParagraphOpen(token: Token | undefined) {

@@ -298,6 +298,9 @@ const zFieldMeta = z.object({
     .optional(),
   endFieldId: zIdOrEmpty,
   icon: z.string().min(1).max(100).optional(),
+  standsFor: z
+    .enum([DatabaseFieldType.CreatedBy, DatabaseFieldType.LastModifiedBy])
+    .optional(),
 });
 
 const zPageTab = z
@@ -323,10 +326,13 @@ const zSettingsPatch = z.object({
       tabs: z.array(zPageTab).max(20).optional(),
       fieldOrder: z.array(zEngineId).max(500).optional(),
       pinnedFieldIds: z.array(zEngineId).max(500).optional(),
+      omittedFieldIds: z.array(zEngineId).max(500).optional(),
+      discussions: z.enum(["expanded", "minimal", "off"]).optional(),
     })
     .nullish(),
   iconFieldId: zEngineId.nullish(),
   subItemFieldId: zEngineId.nullish(),
+  rowsInSidebar: z.boolean().nullish(),
 });
 
 const zFieldOptions = z.object({
@@ -347,6 +353,7 @@ const zFieldOptions = z.object({
     .object({
       type: z.enum(["decimal", "percent", "currency"]).optional(),
       precision: z.number().int().min(0).max(10).optional(),
+      grouping: z.boolean().optional(),
       symbol: z.string().max(10).optional(),
       date: z.string().max(100).optional(),
       time: z.string().max(100).optional(),
@@ -449,6 +456,20 @@ export const DatabasesLinkRowsSchema = BaseSchema.extend({
 
 export type DatabasesLinkRowsReq = z.infer<typeof DatabasesLinkRowsSchema>;
 
+export const DatabasesCleanRowPagesSchema = BaseSchema.extend({
+  body: z.object({
+    id: z.uuid(),
+    dryRun: z.boolean().default(false),
+    /** Row pages are cleaned a page at a time, so that a call ends before the request times out. */
+    offset: z.number().int().min(0).default(0),
+    limit: z.number().int().min(1).max(500).default(100),
+  }),
+});
+
+export type DatabasesCleanRowPagesReq = z.infer<
+  typeof DatabasesCleanRowPagesSchema
+>;
+
 export const DatabasesConvertEmbedsSchema = BaseSchema.extend({
   body: z.object({
     documentId: z.uuid().optional(),
@@ -459,6 +480,18 @@ export const DatabasesConvertEmbedsSchema = BaseSchema.extend({
 
 export type DatabasesConvertEmbedsReq = z.infer<
   typeof DatabasesConvertEmbedsSchema
+>;
+
+export const DatabasesFixImportedTitlesSchema = BaseSchema.extend({
+  body: z.object({
+    /** Only the databases of this collection; else every database of the team. */
+    collectionId: z.uuid().optional(),
+    dryRun: z.boolean().default(false),
+  }),
+});
+
+export type DatabasesFixImportedTitlesReq = z.infer<
+  typeof DatabasesFixImportedTitlesSchema
 >;
 
 export const DatabasesMoveToOutlineEngineSchema = BaseSchema.extend({

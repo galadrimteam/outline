@@ -1,14 +1,17 @@
 import { observer } from "mobx-react";
+import { DocumentIcon } from "outline-icons";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import styled from "styled-components";
 import type { DefaultTheme } from "styled-components";
 import type {
   DatabaseAttachmentValue,
+  DatabaseCellValue,
   DatabaseField,
   DatabaseRecord,
   DatabaseView,
 } from "@shared/databases/types";
+import { DatabaseFieldType } from "@shared/databases/types";
 import { ellipsis, s } from "@shared/styles";
 import { DateMentionText } from "~/components/DateMentionText";
 import type Database from "~/models/Database";
@@ -17,9 +20,9 @@ import { toneColors } from "../../colors";
 import { attachmentsOf, isImageAttachment } from "../../cells/AttachmentCell";
 import { compactPills } from "../../cells/components/ChoicePill";
 import { isEmptyCellValue } from "../../cells/format";
-import { getCell } from "../../cells/registry";
-import { RowIcon } from "../../RowIcon";
+import { IconGlyph, RowIcon, useRowIcon } from "../../RowIcon";
 import { cardFields } from "../../toolbar/columns";
+import { CardProperty } from "../CardProperty";
 
 /** Font size of the title of a board or gallery card, in px. */
 export const cardTitleFontSize = 15;
@@ -73,6 +76,22 @@ export function visibleCardFields(
   view: Pick<DatabaseView, "type" | "columnMeta">
 ): DatabaseField[] {
   return cardFields(database.fields ?? [], view);
+}
+
+/**
+ * Whether a property of a row is drawn on its card: as Notion's cards do, a
+ * checkbox always is, checked or not, and any other property when it has a
+ * value.
+ *
+ * @param field the property.
+ * @param value its value in the row.
+ * @returns true when the card shows it.
+ */
+export function isShownOnCard(
+  field: Pick<DatabaseField, "type">,
+  value: DatabaseCellValue | undefined
+): boolean {
+  return field.type === DatabaseFieldType.Checkbox || !isEmptyCellValue(value);
 }
 
 /**
@@ -187,12 +206,16 @@ export const RecordTitle = observer(function RecordTitle({
 interface HeadingProps {
   database: Database;
   record: DatabaseRecord;
+  /** Drawn after the icon in place of the title, eg the field it is typed in. */
+  editor?: React.ReactNode;
   className?: string;
 }
 
 /**
  * The title of a board or gallery card after the icon of its page, wrapped
- * on as many lines as it needs, in Notion's card type.
+ * on as many lines as it needs, in Notion's card type. A page with no icon of
+ * its own shows Notion's grey page glyph when it has been written, so that its
+ * title lines up with the others; a row with no page shows none.
  *
  * @param props the database and the row.
  * @returns the heading.
@@ -200,15 +223,25 @@ interface HeadingProps {
 export const CardHeading = observer(function CardHeading({
   database,
   record,
+  editor,
   className,
 }: HeadingProps) {
   const { t } = useTranslation();
   const title = recordTitle(database, record);
+  const icon = useRowIcon(database, record);
 
   return (
     <Heading className={className} $empty={!title}>
-      <HeadingIcon database={database} record={record} size={18} />
-      <span>{title ? <DateMentionText text={title} /> : t("Untitled")}</span>
+      {icon ? (
+        <HeadingIcon icon={icon} size={18} />
+      ) : record.documentId ? (
+        <PageGlyph aria-hidden>
+          <DocumentIcon size={18} />
+        </PageGlyph>
+      ) : null}
+      {editor ?? (
+        <span>{title ? <DateMentionText text={title} /> : t("Untitled")}</span>
+      )}
     </Heading>
   );
 });
@@ -221,6 +254,8 @@ interface PropertiesProps {
   showNames?: boolean;
   /** Lays values on one line (list rows) instead of one per line (cards). */
   inline?: boolean;
+  /** False when a click on a property edits it, as in Notion, instead of opening the row. */
+  readOnly?: boolean;
 }
 
 /**
@@ -236,9 +271,12 @@ export const CardProperties = observer(function CardProperties({
   fields,
   showNames,
   inline,
+  readOnly = true,
 }: PropertiesProps) {
-  const filled = fields.filter(
-    (field) => !isEmptyCellValue(record.fields[field.id])
+  const filled = fields.filter((field) =>
+    inline
+      ? !isEmptyCellValue(record.fields[field.id])
+      : isShownOnCard(field, record.fields[field.id])
   );
   if (!filled.length) {
     return null;
@@ -246,21 +284,22 @@ export const CardProperties = observer(function CardProperties({
 
   return (
     <Properties $inline={inline}>
-      {filled.map((field) => {
-        const { Renderer } = getCell(field.type);
-        return (
-          <Property key={field.id} $inline={inline} title={field.name}>
-            {showNames && <PropertyName>{field.name}</PropertyName>}
-            <Renderer
-              field={field}
-              value={record.fields[field.id]}
-              database={database}
-              record={record}
-              variant={inline ? "table" : "card"}
-            />
-          </Property>
-        );
-      })}
+      {filled.map((field) => (
+        <Property
+          key={field.id}
+          database={database}
+          field={field}
+          record={record}
+          readOnly={readOnly}
+          variant={inline ? "table" : "card"}
+          title={field.name}
+          $inline={inline}
+        >
+          {showNames && !namesItself(field, inline) && (
+            <PropertyName>{field.name}</PropertyName>
+          )}
+        </Property>
+      ))}
     </Properties>
   );
 });
@@ -297,6 +336,21 @@ export function openableProps(
   };
 }
 
+/**
+ * Whether a card property already writes its own name, as the checkbox of a
+ * card does next to its box.
+ *
+ * @param field the property.
+ * @param inline whether the property is drawn on a list row rather than a card.
+ * @returns true when the name is not to be repeated above the value.
+ */
+export function namesItself(
+  field: Pick<DatabaseField, "type">,
+  inline = false
+): boolean {
+  return !inline && field.type === DatabaseFieldType.Checkbox;
+}
+
 function isInteractiveTarget(target: EventTarget, container: EventTarget) {
   let node = target instanceof Element ? target : null;
   while (node && node !== container) {
@@ -317,20 +371,28 @@ const Untitled = styled.span`
   color: ${s("placeholder")};
 `;
 
+// Notion's measures: the title 26px after the icon's left edge, weight 500.
 const Heading = styled.div<{ $empty: boolean }>`
   display: flex;
   align-items: flex-start;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
   font-size: ${cardTitleFontSize}px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: ${cardTitleLineHeight};
   overflow-wrap: anywhere;
   color: ${(props) => (props.$empty ? props.theme.placeholder : props.theme.text)};
 `;
 
-const HeadingIcon = styled(RowIcon)`
+const HeadingIcon = styled(IconGlyph)`
   margin-top: 2px;
+`;
+
+const PageGlyph = styled.span`
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: ${s("textTertiary")};
 `;
 
 const Properties = styled.div<{ $inline?: boolean }>`
@@ -341,7 +403,7 @@ const Properties = styled.div<{ $inline?: boolean }>`
   min-width: 0;
 `;
 
-const Property = styled.div<{ $inline?: boolean }>`
+const Property = styled(CardProperty)<{ $inline?: boolean }>`
   min-width: 0;
   max-width: ${(props) => (props.$inline ? "220px" : "none")};
   font-size: ${(props) => (props.$inline ? 13 : 12)}px;

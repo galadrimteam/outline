@@ -1,4 +1,5 @@
 import { observer } from "mobx-react";
+import { transparentize } from "polished";
 import * as React from "react";
 import styled from "styled-components";
 import type {
@@ -9,6 +10,7 @@ import type {
 import { s } from "@shared/styles";
 import Tooltip from "~/components/Tooltip";
 import type Database from "~/models/Database";
+import { cellHostProps } from "../cells/components/EditorPopover";
 import { getCell } from "../cells/registry";
 import { FieldHeaderMenu } from "./FieldHeaderMenu";
 import { FieldKindIcon } from "./FieldKindIcon";
@@ -82,7 +84,9 @@ export const PropertyRow = observer(function PropertyRow_({
       title={field.description ? undefined : field.name}
       $stacked={stacked}
     >
-      <FieldKindIcon field={field} size={16} />
+      <IconSlot>
+        <FieldKindIcon field={field} size={16} />
+      </IconSlot>
       <Name>{field.name}</Name>
     </NameButton>
   );
@@ -111,6 +115,7 @@ export const PropertyRow = observer(function PropertyRow_({
         )}
       </NameCell>
       <ValueCell
+        {...cellHostProps}
         role={editable ? "button" : undefined}
         tabIndex={editable && !editing ? 0 : undefined}
         $editable={editable}
@@ -143,11 +148,14 @@ export const PropertyRow = observer(function PropertyRow_({
   );
 });
 
+/** Height of a property line, Notion's. */
+const LINE_HEIGHT = 38;
+
 const Line = styled.div<{ $stacked: boolean }>`
   display: flex;
   flex-direction: ${(props) => (props.$stacked ? "column" : "row")};
   align-items: ${(props) => (props.$stacked ? "stretch" : "flex-start")};
-  min-height: 34px;
+  min-height: ${LINE_HEIGHT}px;
   margin-bottom: ${(props) => (props.$stacked ? "12px" : "0")};
   font-size: 14px;
 `;
@@ -162,9 +170,9 @@ const NameButton = styled.button<{ $stacked: boolean }>`
   display: ${(props) => (props.$stacked ? "inline-flex" : "flex")};
   font-size: ${(props) => (props.$stacked ? "13px" : "inherit")};
   font-weight: ${(props) => (props.$stacked ? 500 : "inherit")};
-  min-height: ${(props) => (props.$stacked ? "26px" : "34px")};
+  min-height: ${(props) => (props.$stacked ? "26px" : `${LINE_HEIGHT}px`)};
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   width: ${(props) => (props.$stacked ? "auto" : "100%")};
   max-width: 100%;
   padding: 0 6px;
@@ -173,13 +181,14 @@ const NameButton = styled.button<{ $stacked: boolean }>`
   background: none;
   font-family: inherit;
   line-height: inherit;
-  color: ${s("textSecondary")};
+  /* Notion's property names: its text colour at 65 %, the icons at 55 %. */
+  color: ${(props) => transparentize(0.35, props.theme.text)};
   text-align: left;
   cursor: var(--pointer);
 
   svg {
     flex-shrink: 0;
-    fill: currentColor;
+    fill: ${(props) => transparentize(0.45, props.theme.text)};
   }
 
   &:disabled {
@@ -189,6 +198,25 @@ const NameButton = styled.button<{ $stacked: boolean }>`
   &:hover:not(:disabled),
   &[aria-expanded="true"] {
     background: ${s("listItemHoverBackground")};
+  }
+`;
+
+/**
+ * Notion's property icons are 16px glyphs; outline-icons draw a 14px glyph in a 24px box, so the
+ * drawings are enlarged to that box and its margin taken back, the name staying where it was.
+ */
+const IconSlot = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+
+  svg {
+    width: 24px;
+    height: 24px;
+    margin: -4px;
   }
 `;
 
@@ -204,8 +232,8 @@ const ValueCell = styled.div<{ $editable: boolean; $editing: boolean }>`
   display: flex;
   align-items: center;
   min-width: 0;
-  min-height: 34px;
-  padding: 6px 8px;
+  min-height: ${LINE_HEIGHT}px;
+  padding: 8px;
   border-radius: 4px;
   outline: none;
   cursor: ${(props) => (props.$editable ? "var(--pointer)" : "default")};

@@ -170,6 +170,20 @@ export function insertIds(
 }
 
 /**
+ * The key of a statistic in `RecordQuery.statistics`.
+ *
+ * @param fieldId the field computed over.
+ * @param func the statistic.
+ * @returns the key.
+ */
+export function statisticKey(
+  fieldId: string,
+  func: DatabaseStatisticFunc
+): string {
+  return `${func}:${fieldId}`;
+}
+
+/**
  * The rows of one view for one set of reader parameters, loaded page by page.
  * Rows themselves live in the store, so a write shows in every query at once.
  */
@@ -190,6 +204,14 @@ export class RecordQuery {
 
   @observable.ref
   error: Error | undefined = undefined;
+
+  /**
+   * The last statistics the server answered over these rows, by
+   * `statisticKey`: a view drawn again, eg when its toggle opens, shows them
+   * at once instead of a blank until the next answer.
+   */
+  @observable.shallow
+  statistics = new Map<string, number | string | null>();
 
   readonly key: string;
 
@@ -333,13 +355,32 @@ export class RecordQuery {
    * @param fieldStats the function per field.
    * @returns the value per field.
    */
-  aggregate = (
+  aggregate = async (
     fieldStats: Record<string, DatabaseStatisticFunc>
-  ): Promise<Record<string, { value: number | string | null }>> =>
-    this.store.aggregate(this.databaseId, this.viewId, fieldStats, {
-      filter: combineFilters(this.params.filter, this.params.extraFilter),
-      search: this.params.search || undefined,
+  ): Promise<Record<string, { value: number | string | null }>> => {
+    const request = ++this.statisticRequest;
+    const results = await this.store.aggregate(
+      this.databaseId,
+      this.viewId,
+      fieldStats,
+      {
+        filter: combineFilters(this.params.filter, this.params.extraFilter),
+        search: this.params.search || undefined,
+      }
+    );
+    runInAction(() => {
+      for (const [fieldId, func] of Object.entries(fieldStats)) {
+        const key = statisticKey(fieldId, func);
+        // An older request answering late must not hide a newer answer.
+        if ((this.statisticRequests.get(key) ?? 0) > request) {
+          continue;
+        }
+        this.statisticRequests.set(key, request);
+        this.statistics.set(key, results[fieldId]?.value ?? null);
+      }
     });
+    return results;
+  };
 
   /**
    * Applies a change made here to the loaded rows, without asking the server.
@@ -356,6 +397,11 @@ export class RecordQuery {
   private store: DatabaseRecordsStore;
 
   private generation = 0;
+
+  private statisticRequest = 0;
+
+  /** The request each statistic was last set from. */
+  private statisticRequests = new Map<string, number>();
 
   private observed = false;
 
@@ -748,9 +794,31 @@ export default class DatabaseRecordsStore {
       if (record && !record.documentId) {
         this.cacheRecords(databaseId, [{ ...record, documentId: document.id }]);
       }
+      this.showInSidebar(databaseId, document);
       return document;
     });
   };
+
+  /**
+   * Fetches the tree of the collection again when a row page that belongs in
+   * it is missing there: a page created on opening its row is published
+   * without an event, so the sidebar has not heard of it.
+   *
+   * @param databaseId the database the row belongs to.
+   * @param document the row's page.
+   */
+  private showInSidebar(databaseId: string, document: Document) {
+    const collection = document.collectionId
+      ? this.rootStore.collections.get(document.collectionId)
+      : undefined;
+    if (
+      this.rootStore.databases.get(databaseId)?.settings?.rowsInSidebar &&
+      collection?.documents &&
+      !collection.childrenByDocumentId.has(document.id)
+    ) {
+      void collection.fetchDocuments({ force: true });
+    }
+  }
 
   /**
    * Lists the group headers and counts of a view.

@@ -5,6 +5,14 @@ import {
   PopoverAnchor,
   PopoverContent,
 } from "~/components/primitives/Popover";
+import { dropPlacement, useDropAnchor } from "../../dropPlacement";
+
+/**
+ * Props marking the element a cell editor opens over: a table cell, the value of a page
+ * property, a property of a card. Without one, the editor opens over what it draws in place of
+ * the value.
+ */
+export const cellHostProps = { "data-cell-host": "" } as const;
 
 interface Props {
   /** What stays drawn in the cell while the popover is open, usually the renderer. */
@@ -15,13 +23,15 @@ interface Props {
   label: string;
   /** Called when the popover is dismissed (Escape, click outside). */
   onClose: () => void;
-  /** Width of the popover. */
+  /** Least width of the popover; it is never narrower than its cell. */
   width?: number;
 }
 
 /**
- * A popover editor anchored on its cell, always open while mounted: the host mounts it to start
- * editing and unmounts it when `onClose` is called.
+ * A popover editor laid over its cell as in Notion, always open while mounted: its top left
+ * corner on the cell's, at least as wide as the cell, and moved up rather than turned over when
+ * the window lacks room below. The host mounts it to start editing and unmounts it when
+ * `onClose` is called.
  *
  * @param props the anchor, the editor and the close callback.
  * @returns the anchored popover.
@@ -33,6 +43,17 @@ export function EditorPopover({
   onClose,
   width = 300,
 }: Props) {
+  const hostRef = React.useRef<HTMLElement | null>(null);
+  const { anchorRef, size: host } = useDropAnchor(hostRef, true);
+
+  const handleAnchorRef = React.useCallback(
+    (element: HTMLDivElement | null) => {
+      hostRef.current =
+        element?.closest<HTMLElement>("[data-cell-host]") ?? element;
+    },
+    []
+  );
+
   const handleOpenChange = React.useCallback(
     (open: boolean) => {
       if (!open) {
@@ -43,20 +64,17 @@ export function EditorPopover({
   );
 
   const handleCloseAutoFocus = React.useCallback((event: Event) => {
-    // The host moves focus back to its own cell; Radix would focus the anchor's first button.
     event.preventDefault();
   }, []);
 
   return (
     <Popover open onOpenChange={handleOpenChange}>
-      <PopoverAnchor asChild>
-        <Anchor>{anchor}</Anchor>
-      </PopoverAnchor>
+      <Anchor ref={handleAnchorRef}>{anchor}</Anchor>
+      <PopoverAnchor virtualRef={anchorRef} />
       <Content
         aria-label={label}
-        width={width}
-        side="bottom"
-        align="start"
+        width={Math.max(width, Math.ceil(host.width))}
+        {...dropPlacement(host, 0)}
         shrink
         scrollable={false}
         onCloseAutoFocus={handleCloseAutoFocus}

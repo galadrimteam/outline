@@ -19,11 +19,14 @@ import {
   buildTemplate,
   buildUser,
 } from "@server/test/factories";
+import { sequelize } from "@server/storage/database";
 import { withAPIContext } from "@server/test/support";
 import {
   databaseRowDocumentCreator,
   databaseRowsLinker,
 } from "./databaseRowDocumentCreator";
+import { databaseRowsTreeUpdater } from "./databaseRowsTreeUpdater";
+import documentMover from "./documentMover";
 
 async function setup() {
   const team = await buildTeam();
@@ -384,5 +387,166 @@ describe("databaseRowsLinker", () => {
     expect(home.databaseId).toBeNull();
     expect(duplicate.databaseId).toBeNull();
     expect(taken.databaseRecordId).toEqual("rec1");
+  });
+});
+
+describe("a database that keeps its rows in the sidebar", () => {
+  async function projects() {
+    const context = await setup();
+    await context.database.update({ settings: { rowsInSidebar: true } });
+    return context;
+  }
+
+  it("creates the page of a row in the tree, under the home document", async () => {
+    const { user, collection, home, database } = await projects();
+
+    const document = await databaseRowDocumentCreator(
+      { user },
+      { database, recordId: "rec1", title: "Delisle" }
+    );
+
+    const structure = await loadStructure(collection.id);
+    expect(
+      structure.getDocumentTree(home.id)?.children.map((node) => node.id)
+    ).toEqual([document.id]);
+    expect((await home.toNavigationNode()).children).toEqual([
+      expect.objectContaining({ id: document.id }),
+    ]);
+  });
+
+  it("renames a row page in the tree", async () => {
+    const { user, collection, database } = await projects();
+    const document = await databaseRowDocumentCreator(
+      { user },
+      { database, recordId: "rec1", title: "Delisle" }
+    );
+
+    document.title = "Delisle 2";
+    await document.save();
+
+    const structure = await loadStructure(collection.id);
+    expect(structure.getDocumentTree(document.id)?.title).toEqual("Delisle 2");
+  });
+
+  it("links documents without taking them, or their sub-pages, out of the tree", async () => {
+    const { team, user, collection, home, database } = await projects();
+    const project = await buildDocument({
+      teamId: team.id,
+      userId: user.id,
+      collectionId: collection.id,
+      parentDocumentId: home.id,
+    });
+    const subPage = await buildDocument({
+      teamId: team.id,
+      userId: user.id,
+      collectionId: collection.id,
+      parentDocumentId: project.id,
+    });
+
+    const linked = await withAPIContext(user, (ctx) =>
+      databaseRowsLinker(ctx.context, {
+        database,
+        pairs: [{ recordId: "rec1", documentId: project.id }],
+      })
+    );
+
+    expect(linked).toEqual(1);
+    const structure = await loadStructure(collection.id);
+    expect(
+      structure.getDocumentTree(project.id)?.children.map((node) => node.id)
+    ).toEqual([subPage.id]);
+  });
+});
+
+describe("a row page kept in the tree", () => {
+  it("moves, is archived and restored like a page, sub-pages with it", async () => {
+    const { team, user, collection, home, database } = await setup();
+    await database.update({ settings: { rowsInSidebar: true } });
+    const project = await databaseRowDocumentCreator(
+      { user },
+      { database, recordId: "rec1", title: "Delisle" }
+    );
+    const subPage = await buildDocument({
+      teamId: team.id,
+      userId: user.id,
+      collectionId: collection.id,
+      parentDocumentId: project.id,
+    });
+    const elsewhere = await buildDocument({
+      teamId: team.id,
+      userId: user.id,
+      collectionId: collection.id,
+    });
+
+    await withAPIContext(user, (ctx) =>
+      documentMover(ctx, {
+        document: project,
+        collectionId: collection.id,
+        parentDocumentId: elsewhere.id,
+      })
+    );
+    let structure = await loadStructure(collection.id);
+    expect(structure.getDocumentTree(home.id)?.children).toEqual([]);
+    expect(structure.getDocumentTree(elsewhere.id)?.children).toEqual([
+      expect.objectContaining({
+        id: project.id,
+        children: [expect.objectContaining({ id: subPage.id })],
+      }),
+    ]);
+
+    await withAPIContext(user, (ctx) => project.archiveWithCtx(ctx));
+    structure = await loadStructure(collection.id);
+    expect(structure.getDocumentTree(project.id)).toBeNull();
+
+    await withAPIContext(user, (ctx) =>
+      project.restoreTo(ctx, { collectionId: collection.id })
+    );
+    structure = await loadStructure(collection.id);
+    expect(structure.getDocumentTree(project.id)).not.toBeNull();
+    const reloaded = await Document.findByPk(project.id);
+    expect(reloaded?.databaseId).toEqual(database.id);
+  });
+});
+
+describe("databaseRowsTreeUpdater", () => {
+  it("puts the row pages and their sub-pages in the tree, then takes them out", async () => {
+    const { team, user, collection, home, database } = await setup();
+    const card = await databaseRowDocumentCreator(
+      { user },
+      { database, recordId: "rec1", title: "Delisle" }
+    );
+    const subPage = await buildDocument({
+      teamId: team.id,
+      userId: user.id,
+      collectionId: collection.id,
+      parentDocumentId: card.id,
+    });
+    expect((await loadStructure(collection.id)).getDocumentTree(card.id)).toBe(
+      null
+    );
+
+    await database.update({ settings: { rowsInSidebar: true } });
+    const added = await sequelize.transaction((transaction) =>
+      databaseRowsTreeUpdater(database, { transaction })
+    );
+
+    expect(added).toEqual(1);
+    let structure = await loadStructure(collection.id);
+    expect(structure.getDocumentTree(home.id)?.children).toEqual([
+      expect.objectContaining({
+        id: card.id,
+        children: [expect.objectContaining({ id: subPage.id })],
+      }),
+    ]);
+
+    await database.update({ settings: {} });
+    const removed = await sequelize.transaction((transaction) =>
+      databaseRowsTreeUpdater(database, { transaction })
+    );
+
+    expect(removed).toEqual(1);
+    structure = await loadStructure(collection.id);
+    expect(structure.getDocumentTree(home.id)?.children).toEqual([]);
+    expect(structure.getDocumentTree(subPage.id)).toBeNull();
   });
 });

@@ -10,6 +10,7 @@ import {
   cellFromItems,
   cellItems,
   isAttachmentItem,
+  isChecked,
   isObjectItem,
   itemId,
   itemTitle,
@@ -20,6 +21,7 @@ import {
   fieldTimeZone,
   fieldsById,
   formattingOf,
+  isSingleBoolean,
   isUserOrLinkType,
 } from "./fields";
 import { roundNumber } from "./formula/functions/numeric";
@@ -129,7 +131,9 @@ export function groupMembers(
 }
 
 /**
- * Returns the value a cell is grouped under.
+ * Returns the value a cell is grouped under. A box is checked or not, never
+ * empty, so that its unchecked rows make one group whether they hold false
+ * or nothing; blank text counts as no value.
  *
  * @param field the grouping field.
  * @param cell the cell value.
@@ -139,7 +143,10 @@ export function groupValue(
   field: QueryField,
   cell: DatabaseCellValue | undefined
 ): DatabaseCellValue {
-  const items = cellItems(cell);
+  if (isSingleBoolean(field)) {
+    return isChecked(cell);
+  }
+  const items = cellItems(cell).filter((item) => item !== "");
   if (!items.length) {
     return null;
   }
