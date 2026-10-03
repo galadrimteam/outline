@@ -189,6 +189,16 @@ async function reattribute(
     },
     { transaction, silent: true }
   );
+  if (resolver) {
+    await Comment.update(
+      { resolvedById: resolver.id },
+      {
+        where: { parentCommentId: existing.id, resolvedById: user.id },
+        transaction,
+        hooks: false,
+      }
+    );
+  }
   return true;
 }
 

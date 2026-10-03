@@ -1215,6 +1215,17 @@ describe("#comments.import", () => {
       },
     });
     expect((await first.json()).data.resolvedById).toEqual(admin.id);
+    const replyId = randomUUID();
+    await server.post("/api/comments.import", admin, {
+      body: {
+        id: replyId,
+        documentId: document.id,
+        parentCommentId: id,
+        createdById: author.id,
+        createdAt: resolvedAt,
+        text: "answer",
+      },
+    });
 
     const res = await server.post("/api/comments.import", admin, {
       body: {
@@ -1240,6 +1251,8 @@ describe("#comments.import", () => {
     });
     expect(JSON.stringify(body.data.data)).not.toContain("Thomas");
     expect(JSON.stringify(body.data.data)).toContain("question");
+    const reply = await Comment.findByPk(replyId, { rejectOnEmpty: true });
+    expect(reply.resolvedById).toEqual(author.id);
   });
 
   it("should leave a comment under the account of another admin on a replay", async () => {
