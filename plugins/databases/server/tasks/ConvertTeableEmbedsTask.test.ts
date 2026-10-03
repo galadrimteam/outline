@@ -6,6 +6,7 @@ import type { ProsemirrorData } from "@shared/types";
 import { APIUpdateExtension } from "@server/collaboration/APIUpdateExtension";
 import { schema } from "@server/editor";
 import type { Collection, User } from "@server/models";
+import { NotFoundError } from "@server/errors";
 import { Database, Document, Event } from "@server/models";
 import { DocumentHelper } from "@server/models/helpers/DocumentHelper";
 import { ProsemirrorHelper } from "@server/models/helpers/ProsemirrorHelper";
@@ -94,15 +95,18 @@ const reload = (id: string) =>
 
 describe("ConvertTeableEmbedsTask", () => {
   let notifyUpdate: MockInstance<typeof APIUpdateExtension.notifyUpdate>;
+  let describeTable: MockInstance<FakeEngine["describeTable"]>;
 
   beforeEach(() => {
     notifyUpdate = vi
       .spyOn(APIUpdateExtension, "notifyUpdate")
       .mockResolvedValue();
     const engine = new FakeEngine();
-    vi.spyOn(engine, "describeTable").mockImplementation(async (_, ref) => ({
-      name: `Table ${ref.externalTableId}`,
-    }));
+    describeTable = vi
+      .spyOn(engine, "describeTable")
+      .mockImplementation(async (_, ref) => ({
+        name: `Table ${ref.externalTableId}`,
+      }));
     setEngineFactory(() => engine);
   });
 
@@ -488,5 +492,87 @@ describe("ConvertTeableEmbedsTask", () => {
     expect(nodesOf(document.content, "embed")).toEqual([
       embed(framed("tblUnknown")),
     ]);
+  });
+
+  describe("the name of a database shown inside a page", () => {
+    const heading = (text: string): ProsemirrorData => ({
+      type: "heading",
+      attrs: { level: 2 },
+      content: [{ type: "text", text }],
+    });
+
+    async function convertInline(content: ProsemirrorData) {
+      const context = await setup();
+      const page = await buildPage(context, content, "Suivi du projet");
+      const run = new ConvertTeableEmbedsTask().perform({
+        teamId: context.admin.teamId,
+        documentId: page.id,
+      });
+      return { context, page, run };
+    }
+
+    const titleOf = async (teamId: string) =>
+      (
+        await Database.findOne({
+          where: { teamId, externalTableId: "tblA" },
+          rejectOnEmpty: true,
+        })
+      ).title;
+
+    it("is its table's Notion name, without the suffix of a name taken twice", async () => {
+      describeTable.mockResolvedValue({ name: "Delisle Suivi Kanban (2)" });
+      const { context, page, run } = await convertInline(
+        doc(paragraph("Lexique"), embed(framed("tblA")))
+      );
+      await run;
+
+      expect(await titleOf(context.admin.teamId)).toBe("Delisle Suivi Kanban");
+      const [node] = nodesOf((await reload(page.id)).content, "database");
+      expect(node.attrs?.title).toBe("Delisle Suivi Kanban");
+    });
+
+    it("is the heading above it when the table has no name", async () => {
+      describeTable.mockResolvedValue({ name: "" });
+      const { context, run } = await convertInline(
+        doc(heading("Kanban"), embed(framed("tblA")))
+      );
+      await run;
+
+      expect(await titleOf(context.admin.teamId)).toBe("Kanban");
+    });
+
+    it("is left empty rather than the page's when nothing names it", async () => {
+      describeTable.mockRejectedValue(NotFoundError("Table not found"));
+      const { context, run } = await convertInline(
+        doc(paragraph("Lexique"), embed(framed("tblA")))
+      );
+      await run;
+
+      expect(await titleOf(context.admin.teamId)).toBe("");
+    });
+
+    it("waits for a retry when the table cannot be read, rather than taking the page's", async () => {
+      describeTable.mockRejectedValue(new Error("connection timeout"));
+      const { context, page, run } = await convertInline(
+        doc(paragraph("Lexique"), embed(framed("tblA")))
+      );
+
+      await expect(run).rejects.toThrow("connection timeout");
+      expect(
+        await Database.count({ where: { teamId: context.admin.teamId } })
+      ).toBe(0);
+      expect(nodesOf((await reload(page.id)).content, "embed")).toHaveLength(1);
+    });
+
+    it("reads the table before the conversion takes its lock on the page", async () => {
+      describeTable.mockResolvedValueOnce({ name: "Points" });
+      describeTable.mockRejectedValue(new Error("no second connection"));
+      const { context, run } = await convertInline(
+        doc(paragraph("Lexique"), embed(framed("tblA")))
+      );
+      await run;
+
+      expect(await titleOf(context.admin.teamId)).toBe("Points");
+    });
   });
 });
