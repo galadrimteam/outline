@@ -379,7 +379,9 @@ describe("TableView", () => {
   it("opens only the options of a select cell clicked, not the row", async () => {
     await render(makeView({ id: "viwTable20" }));
     await act(async () => {
-      container.querySelector<HTMLElement>("[data-cell='rec2:status']")?.click();
+      container
+        .querySelector<HTMLElement>("[data-cell='rec2:status']")
+        ?.click();
     });
     expect(
       document.querySelector("[aria-label='Edit options'] input")
@@ -433,15 +435,16 @@ describe("TableView", () => {
     expect(container.querySelector("[role='toolbar']")?.textContent).toContain(
       "1"
     );
-    expect(
-      rows().every((row) => row.querySelector("[role='checkbox']"))
-    ).toBe(true);
+    expect(rows().every((row) => row.querySelector("[role='checkbox']"))).toBe(
+      true
+    );
 
     await act(async () => {
       handle(rows()[1])?.click();
     });
-    expect(rows().some((row) => row.getAttribute("aria-selected") === "true"))
-      .toBe(false);
+    expect(
+      rows().some((row) => row.getAttribute("aria-selected") === "true")
+    ).toBe(false);
   });
 
   it("adds a row under the one whose « + » is clicked", async () => {

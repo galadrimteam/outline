@@ -156,7 +156,10 @@ export const Gutter = styled.div`
 `;
 
 /** A control in the gutter shown on hover (or while rows are selected). */
-export const GutterControl = styled.div<{ $visible?: boolean; $width?: number }>`
+export const GutterControl = styled.div<{
+  $visible?: boolean;
+  $width?: number;
+}>`
   position: relative;
   display: flex;
   align-items: center;

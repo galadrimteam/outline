@@ -580,8 +580,7 @@ const LoadedView = observer(function LoadedView({
   );
 
   const handleOpenComments = React.useCallback(
-    (recordId: string) =>
-      void openRowComments(handleOpenRecord, ui, recordId),
+    (recordId: string) => void openRowComments(handleOpenRecord, ui, recordId),
     [handleOpenRecord, ui]
   );
 
