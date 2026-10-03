@@ -653,6 +653,11 @@ const LoadedView = observer(function LoadedView({
   }, [databaseRecords, database, view, handleOpenRecord, t]);
 
   const [filterRequest, setFilterRequest] = React.useState<FilterRequest>();
+  const [groupRequest, setGroupRequest] = React.useState<number>();
+  const handleEditGroups = React.useCallback(
+    () => setGroupRequest(Date.now()),
+    []
+  );
 
   const handleFilter = React.useCallback(
     (fieldId: string) => {
@@ -688,8 +693,16 @@ const LoadedView = observer(function LoadedView({
       onViewCreated,
       filterRequest,
       onOpenComments: handleOpenComments,
+      groupRequest,
+      onEditGroups: handleEditGroups,
     }),
-    [onViewCreated, filterRequest, handleOpenComments]
+    [
+      onViewCreated,
+      filterRequest,
+      handleOpenComments,
+      groupRequest,
+      handleEditGroups,
+    ]
   );
 
   const viewProps: TableViewProps = {

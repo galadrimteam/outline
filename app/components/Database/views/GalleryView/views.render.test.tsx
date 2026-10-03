@@ -560,6 +560,86 @@ describe("database views", () => {
     expect(opened).toEqual(["rec2"]);
   });
 
+  it("offers Notion's group actions in a column's menu, the calculation hidden from there", async () => {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+    await render(
+      BoardView,
+      makeView({
+        type: "kanban",
+        layout: DatabaseLayout.Board,
+        options: { stackFieldId: "status" },
+        overrides: { stackOrder: ["Terminé"], hiddenStacks: ["", "À faire"] },
+      })
+    );
+    await settle();
+    const trigger = container.querySelector<HTMLElement>(
+      "[aria-label='Group options']"
+    );
+    await act(async () => {
+      trigger?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
+      );
+    });
+    const items = Array.from(
+      document.querySelectorAll<HTMLElement>("[role='menuitem']")
+    );
+    expect(items.map((item) => item.textContent)).toEqual([
+      "Hide calculation",
+      "Hide group",
+    ]);
+
+    vi.mocked(client.post).mockClear();
+    await act(async () => {
+      items[0].click();
+    });
+    expect(
+      vi
+        .mocked(client.post)
+        .mock.calls.some(
+          ([path, body]) =>
+            path === "/databaseViews.update" &&
+            JSON.stringify(body).includes('"groupCalculation":{"func":"none"}')
+        )
+    ).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it("lists the empty properties of a new card as Notion's « Add … », not the one its column gives", async () => {
+    await render(
+      BoardView,
+      makeView({
+        type: "kanban",
+        layout: DatabaseLayout.Board,
+        options: { stackFieldId: "status" },
+        columnMeta: {
+          status: { order: 1, visible: true },
+          estimate: { order: 2, visible: true },
+        },
+        overrides: { stackOrder: ["Terminé"], hiddenStacks: ["", "À faire"] },
+      })
+    );
+    await settle();
+    const newPage = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "New page"
+    );
+    await act(async () => {
+      newPage?.click();
+    });
+
+    expect(
+      container.querySelector("textarea[aria-label='Card name']")
+    ).not.toBeNull();
+    expect(container.textContent).toContain("Add Estimation");
+    expect(container.textContent).not.toContain("Add Statut");
+  });
+
   it("types a card's title in place from its ✎, without opening the row", async () => {
     const opened: string[] = [];
     await render(BoardView, boardView(), {

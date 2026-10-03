@@ -19,6 +19,10 @@ export interface DatabaseBlockContextValue {
   filterRequest: FilterRequest | undefined;
   /** Opens the comments of a row, from the comment count of a card or a table row. */
   onOpenComments?: (recordId: string) => void;
+  /** The last request to open the grouping of the view, eg « Edit groups » in a column menu. */
+  groupRequest?: number;
+  /** Opens the grouping of the view. */
+  onEditGroups?: () => void;
 }
 
 /** Provided by `DatabaseBlock` around its toolbar and view. */
