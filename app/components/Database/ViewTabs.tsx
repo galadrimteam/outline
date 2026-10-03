@@ -43,6 +43,7 @@ import { PanelAction } from "./toolbar/components";
 import { useIsWrapped } from "./useIsWrapped";
 import { useTabStripMetrics } from "./useTabStripMetrics";
 import { ViewIcon } from "./ViewIcon";
+import { ViewsMenu } from "./ViewsMenu";
 import { splitTabs, stripMinimum } from "./viewTabsOverflow";
 
 interface Props {
@@ -108,7 +109,8 @@ export function layoutName(
 /**
  * The view tabs of a database block: switch views, add one, and for editors
  * rename, duplicate, delete (click the active tab or right-click) and reorder
- * them by dragging.
+ * them by dragging. The tabs that do not fit wait behind « N more… », Notion's
+ * menu of every view with a search field and « New view ».
  */
 export const ViewTabs = observer(function ViewTabs({
   database,
@@ -287,16 +289,9 @@ export const ViewTabs = observer(function ViewTabs({
   const actionsRef = React.useRef<HTMLDivElement>(null);
   const isWrapped = useIsWrapped(barRef, stripRef, actionsRef);
 
-  const moreAction = useMenuAction(
-    hiddenViews.map((view) =>
-      createAction({
-        id: `view-${view.id}`,
-        name: view.name || t("Untitled"),
-        section: "Database",
-        icon: <ViewIcon view={view} />,
-        perform: () => onSelect(view.id),
-      })
-    )
+  const nameOfLayout = React.useCallback(
+    (layout: DatabaseLayout) => layoutName(layout, t),
+    [t]
   );
 
   return (
@@ -352,11 +347,18 @@ export const ViewTabs = observer(function ViewTabs({
               </Tabs>
             </DndContext>
             {hiddenViews.length > 0 && (
-              <DropdownMenu action={moreAction} ariaLabel={t("More views")}>
-                <MoreButton type="button">
+              <ViewsMenu
+                views={views}
+                activeViewId={activeViewId}
+                layouts={creatableLayouts}
+                layoutName={nameOfLayout}
+                onSelect={onSelect}
+                onCreate={readOnly ? undefined : handleCreate}
+              >
+                <MoreButton type="button" aria-label={t("More views")}>
                   {t("{{ count }} more…", { count: hiddenViews.length })}
                 </MoreButton>
-              </DropdownMenu>
+              </ViewsMenu>
             )}
           </>
         )}

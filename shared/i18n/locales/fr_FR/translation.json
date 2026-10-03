@@ -778,6 +778,7 @@
   "{{ count }} more…_plural": "{{ count }} de plus…",
   "Views": "Vues",
   "More views": "Autres vues",
+  "Search for a view": "Rechercher une vue",
   "Add a view": "Ajouter une vue",
   "Change icon": "Changer l'icône",
   "Delete view": "Supprimer la vue",

@@ -778,6 +778,7 @@
   "{{ count }} more…_plural": "{{ count }} more…",
   "Views": "Views",
   "More views": "More views",
+  "Search for a view": "Search for a view",
   "Add a view": "Add a view",
   "Change icon": "Change icon",
   "Delete view": "Delete view",
