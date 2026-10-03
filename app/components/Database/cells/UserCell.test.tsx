@@ -50,9 +50,9 @@ describe("peopleOf", () => {
     expect(peopleOf(people)).toEqual(people);
   });
 
-  it("finds no people in linked rows or in a mix", () => {
+  it("finds no people in linked rows or in text", () => {
     expect(peopleOf([{ id: "rec1", title: "QCM" }])).toEqual([]);
-    expect(peopleOf([people[0], "texte"])).toEqual([]);
+    expect(peopleOf(["Malo Durand"])).toEqual([]);
     expect(peopleOf(null)).toEqual([]);
   });
 });
