@@ -8,8 +8,10 @@ import {
   HeaderLine,
   OpenLine,
   RowLine,
+  Scroller,
   SpanningLine,
 } from "./styles";
+import { BLEED_VARIABLE } from "../bleed";
 
 /** The declarations of the style rules that target a pseudo-element of an element, in order. */
 function pseudoRules(element: Element, pseudo: "::before" | "::after") {
@@ -70,6 +72,7 @@ describe("table lines", () => {
           </RowLine>
           <SpanningLine $template="24px 1fr" data-testid="add-in-group" />
           <OpenLine $template="24px 1fr" data-testid="add" />
+          <Scroller data-testid="scroller" />
         </ThemeProvider>
       )
     );
@@ -116,5 +119,16 @@ describe("table lines", () => {
     expect(
       lastValue(pseudoRules(byTestId("add-in-group"), "::after"), "display")
     ).toBeUndefined();
+  });
+
+  it("lets the table run right of the text column into the room its block gives", () => {
+    render();
+    const style = getComputedStyle(byTestId("scroller"));
+    expect(style.getPropertyValue("margin-inline-end")).toContain(
+      `var(${BLEED_VARIABLE}`
+    );
+    expect(style.getPropertyValue("padding-inline-end")).toContain(
+      `var(${BLEED_VARIABLE}`
+    );
   });
 });

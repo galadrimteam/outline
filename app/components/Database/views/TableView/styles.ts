@@ -2,6 +2,7 @@ import { transparentize } from "polished";
 import styled, { css } from "styled-components";
 import breakpoint from "styled-components-breakpoint";
 import { s } from "@shared/styles";
+import { bleedRight } from "../bleed";
 import { GUTTER_WIDTH } from "./layout";
 
 /** Height of the line of column headers, as Notion's. */
@@ -42,13 +43,15 @@ const cellLine = css`
 /**
  * Scrolls the table sideways when it is wider than the page. It starts a
  * gutter's width left of the page column so that the drag handles and
- * checkboxes take no room from the columns.
+ * checkboxes take no room from the columns, and runs right of the page column
+ * as far as the block lets it.
  */
 export const Scroller = styled.div`
   position: relative;
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 4px;
+  ${bleedRight}
 
   ${breakpoint("tablet")`
     margin-inline-start: -${GUTTER_WIDTH}px;
