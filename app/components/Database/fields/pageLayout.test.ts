@@ -1,6 +1,7 @@
 import { DatabaseFieldType, DatabaseLayout } from "@shared/databases/types";
 import { makeField, makeView } from "../views/TableView/testFixtures";
 import {
+  pageDiscussions,
   pageFields,
   propertyVisibility,
   splitPageProperties,
@@ -134,5 +135,14 @@ describe("splitPageProperties", () => {
     expect(split.pinned).toBe(true);
     expect(split.shown).toEqual([]);
     expect(split.hidden.map((field) => field.id)).toEqual(["status", "notes"]);
+  });
+});
+
+describe("pageDiscussions", () => {
+  it("keeps the discussions of a page minimal unless its database says otherwise, as Notion", () => {
+    expect(pageDiscussions(undefined)).toBe("minimal");
+    expect(pageDiscussions({})).toBe("minimal");
+    expect(pageDiscussions({ discussions: "expanded" })).toBe("expanded");
+    expect(pageDiscussions({ discussions: "off" })).toBe("off");
   });
 });

@@ -35,6 +35,7 @@ import {
   pageIconPlaceholderSize,
   pageIconSize,
   pageTitleStyles,
+  peekIconSize,
 } from "./pageTitle";
 
 const IconPicker = lazyWithRetry(() => import("~/components/IconPicker"));
@@ -54,6 +55,10 @@ type Props = {
   readOnly?: boolean;
   /** galadrim: the document is nothing but a full-page database, laid out like Notion's. */
   databasePage?: boolean;
+  /** galadrim: the document is the page of a database row, its properties right below. */
+  databaseRow?: boolean;
+  /** galadrim: the document is shown in the side peek of its database, its header smaller. */
+  compact?: boolean;
   /** Callback called on any edits to text */
   onChangeTitle?: (text: string) => void;
   /** Callback called when the user selects an icon */
@@ -77,6 +82,8 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
     color,
     readOnly,
     databasePage,
+    databaseRow,
+    compact,
     onChangeTitle,
     onChangeIcon,
     onSave,
@@ -248,12 +255,13 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
 
   const dir = ref.current?.getComputedDirection();
   const initial = title.charAt(0).toUpperCase();
+  const iconSize = compact ? peekIconSize : pageIconSize;
   const fallbackIcon = icon ? (
     <Icon
       value={icon}
       initial={initial}
       color={color}
-      size={pageIconSize}
+      size={iconSize}
       fullSize
     />
   ) : null;
@@ -261,7 +269,9 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
   // appears just above the title on hover, where Notion shows its "Add icon",
   // or in the margin beside the title of a database page, which has no room
   // above it.
-  const pickerSize = icon ? pageIconSize : pageIconPlaceholderSize;
+  const pickerSize = icon ? iconSize : pageIconPlaceholderSize;
+  // Notion's peek draws its icon right on the title.
+  const iconGap = icon ? (compact ? 0 : undefined) : 4;
   const pickerAbove = !!icon || !databasePage;
 
   return (
@@ -276,6 +286,8 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
       $iconPickerIsOpen={iconPickerIsOpen}
       $containsIcon={!!icon}
       $databasePage={databasePage}
+      $databaseRow={databaseRow}
+      $compact={compact}
       autoFocus={!title}
       maxLength={DocumentValidation.maxTitleLength}
       // galadrim: the title given here keeps up with what is typed (see
@@ -292,7 +304,7 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
         <IconTitleWrapper
           dir={dir}
           $above={pickerAbove ? pickerSize : undefined}
-          $gap={icon ? undefined : 4}
+          $gap={iconGap}
         >
           <React.Suspense fallback={fallbackIcon}>
             <StyledIconPicker
@@ -312,7 +324,12 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
           </React.Suspense>
         </IconTitleWrapper>
       ) : icon ? (
-        <IconTitleWrapper dir={dir} $above={pageIconSize} aria-hidden>
+        <IconTitleWrapper
+          dir={dir}
+          $above={iconSize}
+          $gap={iconGap}
+          aria-hidden
+        >
           {fallbackIcon}
         </IconTitleWrapper>
       ) : null}
@@ -323,6 +340,8 @@ const DocumentTitle = React.forwardRef(function DocumentTitle_(
 type TitleProps = {
   $containsIcon: boolean;
   $databasePage?: boolean;
+  $databaseRow?: boolean;
+  $compact?: boolean;
   $iconPickerIsOpen: boolean;
   readOnly?: boolean;
 };

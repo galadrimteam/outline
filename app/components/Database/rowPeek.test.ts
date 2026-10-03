@@ -1,4 +1,9 @@
-import { escapeClosesPeek, isRowPeek, peekedDocumentSlug } from "./rowPeek";
+import {
+  escapeClosesPeek,
+  isRowPeek,
+  peekSplitRatio,
+  peekedDocumentSlug,
+} from "./rowPeek";
 
 describe("isRowPeek", () => {
   it("is a row page in the side pane", () => {
@@ -57,5 +62,16 @@ describe("escapeClosesPeek", () => {
     );
     expect(escapeClosesPeek(inside("dialog", "<span>Edit</span>"))).toBe(false);
     expect(escapeClosesPeek(inside("grid", "<span>Cell</span>"))).toBe(false);
+  });
+});
+
+describe("peekSplitRatio", () => {
+  it("leaves the side peek half of the window, as Notion's, beside the sidebar", () => {
+    const ratio = peekSplitRatio(1440, 1180);
+    expect(Math.round(1180 * (1 - ratio))).toBe(720);
+  });
+
+  it("splits the main area in two when nothing is beside it", () => {
+    expect(peekSplitRatio(1440, 1440)).toBe(0.5);
   });
 });

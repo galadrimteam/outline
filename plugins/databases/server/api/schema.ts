@@ -298,6 +298,9 @@ const zFieldMeta = z.object({
     .optional(),
   endFieldId: zIdOrEmpty,
   icon: z.string().min(1).max(100).optional(),
+  standsFor: z
+    .enum([DatabaseFieldType.CreatedBy, DatabaseFieldType.LastModifiedBy])
+    .optional(),
 });
 
 const zPageTab = z
@@ -324,6 +327,7 @@ const zSettingsPatch = z.object({
       fieldOrder: z.array(zEngineId).max(500).optional(),
       pinnedFieldIds: z.array(zEngineId).max(500).optional(),
       omittedFieldIds: z.array(zEngineId).max(500).optional(),
+      discussions: z.enum(["expanded", "minimal", "off"]).optional(),
     })
     .nullish(),
   iconFieldId: zEngineId.nullish(),

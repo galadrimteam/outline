@@ -62,4 +62,23 @@ describe("FieldKindIcon", () => {
     );
     expect(created).toEqual(clock);
   });
+
+  it("draws Notion's created-by icon on the person field standing for it", () => {
+    const createdBy = renderToString(
+      <FieldKindIcon field={field({ type: DatabaseFieldType.CreatedBy })} />
+    );
+    const person = renderToString(
+      <FieldKindIcon field={field({ type: DatabaseFieldType.User })} />
+    );
+    const imported = renderToString(
+      <FieldKindIcon
+        field={field({
+          type: DatabaseFieldType.User,
+          meta: { standsFor: DatabaseFieldType.CreatedBy },
+        })}
+      />
+    );
+    expect(imported).toEqual(createdBy);
+    expect(imported).not.toEqual(person);
+  });
 });

@@ -64,6 +64,8 @@ type Props = {
    * may be modified, e.g. to set a pending anchor before submission.
    */
   onBeforeCreate?: (comment: Comment) => void;
+  /** galadrim: drawn in the page as Notion's « Add a comment… »: no bubble around the text. */
+  inPage?: boolean;
 };
 
 function CommentForm({
@@ -81,6 +83,7 @@ function CommentForm({
   placeholder,
   animatePresence,
   highlightedText,
+  inPage,
   ...rest
 }: Props) {
   const { editor } = useDocumentContext();
@@ -355,10 +358,10 @@ function CommentForm({
           tabIndex={-1}
         />
       </VisuallyHidden.Root>
-      <Flex gap={8} align="flex-start">
+      <Flex gap={inPage ? 10 : 8} align="flex-start">
         {standalone ? (
           <m.div
-            style={{ marginTop: 8 }}
+            style={{ marginTop: inPage ? 0 : 8 }}
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, ease: "easeOut" }}
@@ -366,7 +369,11 @@ function CommentForm({
             <Avatar model={user} size={24} />
           </m.div>
         ) : (
-          <Avatar model={user} size={24} style={{ marginTop: 8 }} />
+          <Avatar
+            model={user}
+            size={24}
+            style={{ marginTop: inPage ? 0 : 8 }}
+          />
         )}
         <Bubble
           gap={10}
@@ -374,6 +381,7 @@ function CommentForm({
           $lastOfThread
           $firstOfAuthor
           $firstOfThread={standalone}
+          $inPage={inPage}
           column
         >
           {highlightedText && (

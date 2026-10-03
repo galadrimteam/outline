@@ -484,8 +484,12 @@ describe("#databases.update", () => {
             hideEmpty: true,
             fieldOrder: ["fldStatusAAAAAAAAAA", "fldIconAAAAAAAAAAAA"],
             pinnedFieldIds: ["fldStatusAAAAAAAAAA"],
+            discussions: "expanded",
           },
-          fieldMeta: { fldStatusAAAAAAAAAA: { icon: "💵" } },
+          fieldMeta: {
+            fldStatusAAAAAAAAAA: { icon: "💵" },
+            fldCreatorAAAAAAAAA: { standsFor: "createdBy" },
+          },
           subItemFieldId: "fldSubItems",
         },
       },
@@ -503,8 +507,12 @@ describe("#databases.update", () => {
         hideEmpty: true,
         fieldOrder: ["fldStatusAAAAAAAAAA", "fldIconAAAAAAAAAAAA"],
         pinnedFieldIds: ["fldStatusAAAAAAAAAA"],
+        discussions: "expanded",
       },
-      fieldMeta: { fldStatusAAAAAAAAAA: { icon: "💵" } },
+      fieldMeta: {
+        fldStatusAAAAAAAAAA: { icon: "💵" },
+        fldCreatorAAAAAAAAA: { standsFor: "createdBy" },
+      },
       subItemFieldId: "fldSubItems",
     });
   });

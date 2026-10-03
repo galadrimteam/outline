@@ -1,4 +1,5 @@
 import { observer } from "mobx-react";
+import { transparentize } from "polished";
 import * as React from "react";
 import styled from "styled-components";
 import type {
@@ -83,7 +84,9 @@ export const PropertyRow = observer(function PropertyRow_({
       title={field.description ? undefined : field.name}
       $stacked={stacked}
     >
-      <FieldKindIcon field={field} size={16} />
+      <IconSlot>
+        <FieldKindIcon field={field} size={16} />
+      </IconSlot>
       <Name>{field.name}</Name>
     </NameButton>
   );
@@ -169,7 +172,7 @@ const NameButton = styled.button<{ $stacked: boolean }>`
   font-weight: ${(props) => (props.$stacked ? 500 : "inherit")};
   min-height: ${(props) => (props.$stacked ? "26px" : `${LINE_HEIGHT}px`)};
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   width: ${(props) => (props.$stacked ? "auto" : "100%")};
   max-width: 100%;
   padding: 0 6px;
@@ -178,13 +181,14 @@ const NameButton = styled.button<{ $stacked: boolean }>`
   background: none;
   font-family: inherit;
   line-height: inherit;
-  color: ${s("textSecondary")};
+  /* Notion's property names: its text colour at 65 %, the icons at 55 %. */
+  color: ${(props) => transparentize(0.35, props.theme.text)};
   text-align: left;
   cursor: var(--pointer);
 
   svg {
     flex-shrink: 0;
-    fill: currentColor;
+    fill: ${(props) => transparentize(0.45, props.theme.text)};
   }
 
   &:disabled {
@@ -194,6 +198,25 @@ const NameButton = styled.button<{ $stacked: boolean }>`
   &:hover:not(:disabled),
   &[aria-expanded="true"] {
     background: ${s("listItemHoverBackground")};
+  }
+`;
+
+/**
+ * Notion's property icons are 16px glyphs; outline-icons draw a 14px glyph in a 24px box, so the
+ * drawings are enlarged to that box and its margin taken back, the name staying where it was.
+ */
+const IconSlot = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+
+  svg {
+    width: 24px;
+    height: 24px;
+    margin: -4px;
   }
 `;
 
