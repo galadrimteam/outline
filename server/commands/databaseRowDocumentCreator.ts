@@ -1,6 +1,6 @@
 import { cloneDeep } from "es-toolkit/compat";
 import type { Transaction } from "sequelize";
-import type { NavigationNode, ProsemirrorData } from "@shared/types";
+import type { ProsemirrorData } from "@shared/types";
 import { DocumentValidation } from "@shared/validations";
 import { createContext } from "@server/context";
 import { NotFoundError } from "@server/errors";
@@ -11,6 +11,7 @@ import { ProsemirrorHelper } from "@server/models/helpers/ProsemirrorHelper";
 import { sequelize } from "@server/storage/database";
 import { LockHelper } from "@server/storage/LockHelper";
 import type { APIContext } from "@server/types";
+import { withoutNodes } from "./databaseRowsTreeUpdater";
 
 /** The acting user and the transaction to work in, when there is no request context. */
 export interface DatabaseActorContext {
@@ -57,8 +58,9 @@ interface RowsLinkerProps {
 /**
  * Returns the page of a database row, creating it on first use as a published
  * child of the database's home document (or at the root of its collection).
- * The page never enters the collection's document structure and publishing it
- * sends no event, so opening a card notifies nobody. The caller authorizes the
+ * The page only enters the collection's document structure when the database
+ * keeps its rows there, and publishing it sends no event, so opening a card
+ * notifies nobody. The caller authorizes the
  * user on the database: reading it is enough, the publish right is not needed.
  *
  * @param ctx the request context, or the acting user with an optional transaction.
@@ -146,9 +148,9 @@ export async function databaseRowDocumentCreator(
  * Turns existing documents into the pages of database rows, as the migration
  * does for cards imported as ordinary pages, and takes them out of the
  * collection's document structure in a single save (their sub-pages leave the
- * tree with them, as in Notion). Documents outside the database's team and
- * collection, the database's home document, and rows whose page is already
- * another document are skipped.
+ * tree with them, as in Notion), unless the database keeps its rows in the
+ * tree. Documents outside the database's team and collection, the database's
+ * home document, and rows whose page is already another document are skipped.
  *
  * @param ctx the request context, or the acting user with an optional transaction.
  * @param props.database the database the rows belong to.
@@ -207,6 +209,9 @@ export async function databaseRowsLinker(
       return 0;
     }
 
+    if (database.rowsInSidebar) {
+      return linkedIds.size;
+    }
     const collection = await Collection.findByPk(database.collectionId, {
       includeDocumentStructure: true,
       transaction: t,
@@ -279,13 +284,4 @@ function uniqueLinks(pairs: RowLink[]): RowLink[] {
     documentIds.add(pair.documentId);
     return true;
   });
-}
-
-function withoutNodes(
-  nodes: NavigationNode[],
-  ids: Set<string>
-): NavigationNode[] {
-  return nodes
-    .filter((node) => !ids.has(node.id))
-    .map((node) => ({ ...node, children: withoutNodes(node.children, ids) }));
 }

@@ -3,6 +3,7 @@ import { Op } from "sequelize";
 import { UserRole } from "@shared/types";
 import { toError } from "@shared/utils/error";
 import { databaseRowsLinker } from "@server/commands/databaseRowDocumentCreator";
+import { databaseRowsTreeUpdater } from "@server/commands/databaseRowsTreeUpdater";
 import { NotFoundError, ValidationError } from "@server/errors";
 import Logger from "@server/logging/Logger";
 import auth from "@server/middlewares/authentication";
@@ -254,6 +255,7 @@ router.post(
     if (icon !== undefined) {
       database.icon = icon;
     }
+    const rowsWereInSidebar = database.rowsInSidebar;
     if (settings) {
       database.settings = DatabaseSettingsHelper.merge(
         database.settings,
@@ -262,6 +264,9 @@ router.post(
       database.changed("settings", true);
     }
     await database.save({ transaction });
+    if (database.rowsInSidebar !== rowsWereInSidebar) {
+      await databaseRowsTreeUpdater(database, { transaction });
+    }
     database.document = loaded.document;
     database.collection = loaded.collection;
 

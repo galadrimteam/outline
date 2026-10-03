@@ -317,6 +317,87 @@ describe("#addDocumentToStructure", () => {
     ]);
   });
 
+  it("should add a row page of a database that keeps its rows in the sidebar", async () => {
+    const collection = await buildCollection();
+    const parent = await buildDocument({
+      teamId: collection.teamId,
+      collectionId: collection.id,
+    });
+    const database = await buildDatabase({
+      teamId: collection.teamId,
+      documentId: parent.id,
+      settings: { rowsInSidebar: true },
+    });
+    const rowPage = await buildDocument({
+      teamId: collection.teamId,
+      collectionId: collection.id,
+      parentDocumentId: parent.id,
+      databaseId: database.id,
+      databaseRecordId: "rec1",
+    });
+
+    const reloaded = await Collection.findByPk(collection.id, {
+      includeDocumentStructure: true,
+      rejectOnEmpty: true,
+    });
+    expect(
+      reloaded.getDocumentTree(parent.id)?.children.map((node) => node.id)
+    ).toEqual([rowPage.id]);
+  });
+
+  it("should keep the row pages of a database that keeps its rows in the sidebar in a rebuilt structure", async () => {
+    const collection = await buildCollection();
+    const parent = await buildDocument({
+      teamId: collection.teamId,
+      collectionId: collection.id,
+    });
+    const projects = await buildDatabase({
+      teamId: collection.teamId,
+      documentId: parent.id,
+      settings: { rowsInSidebar: true },
+    });
+    const cards = await buildDatabase({
+      teamId: collection.teamId,
+      documentId: parent.id,
+    });
+    const project = await buildDocument({
+      teamId: collection.teamId,
+      collectionId: collection.id,
+      parentDocumentId: parent.id,
+      databaseId: projects.id,
+      databaseRecordId: "rec1",
+    });
+    const subPage = await buildDocument({
+      teamId: collection.teamId,
+      collectionId: collection.id,
+      parentDocumentId: project.id,
+    });
+    await buildDocument({
+      teamId: collection.teamId,
+      collectionId: collection.id,
+      parentDocumentId: parent.id,
+      databaseId: cards.id,
+      databaseRecordId: "rec2",
+    });
+
+    const reloaded = await Collection.findByPk(collection.id, {
+      includeDocumentStructure: true,
+      rejectOnEmpty: true,
+    });
+    await reloaded.rebuildDocumentStructure([]);
+    expect(reloaded.documentStructure).toEqual([
+      expect.objectContaining({
+        id: parent.id,
+        children: [
+          expect.objectContaining({
+            id: project.id,
+            children: [expect.objectContaining({ id: subPage.id })],
+          }),
+        ],
+      }),
+    ]);
+  });
+
   describe("options: documentJson", () => {
     it("should append supplied json over document's own", async () => {
       const collection = await buildCollection();

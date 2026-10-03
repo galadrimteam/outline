@@ -490,11 +490,10 @@ class Document extends ArchivableModel<
     model: Document,
     { transaction }: SaveOptions<InferAttributes<Document>>
   ) {
-    // templates, drafts, archived documents and database row pages don't appear
-    // in the structure and so never need to be updated when the title changes
+    // templates, drafts, archived documents and most database row pages don't
+    // appear in the structure and so never need to be updated when the title changes
     if (
       model.archivedAt ||
-      model.databaseId ||
       !model.publishedAt ||
       !(
         model.changed("title") ||
@@ -502,6 +501,12 @@ class Document extends ArchivableModel<
         model.changed("color")
       ) ||
       !model.collectionId
+    ) {
+      return;
+    }
+    if (
+      model.databaseId &&
+      (await Database.rowPageIdsOutsideTree([model], { transaction })).size
     ) {
       return;
     }
@@ -664,7 +669,10 @@ class Document extends ArchivableModel<
   @Column(DataType.JSONB)
   sourceMetadata: SourceMetadata | null;
 
-  /** The database this document is a row page of. Row pages stay out of the sidebar tree. */
+  /**
+   * The database this document is a row page of. Row pages stay out of the
+   * sidebar tree, unless the database keeps its rows there.
+   */
   @BelongsTo(() => Database, "databaseId")
   database: Database | null;
 
@@ -1525,21 +1533,17 @@ class Document extends ArchivableModel<
       : await (this.constructor as typeof Document).unscoped().findAll({
           where: options?.includeArchived
             ? {
+                [Op.and]: [Database.inTreeWhere()],
                 teamId: this.teamId,
                 parentDocumentId: this.id,
-                databaseId: {
-                  [Op.is]: null,
-                },
                 publishedAt: {
                   [Op.ne]: null,
                 },
               }
             : {
+                [Op.and]: [Database.inTreeWhere()],
                 teamId: this.teamId,
                 parentDocumentId: this.id,
-                databaseId: {
-                  [Op.is]: null,
-                },
                 publishedAt: {
                   [Op.ne]: null,
                 },

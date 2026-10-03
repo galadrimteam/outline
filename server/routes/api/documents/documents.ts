@@ -52,6 +52,7 @@ import {
   Attachment,
   Relationship,
   Collection,
+  Database,
   Document,
   DocumentInsight,
   Event,
@@ -299,9 +300,9 @@ router.post(
     }
 
     // The children of a page are its sub-pages: the row pages of a database it
-    // holds are listed by the database instead.
+    // holds are listed by the database instead, unless they are in the tree.
     if (parentDocumentId) {
-      where[Op.and].push({ databaseId: { [Op.is]: null } });
+      where[Op.and].push(Database.inTreeWhere());
     }
 
     // Sort=index needs the collection's documentStructure for ordering and

@@ -2,7 +2,9 @@ import type {
   InferAttributes,
   InferCreationAttributes,
   Transaction,
+  WhereOptions,
 } from "sequelize";
+import { Op, literal } from "sequelize";
 import {
   AllowNull,
   BelongsTo,
@@ -51,6 +53,65 @@ class Database extends ParanoidModel<
     }
     await database.loadAnchor(userId, options);
     return database;
+  }
+
+  /**
+   * Returns the documents among the given ones that stay out of their
+   * collection's tree: the pages of database rows, unless their database keeps
+   * its rows in the tree (`settings.rowsInSidebar`).
+   *
+   * @param documents the documents, with their database.
+   * @param options.transaction an optional transaction.
+   * @returns the ids of the documents left out of the tree.
+   */
+  static async rowPageIdsOutsideTree(
+    documents: Pick<Document, "id" | "databaseId">[],
+    options: { transaction?: Transaction | null } = {}
+  ): Promise<Set<string>> {
+    const rowPages = documents.filter((document) => document.databaseId);
+    if (!rowPages.length) {
+      return new Set();
+    }
+    const inTree = await this.findAll({
+      attributes: ["id"],
+      where: {
+        id: [...new Set(rowPages.map((document) => document.databaseId!))],
+        settings: { [Op.contains]: { rowsInSidebar: true } },
+      },
+      transaction: options.transaction,
+    });
+    const keeping = new Set(inTree.map((database) => database.id));
+    return new Set(
+      rowPages
+        .filter((document) => !keeping.has(document.databaseId!))
+        .map((document) => document.id)
+    );
+  }
+
+  /**
+   * A condition on documents that keeps those belonging in a collection's tree:
+   * ordinary pages, and the row pages of databases that keep their rows there.
+   *
+   * @returns the where options.
+   */
+  static inTreeWhere(): WhereOptions<Document> {
+    return {
+      [Op.or]: [
+        { databaseId: { [Op.is]: null } },
+        {
+          databaseId: {
+            [Op.in]: literal(
+              `(SELECT "id" FROM "databases" WHERE "deletedAt" IS NULL AND "settings" @> '{"rowsInSidebar": true}')`
+            ),
+          },
+        },
+      ],
+    };
+  }
+
+  /** Whether the row pages keep their place in the collection's tree. */
+  get rowsInSidebar(): boolean {
+    return !!this.settings?.rowsInSidebar;
   }
 
   @Length({ max: 255, msg: "title must be 255 characters or less" })

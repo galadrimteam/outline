@@ -525,6 +525,12 @@ export interface DatabaseSettings {
    * symmetric field holds each row's parent.
    */
   subItemFieldId?: string;
+  /**
+   * The row pages keep their place in the collection's tree, with their sub-pages, like other
+   * pages: for a database whose rows are spaces of their own (a project and its pages). Without
+   * it, row pages are reached through the database only, as Notion's sidebar never lists rows.
+   */
+  rowsInSidebar?: boolean;
 }
 
 /** Websocket event sent to the readers of a database when its data changes. */
