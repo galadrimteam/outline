@@ -261,6 +261,7 @@ export const CardList = observer(function CardList({
           view={view}
           recordId={recordId}
           fields={cardFields}
+          readOnly={readOnly}
           onOpen={onOpen}
         />
       ))}

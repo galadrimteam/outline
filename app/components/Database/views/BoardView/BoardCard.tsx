@@ -151,11 +151,9 @@ export const StaticCard = observer(function StaticCard({
   view,
   recordId,
   fields,
-  readOnly = true,
+  readOnly,
   onOpen,
-}: Omit<SortableCardProps, "container" | "readOnly"> & {
-  readOnly?: boolean;
-}) {
+}: Omit<SortableCardProps, "container">) {
   const { t } = useTranslation();
   const { databaseRecords } = useStores();
   const record = databaseRecords.recordById(database.id, recordId);
