@@ -6,7 +6,7 @@ import type Database from "~/models/Database";
 import type { RecordQuery } from "~/stores/DatabaseRecordsStore";
 import { useCellLocale } from "../../cells/hooks";
 import { formatStatistic } from "../TableView/statistics";
-import { columnCalculation } from "./groupCalculation";
+import { columnCalculation, columnValue } from "./groupCalculation";
 
 interface Props {
   database: Database;
@@ -28,7 +28,7 @@ export const ColumnCalculationValue = observer(function ColumnCalculationValue({
   const { t } = useTranslation();
   const locale = useCellLocale();
   const calculation = columnCalculation(database, view);
-  const [value, setValue] = React.useState<number | string | null>(null);
+  const [value, setValue] = React.useState<number | string | null>();
   const fieldId =
     calculation.kind === "field" ? calculation.field.id : undefined;
   const func = calculation.kind === "field" ? calculation.func : undefined;
@@ -61,9 +61,18 @@ export const ColumnCalculationValue = observer(function ColumnCalculationValue({
   if (calculation.kind === "count") {
     return <>{total}</>;
   }
+  if (value === undefined) {
+    return null;
+  }
   return (
     <>
-      {formatStatistic(calculation.func, value, calculation.field, t, locale)}
+      {formatStatistic(
+        calculation.func,
+        columnValue(calculation.func, value),
+        calculation.field,
+        t,
+        locale
+      )}
     </>
   );
 });
