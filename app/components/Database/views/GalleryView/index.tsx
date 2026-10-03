@@ -30,11 +30,12 @@ import {
 import { CommentCount } from "../../comments/CommentCount";
 import { GroupLabel } from "../GroupLabel";
 import { SubItemCount } from "../SubItemCount";
+import { useAllRecords } from "../useAllRecords";
 
 /**
  * Notion-like gallery: cards with a cover image (the view's cover property),
  * a title and the visible properties; small, medium or large; split in
- * collapsible sections when the view is grouped.
+ * collapsible sections when the view is grouped, each paged on its own.
  *
  * @param props the database, the view, its rows and the callbacks.
  * @returns the gallery.
@@ -55,6 +56,7 @@ export const GalleryView = observer(function GalleryView({
     ? database.fieldById(groupLevel.fieldId)
     : undefined;
   const canCreate = !readOnly && !!onCreateRecord;
+  const rowsLeft = useAllRecords(query, !!groupField);
 
   React.useEffect(() => {
     void query.fetch();
@@ -109,15 +111,16 @@ export const GalleryView = observer(function GalleryView({
               database={database}
               field={groupField}
               group={group}
+              limit={query.params.pageSize}
             >
-              {renderCards(group.records, prefillFor(groupField, group))}
+              {(records) => renderCards(records, prefillFor(groupField, group))}
             </GallerySection>
           ))
         : renderCards(query.records)}
       {!query.records.length && !canCreate && (
         <Empty>{t("No pages to show")}</Empty>
       )}
-      {query.hasMore && (
+      {query.hasMore && (!groupField || rowsLeft) && (
         <LoadMore
           type="button"
           disabled={query.isLoading}
@@ -141,23 +144,38 @@ interface SectionProps {
   database: Database;
   field: DatabaseField;
   group: RecordGroup;
-  children: React.ReactNode;
+  /** The rows the group shows before its own « Load more », all when undefined. */
+  limit?: number;
+  /** Draws the rows shown. */
+  children: (records: DatabaseRecord[]) => React.ReactNode;
 }
 
 /**
- * A collapsible group of a grouped view: its title, its count (on hover), its content.
+ * A collapsible group of a grouped view: its title, its count of rows (on
+ * hover), its rows up to the view's load limit, then « Load more » for the
+ * rest of the group, as Notion pages each group.
  *
- * @param props the group and its content.
+ * @param props the group, its limit and how to draw its rows.
  * @returns the section.
  */
 export const GallerySection = observer(function GallerySection({
   database,
   field,
   group,
+  limit,
   children,
 }: SectionProps) {
+  const { t } = useTranslation();
   const [collapsed, setCollapsed] = React.useState(false);
+  const [shown, setShown] = React.useState(limit);
   const contentId = React.useId();
+
+  React.useEffect(() => {
+    setShown(limit);
+  }, [limit]);
+
+  const records =
+    shown === undefined ? group.records : group.records.slice(0, shown);
 
   return (
     <Section>
@@ -176,8 +194,18 @@ export const GallerySection = observer(function GallerySection({
         <SectionCount>{group.records.length}</SectionCount>
       </SectionHeader>
       <div id={contentId} hidden={collapsed}>
-        {!collapsed && children}
+        {!collapsed && children(records)}
       </div>
+      {!collapsed &&
+        limit !== undefined &&
+        records.length < group.records.length && (
+          <LoadMore
+            type="button"
+            onClick={() => setShown(records.length + limit)}
+          >
+            {t("Load more")}
+          </LoadMore>
+        )}
     </Section>
   );
 });
