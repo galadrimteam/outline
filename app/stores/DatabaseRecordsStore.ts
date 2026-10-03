@@ -748,9 +748,31 @@ export default class DatabaseRecordsStore {
       if (record && !record.documentId) {
         this.cacheRecords(databaseId, [{ ...record, documentId: document.id }]);
       }
+      this.showInSidebar(databaseId, document);
       return document;
     });
   };
+
+  /**
+   * Fetches the tree of the collection again when a row page that belongs in
+   * it is missing there: a page created on opening its row is published
+   * without an event, so the sidebar has not heard of it.
+   *
+   * @param databaseId the database the row belongs to.
+   * @param document the row's page.
+   */
+  private showInSidebar(databaseId: string, document: Document) {
+    const collection = document.collectionId
+      ? this.rootStore.collections.get(document.collectionId)
+      : undefined;
+    if (
+      this.rootStore.databases.get(databaseId)?.settings?.rowsInSidebar &&
+      collection?.documents &&
+      !collection.childrenByDocumentId.has(document.id)
+    ) {
+      void collection.fetchDocuments({ force: true });
+    }
+  }
 
   /**
    * Lists the group headers and counts of a view.

@@ -65,6 +65,7 @@ import { RedisPrefixHelper } from "@server/utils/RedisPrefixHelper";
 import removeIndexCollision from "@server/utils/removeIndexCollision";
 import { generateUrlId } from "@server/utils/url";
 import { ValidateIndex } from "@server/validation";
+import Database from "./Database";
 import Document from "./Document";
 import FileOperation from "./FileOperation";
 import Group from "./Group";
@@ -1043,8 +1044,14 @@ class Collection extends ParanoidModel<
       insertOrder?: "prepend" | "append";
     } = {}
   ) => {
-    // Row pages of a database are reached through the database, never the tree.
-    if (document.databaseId) {
+    if (
+      document.databaseId &&
+      (
+        await Database.rowPageIdsOutsideTree([document], {
+          transaction: options.transaction,
+        })
+      ).size
+    ) {
       return this;
     }
 
@@ -1150,10 +1157,8 @@ class Collection extends ParanoidModel<
       },
       transaction: options.transaction,
     });
-    // Row pages of databases stay out of the tree, as addDocumentToStructure keeps them, and so do the pages under them.
-    const hidden = new Set(
-      published.filter((document) => document.databaseId).map(({ id }) => id)
-    );
+    // The pages under a row page left out of the tree are left out with it.
+    const hidden = await Database.rowPageIdsOutsideTree(published, options);
     for (let size = -1; size !== hidden.size;) {
       size = hidden.size;
       for (const document of published) {

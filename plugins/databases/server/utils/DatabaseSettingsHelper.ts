@@ -15,6 +15,7 @@ export interface DatabaseSettingsPatch {
   pageLayout?: DatabaseSettings["pageLayout"] | null;
   iconFieldId?: string | null;
   subItemFieldId?: string | null;
+  rowsInSidebar?: boolean | null;
 }
 
 /**
@@ -141,6 +142,13 @@ export class DatabaseSettingsHelper {
         delete next.subItemFieldId;
       } else {
         next.subItemFieldId = patch.subItemFieldId;
+      }
+    }
+    if (patch.rowsInSidebar !== undefined) {
+      if (patch.rowsInSidebar) {
+        next.rowsInSidebar = true;
+      } else {
+        delete next.rowsInSidebar;
       }
     }
     return next;

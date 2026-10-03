@@ -327,6 +327,7 @@ const zSettingsPatch = z.object({
     .nullish(),
   iconFieldId: zEngineId.nullish(),
   subItemFieldId: zEngineId.nullish(),
+  rowsInSidebar: z.boolean().nullish(),
 });
 
 const zFieldOptions = z.object({
