@@ -18,6 +18,8 @@ import stores from "~/stores";
 import type { RecordQueryParams } from "~/stores/DatabaseRecordsStore";
 import { client } from "~/utils/ApiClient";
 import { rowCommentCounts } from "../../comments/rowCommentCounts";
+import { DatabaseBlockContext } from "../../DatabaseBlockContext";
+import type { DatabaseRecordOrder } from "@shared/databases/types";
 import { makeField, makeView } from "./testFixtures";
 import { TableView } from ".";
 
@@ -100,6 +102,9 @@ describe("TableView", () => {
   let calls: { path: string; body: Record<string, unknown> }[];
   let listed: DatabaseRecord[];
   let commentCounts: Record<string, number>;
+  let opened: string[];
+  let discussed: string[];
+  let created: (DatabaseRecordOrder | undefined)[];
 
   beforeEach(() => {
     // @ts-expect-error the flag React reads to allow act() outside of its own test utilities.
@@ -116,6 +121,9 @@ describe("TableView", () => {
     calls = [];
     listed = records;
     commentCounts = {};
+    opened = [];
+    discussed = [];
+    created = [];
     vi.mocked(client.post).mockReset();
     vi.mocked(client.post).mockImplementation(async (path, body) => {
       calls.push({ path, body: (body ?? {}) as Record<string, unknown> });
@@ -199,14 +207,24 @@ describe("TableView", () => {
           <MemoryRouter>
             <ThemeProvider theme={light}>
               <ActionContextProvider>
-                <TableView
-                  database={database}
-                  view={view}
-                  query={query}
-                  readOnly={false}
-                  onOpenRecord={() => undefined}
-                  onCreateRecord={async () => undefined}
-                />
+                <DatabaseBlockContext.Provider
+                  value={{
+                    onViewCreated: () => undefined,
+                    filterRequest: undefined,
+                    onOpenComments: (id) => discussed.push(id),
+                  }}
+                >
+                  <TableView
+                    database={database}
+                    view={view}
+                    query={query}
+                    readOnly={false}
+                    onOpenRecord={(id) => opened.push(id)}
+                    onCreateRecord={async (_fields, order) => {
+                      created.push(order);
+                    }}
+                  />
+                </DatabaseBlockContext.Provider>
               </ActionContextProvider>
             </ThemeProvider>
           </MemoryRouter>
@@ -246,11 +264,11 @@ describe("TableView", () => {
     await act(async () => {
       cell?.click();
     });
-    const input = cell?.querySelector("input");
+    const input = document.querySelector("[aria-label='Edit text'] textarea");
     expect(input).not.toBeNull();
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype,
+        HTMLTextAreaElement.prototype,
         "value"
       )?.set;
       setter?.call(input, "Intégration v2");
@@ -352,10 +370,90 @@ describe("TableView", () => {
     await render(makeView({ id: "viwTable7" }));
     await pressOnGrid("ArrowDown");
     await pressOnGrid("x");
-    const input = container.querySelector<HTMLInputElement>(
-      "[data-cell='rec1:name'] input"
+    const input = document.querySelector<HTMLTextAreaElement>(
+      "[aria-label='Edit text'] textarea"
     );
     expect(input?.value).toBe("x");
+  });
+
+  it("opens only the options of a select cell clicked, not the row", async () => {
+    await render(makeView({ id: "viwTable20" }));
+    await act(async () => {
+      container.querySelector<HTMLElement>("[data-cell='rec2:status']")?.click();
+    });
+    expect(
+      document.querySelector("[aria-label='Edit options'] input")
+    ).not.toBeNull();
+    expect(
+      document.querySelector("[aria-label='Edit text'] textarea")
+    ).toBeNull();
+    expect(opened).toEqual([]);
+  });
+
+  it("opens the row from « Open » and its comments from its comment count", async () => {
+    rowCommentCounts.invalidate(databaseId);
+    commentCounts = { rec1: 3 };
+    await render(makeView({ id: "viwTable21" }));
+    await wait(80);
+    const title = container.querySelector("[data-cell='rec1:name']");
+
+    await act(async () => {
+      title
+        ?.querySelector<HTMLElement>("button[aria-label^='3 comment']")
+        ?.click();
+    });
+    expect(discussed).toEqual(["rec1"]);
+    expect(opened).toEqual([]);
+    expect(title?.getAttribute("aria-selected")).toBe("false");
+
+    await act(async () => {
+      title?.querySelector<HTMLElement>("[data-open-button]")?.click();
+    });
+    expect(opened).toEqual(["rec1"]);
+  });
+
+  it("selects a row from its drag handle, with no checkbox before that", async () => {
+    await render(makeView({ id: "viwTable22" }));
+    const rows = () =>
+      Array.from(
+        container.querySelectorAll<HTMLElement>("[role='row'][data-index]")
+      );
+    expect(container.querySelectorAll("[role='checkbox']")).toHaveLength(0);
+
+    const handle = (row: HTMLElement) =>
+      row.querySelector<HTMLElement>("[aria-label^='Drag to move']");
+    await act(async () => {
+      handle(rows()[1])?.click();
+    });
+    expect(rows().map((row) => row.getAttribute("aria-selected"))).toEqual([
+      "false",
+      "true",
+      "false",
+    ]);
+    expect(container.querySelector("[role='toolbar']")?.textContent).toContain(
+      "1"
+    );
+    expect(
+      rows().every((row) => row.querySelector("[role='checkbox']"))
+    ).toBe(true);
+
+    await act(async () => {
+      handle(rows()[1])?.click();
+    });
+    expect(rows().some((row) => row.getAttribute("aria-selected") === "true"))
+      .toBe(false);
+  });
+
+  it("adds a row under the one whose « + » is clicked", async () => {
+    await render(makeView({ id: "viwTable23" }));
+    await act(async () => {
+      container
+        .querySelectorAll<HTMLElement>("[aria-label='Add a row below']")[0]
+        ?.click();
+    });
+    expect(created).toEqual([
+      { viewId: "viwTable23", anchorId: "rec1", position: "after" },
+    ]);
   });
 
   it("opens a picker with the character typed as its search", async () => {

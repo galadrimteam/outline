@@ -361,6 +361,9 @@ const CellArea = styled.div`
 `;
 
 const CellOverlay = styled(PopoverContent)<{ $title: boolean }>`
+  && {
+    box-sizing: border-box;
+  }
   padding: 8px 9px;
   border-radius: 6px;
   font-size: 14px;
