@@ -202,6 +202,168 @@ describe("group layout", () => {
   });
 });
 
+describe("rows without a value", () => {
+  const projects = makeTable(
+    "tblProjects",
+    [makeField({ id: "name", type: DatabaseFieldType.SingleLineText })],
+    [makeRecord("recV3", { name: "Programmes V3" })]
+  );
+  const estimates = makeTable(
+    "tblEstimates",
+    [
+      makeField({ id: "name", type: DatabaseFieldType.SingleLineText }),
+      makeField({
+        id: "project",
+        type: DatabaseFieldType.Link,
+        options: { foreignTableId: "tblProjects", relationship: "manyMany" },
+      }),
+      makeField({
+        id: "status",
+        type: DatabaseFieldType.SingleSelect,
+        options: { choices },
+      }),
+      makeField({
+        id: "tags",
+        type: DatabaseFieldType.MultipleSelect,
+        options: { choices },
+      }),
+      makeField({ id: "owner", type: DatabaseFieldType.User }),
+      makeField({
+        id: "due",
+        type: DatabaseFieldType.Date,
+        options: { formatting: { date: "YYYY-MM-DD", timeZone: PARIS } },
+      }),
+      makeField({ id: "done", type: DatabaseFieldType.Checkbox }),
+      makeField({ id: "note", type: DatabaseFieldType.SingleLineText }),
+    ],
+    [
+      makeRecord("recFilled", {
+        name: "Conception",
+        project: [{ id: "recV3" }],
+        status: "Doing",
+        tags: ["Todo"],
+        owner: { id: "u1", title: "Ada" },
+        due: "2026-08-03T10:00:00.000Z",
+        done: true,
+        note: "Cadrage",
+      }),
+      makeRecord("recNull", {
+        name: "Améliorations Visios",
+        project: null,
+        status: null,
+        tags: null,
+        owner: null,
+        due: null,
+        done: null,
+        note: null,
+      }),
+      makeRecord("recBlank", {
+        name: "Améliorations Exo",
+        project: [],
+        tags: [],
+        owner: [],
+        done: false,
+        note: "",
+      }),
+      makeRecord("recGone", {
+        name: "Améliorations IA",
+        project: [{ id: "recDeleted" }],
+      }),
+      makeRecord("recMissing", { name: "Améliorations Permanence" }),
+      makeRecord("recFilled2", {
+        name: "Programme Cours",
+        project: [{ id: "recV3" }],
+        status: "Doing",
+        tags: ["Todo"],
+        owner: { id: "u1", title: "Ada" },
+        due: "2026-08-03T12:00:00.000Z",
+        done: true,
+        note: "Cadrage",
+      }),
+    ]
+  );
+  const emptyBase = computeBase([projects, estimates], context);
+  const empties = ["recNull", "recBlank", "recGone", "recMissing"];
+  const fieldIds = [
+    "project",
+    "status",
+    "tags",
+    "owner",
+    "due",
+    "done",
+    "note",
+  ];
+
+  it.each(fieldIds)(
+    "gathers every row without a %s in one group with its count",
+    (fieldId) => {
+      for (const order of ["asc", "desc"] as const) {
+        const group = [{ fieldId, order }];
+        const records = selectRecords(
+          estimates,
+          emptyBase,
+          { view: makeView({ id: "v", group }) },
+          context
+        );
+        const points = groupPoints(estimates, records, group);
+        const headers = points.flatMap((point) =>
+          point.type === "header" ? [point] : []
+        );
+        expect(headers).toHaveLength(2);
+        const counts = points.flatMap((point) =>
+          point.type === "row" ? [point.count] : []
+        );
+        const emptyHeader = headers.findIndex((header) =>
+          fieldId === "done" ? header.value !== true : header.value === null
+        );
+        expect(counts[emptyHeader]).toBe(empties.length);
+        const members = groupMembers(estimates, records, group);
+        expect(
+          (members.get(headers[emptyHeader].id) ?? [])
+            .map((record) => record.row.id)
+            .sort()
+        ).toEqual([...empties].sort());
+      }
+    }
+  );
+
+  it.each(fieldIds)(
+    "puts the rows without a %s where the view orders their group, and folds them away with it",
+    (fieldId) => {
+      const group = [{ fieldId, order: "asc" as const }];
+      const emptyKey = fieldId === "done" ? "false" : "";
+      const ordered = selectRecords(
+        estimates,
+        emptyBase,
+        {
+          view: makeView({ id: "v", group: [{ fieldId, order: "desc" }] }),
+          groupLayout: { order: [emptyKey] },
+        },
+        context
+      );
+      expect(
+        ordered
+          .slice(0, empties.length)
+          .map((record) => record.row.id)
+          .sort()
+      ).toEqual([...empties].sort());
+      const folded = selectRecords(
+        estimates,
+        emptyBase,
+        {
+          view: makeView({ id: "v", group }),
+          groupLayout: { hidden: [emptyKey] },
+        },
+        context
+      );
+      expect(folded.map((record) => record.row.id)).toEqual([
+        "recFilled",
+        "recFilled2",
+      ]);
+    }
+  );
+});
+
 describe("groupMembers", () => {
   it("gives the records of every group under the ids of the headers", () => {
     const group = [

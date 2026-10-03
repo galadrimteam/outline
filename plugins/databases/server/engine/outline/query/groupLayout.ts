@@ -3,11 +3,16 @@ import type {
   DatabaseGroup,
   DatabaseGroupLayout,
 } from "@shared/databases/types";
-import { DatabaseFieldType } from "@shared/databases/types";
-import { cellItems, isObjectItem, itemId, itemTitle } from "./cellValues";
+import {
+  cellItems,
+  isChecked,
+  isObjectItem,
+  itemId,
+  itemTitle,
+} from "./cellValues";
 import type { ComputedRecord } from "./contract";
 import type { QueryField } from "./fields";
-import { isUserOrLinkType } from "./fields";
+import { isSingleBoolean, isUserOrLinkType } from "./fields";
 import type { SortLevel } from "./sort";
 import { sortLevels } from "./sort";
 
@@ -34,9 +39,9 @@ export function groupLevels(
 
 /**
  * The key of the group a cell falls in, as the app and the Notion migration
- * name groups: the choice name, "true" or "false" for a checkbox, the id of a
- * person or a linked row, "" for the rows without a value. A list is keyed by
- * its first element.
+ * name groups: the choice name, "true" or "false" for a box (unchecked when
+ * empty), the id of a person or a linked row, "" for the rows without a value
+ * (blank text included). A list is keyed by its first element.
  *
  * @param field the grouping field.
  * @param cell the cell value.
@@ -46,13 +51,10 @@ export function groupKey(
   field: QueryField,
   cell: DatabaseCellValue | undefined
 ): string {
-  const items = cellItems(cell);
-  if (field.type === DatabaseFieldType.Checkbox) {
-    return items.some((item) => item === true || item === "true")
-      ? "true"
-      : "false";
+  if (isSingleBoolean(field)) {
+    return isChecked(cell) ? "true" : "false";
   }
-  const [first] = items;
+  const [first] = cellItems(cell).filter((item) => item !== "");
   if (first === undefined) {
     return "";
   }
