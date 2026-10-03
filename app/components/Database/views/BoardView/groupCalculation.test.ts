@@ -1,6 +1,6 @@
 import type { DatabaseField } from "@shared/databases/types";
 import { DatabaseFieldType } from "@shared/databases/types";
-import { columnCalculation } from "./groupCalculation";
+import { columnCalculation, columnValue } from "./groupCalculation";
 
 const estimate: DatabaseField = {
   id: "fldEstimate",
@@ -49,5 +49,17 @@ describe("columnCalculation", () => {
         overrides: { groupCalculation: { func: "sum", fieldId: "fldGone" } },
       })
     ).toEqual({ kind: "count" });
+  });
+});
+
+describe("columnValue", () => {
+  it("sums to 0 a column with nothing to add, as Notion does", () => {
+    expect(columnValue("sum", null)).toBe(0);
+    expect(columnValue("sum", 176)).toBe(176);
+  });
+
+  it("leaves the other calculations as the server answers them", () => {
+    expect(columnValue("average", null)).toBeNull();
+    expect(columnValue("filled", 3)).toBe(3);
   });
 });

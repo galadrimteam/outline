@@ -35,3 +35,19 @@ export function columnCalculation(
     ? { kind: "field", func: calculation.func, field }
     : { kind: "count" };
 }
+
+/**
+ * The value a column calculation shows once the server answered: its answer,
+ * or 0 for a sum over cards with nothing to add, as Notion writes
+ * « Backlog Design 0 » where the engine, like Teable, has no value.
+ *
+ * @param func the calculation.
+ * @param value the server's answer.
+ * @returns the value to format.
+ */
+export function columnValue(
+  func: DatabaseStatisticFunc,
+  value: number | string | null
+): number | string | null {
+  return value === null && func === "sum" ? 0 : value;
+}
