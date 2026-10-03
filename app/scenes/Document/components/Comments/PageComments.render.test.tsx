@@ -102,7 +102,7 @@ describe("PageComments", () => {
     stores.users.add({ id: me, name: "Maceo" });
     stores.users.add({ id: thomas, name: "Thomas" });
     stores.auth.add({ id: teamId, name: "Galadrim", preferences: {} });
-    stores.documents.add({ id: documentId, title: "Ticket", teamId });
+    stores.documents.add({ id: documentId, title: "Ticket" });
     runInAction(() => {
       stores.auth.currentUserId = me;
       stores.auth.currentTeamId = teamId;
