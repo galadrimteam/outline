@@ -560,6 +560,66 @@ describe("database views", () => {
     expect(opened).toEqual(["rec2"]);
   });
 
+  it("types a card's title in place from its ✎, without opening the row", async () => {
+    const opened: string[] = [];
+    await render(BoardView, boardView(), {
+      onOpenRecord: (id) => opened.push(id),
+    });
+    await settle();
+
+    const rename = cardOf("Maquettes")?.querySelector<HTMLElement>(
+      "button[aria-label='Rename']"
+    );
+    expect(rename).toBeTruthy();
+    await act(async () => {
+      rename?.click();
+    });
+    const input = cardOf("Maquettes")?.querySelector<HTMLTextAreaElement>(
+      "textarea[aria-label='Card name']"
+    );
+    expect(input?.value).toBe("Maquettes");
+    expect(document.activeElement).toBe(input);
+    expect(
+      cardOf("Maquettes")?.querySelector("button[aria-label='Rename']")
+    ).toBeNull();
+
+    vi.mocked(client.post).mockClear();
+    vi.mocked(client.post).mockImplementation(async (path: string) =>
+      path === "/databaseRecords.update"
+        ? { data: { ...records[0], fields: { ...records[0].fields } } }
+        : {
+            data: records,
+            pagination: { offset: 0, limit: 50, total: records.length },
+          }
+    );
+    await act(async () => {
+      if (input) {
+        Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          "value"
+        )?.set?.call(input, "Maquettes v2");
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
+        );
+      }
+    });
+
+    expect(
+      vi
+        .mocked(client.post)
+        .mock.calls.some(
+          ([path, body]) =>
+            path === "/databaseRecords.update" &&
+            JSON.stringify(body).includes('"name":"Maquettes v2"')
+        )
+    ).toBe(true);
+    expect(container.querySelector("textarea[aria-label='Card name']")).toBe(
+      null
+    );
+    expect(opened).toEqual([]);
+  });
+
   it("opens the comments of a card's row from its comment count", async () => {
     rowCommentCounts.invalidate(databaseId);
     vi.mocked(client.post).mockImplementation(async (path: string) =>

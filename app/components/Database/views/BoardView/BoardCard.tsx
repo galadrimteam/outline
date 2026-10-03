@@ -1,7 +1,13 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { observer } from "mobx-react";
-import { DuplicateIcon, MoreIcon, OpenIcon, TrashIcon } from "outline-icons";
+import {
+  DuplicateIcon,
+  EditIcon,
+  MoreIcon,
+  OpenIcon,
+  TrashIcon,
+} from "outline-icons";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -15,12 +21,14 @@ import type {
 } from "@shared/databases/types";
 import { s, hover } from "@shared/styles";
 import { DropdownMenu } from "~/components/Menu/DropdownMenu";
+import Tooltip from "~/components/Tooltip";
 import { createAction } from "~/actions";
 import { useMenuAction } from "~/hooks/useMenuAction";
 import useStores from "~/hooks/useStores";
 import type Database from "~/models/Database";
 import { cellTitle } from "../../boardModel";
 import { compactPills } from "../../cells/components/ChoicePill";
+import { getCell } from "../../cells/registry";
 import { CommentCount } from "../../comments/CommentCount";
 import { usePeekedRecordId } from "../../rowPeek";
 import { CardProperty } from "../CardProperty";
@@ -32,6 +40,7 @@ import {
   namesItself,
   recordCardColor,
 } from "../GalleryView/cards";
+import { CardTitleEditor } from "./CardTitleEditor";
 import { borderBox } from "./styles";
 
 /** Drag data of a card, read by the board's collision detection. */
@@ -49,6 +58,9 @@ interface CardContentProps {
   fields: DatabaseField[];
   /** Whether a click on a property may not edit it. */
   readOnly: boolean;
+  /** Whether the title is being typed in place, and how that ends. */
+  renaming?: boolean;
+  onRenamed?: () => void;
 }
 
 interface SortableCardProps {
@@ -79,6 +91,7 @@ export const SortableCard = observer(function SortableCard({
   const record = databaseRecords.recordById(database.id, recordId);
   const background = useCardBackground(database, view, record);
   const isPeeked = usePeekedRecordId(database.id) === recordId;
+  const [renaming, setRenaming] = React.useState(false);
   const data: CardDragData = { type: "card", container };
   const {
     attributes,
@@ -87,7 +100,10 @@ export const SortableCard = observer(function SortableCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: recordId, data, disabled: readOnly });
+  } = useSortable({ id: recordId, data, disabled: readOnly || renaming });
+
+  const handleRename = React.useCallback(() => setRenaming(true), []);
+  const handleRenamed = React.useCallback(() => setRenaming(false), []);
 
   const handleClick = React.useCallback(() => {
     onOpen(recordId);
@@ -139,9 +155,16 @@ export const SortableCard = observer(function SortableCard({
         record={record}
         fields={fields}
         readOnly={readOnly}
+        renaming={renaming}
+        onRenamed={handleRenamed}
       />
-      {!readOnly && (
-        <CardMenu database={database} record={record} onOpen={onOpen} />
+      {!readOnly && !renaming && (
+        <CardMenu
+          database={database}
+          record={record}
+          onOpen={onOpen}
+          onRename={canRename(database) ? handleRename : undefined}
+        />
       )}
     </Card>
   );
@@ -242,11 +265,30 @@ const CardContent = observer(function CardContent({
   record,
   fields,
   readOnly,
+  renaming,
+  onRenamed,
 }: CardContentProps) {
+  const { databaseRecords } = useStores();
+  const { t } = useTranslation();
   const cover = coverOf(record, view);
   const showNames = view.options.isFieldNameHidden === false;
   const shown = fields.filter((field) =>
     isShownOnCard(field, record.fields[field.id])
+  );
+  const titleField = database.primaryField;
+
+  const handleSaveTitle = React.useCallback(
+    (title: string) => {
+      if (!titleField) {
+        return;
+      }
+      databaseRecords
+        .update(database.id, record.id, {
+          [titleField.id]: title === "" ? null : title,
+        })
+        .catch(() => toast.error(t("The change could not be saved")));
+    },
+    [database.id, databaseRecords, record.id, titleField, t]
   );
 
   return (
@@ -257,7 +299,19 @@ const CardContent = observer(function CardContent({
         </Cover>
       )}
       <Body>
-        <Title database={database} record={record} />
+        <Title
+          database={database}
+          record={record}
+          editor={
+            renaming && titleField && onRenamed ? (
+              <CardTitleEditor
+                value={cellTitle(record.fields[titleField.id])}
+                onSave={handleSaveTitle}
+                onClose={onRenamed}
+              />
+            ) : undefined
+          }
+        />
         {shown.length > 0 && (
           <Properties>
             {shown.map((field) => (
@@ -290,10 +344,13 @@ const CardMenu = observer(function CardMenu({
   database,
   record,
   onOpen,
+  onRename,
 }: {
   database: Database;
   record: DatabaseRecord;
   onOpen: (recordId: string) => void;
+  /** Starts typing the title in place; absent when it cannot be edited. */
+  onRename?: () => void;
 }) {
   const { t } = useTranslation();
   const { databaseRecords } = useStores();
@@ -334,17 +391,42 @@ const CardMenu = observer(function CardMenu({
       onClick={stopPropagation}
       onKeyDown={stopPropagation}
     >
-      <DropdownMenu action={action} ariaLabel={t("Card options")} align="end">
-        <MenuButton aria-label={t("Card options")}>
-          <MoreIcon size={18} />
-        </MenuButton>
-      </DropdownMenu>
+      <Buttons>
+        {onRename && (
+          <Tooltip content={t("Rename")}>
+            <MenuButton aria-label={t("Rename")} onClick={onRename}>
+              <EditIcon size={18} />
+            </MenuButton>
+          </Tooltip>
+        )}
+        <DropdownMenu action={action} ariaLabel={t("Card options")} align="end">
+          <MenuButton aria-label={t("Card options")}>
+            <MoreIcon size={18} />
+          </MenuButton>
+        </DropdownMenu>
+      </Buttons>
     </MenuAnchor>
   );
 });
 
 function stopPropagation(event: React.SyntheticEvent) {
   event.stopPropagation();
+}
+
+/**
+ * Whether a card's title can be typed in place: its database has a title
+ * property that the reader may write.
+ *
+ * @param database the database.
+ * @returns true when the ✎ of a card applies.
+ */
+function canRename(database: Database): boolean {
+  const field = database.primaryField;
+  if (!field) {
+    return false;
+  }
+  const cell = getCell(field.type);
+  return !!cell.Editor && cell.isEditable(field);
 }
 
 /** The background of a card the view colours, see `recordCardColor`. */
@@ -387,25 +469,33 @@ const coverHeights: Record<DatabaseCardSize, number> = {
   large: 200,
 };
 
-const MenuButton = styled.button`
+// Notion's card buttons: ✎ and « … » side by side in one raised group.
+const Buttons = styled.div`
   display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 0;
-  border-radius: 4px;
+  border-radius: 6px;
+  overflow: hidden;
   background: ${s("menuBackground")};
-  color: ${s("textSecondary")};
   box-shadow: ${(props) =>
     props.theme.isDark
       ? "0 0 0 1px rgba(255, 255, 255, 0.08), 0 2px 4px rgba(0, 0, 0, 0.3)"
       : "0 0 0 1px rgba(15, 15, 15, 0.08), 0 2px 4px rgba(15, 15, 15, 0.08)"};
+`;
+
+const MenuButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: ${s("textSecondary")};
   cursor: var(--pointer);
 
   &:${hover} {
     color: ${s("text")};
+    background: ${s("listItemHoverBackground")};
   }
 `;
 

@@ -206,6 +206,8 @@ export const RecordTitle = observer(function RecordTitle({
 interface HeadingProps {
   database: Database;
   record: DatabaseRecord;
+  /** Drawn after the icon in place of the title, eg the field it is typed in. */
+  editor?: React.ReactNode;
   className?: string;
 }
 
@@ -221,6 +223,7 @@ interface HeadingProps {
 export const CardHeading = observer(function CardHeading({
   database,
   record,
+  editor,
   className,
 }: HeadingProps) {
   const { t } = useTranslation();
@@ -236,7 +239,9 @@ export const CardHeading = observer(function CardHeading({
           <DocumentIcon size={18} />
         </PageGlyph>
       ) : null}
-      <span>{title ? <DateMentionText text={title} /> : t("Untitled")}</span>
+      {editor ?? (
+        <span>{title ? <DateMentionText text={title} /> : t("Untitled")}</span>
+      )}
     </Heading>
   );
 });
