@@ -15,7 +15,12 @@ import {
   DOMParser as ProsemirrorDOMParser,
 } from "prosemirror-model";
 import type { Plugin, Transaction } from "prosemirror-state";
-import { EditorState, Selection, TextSelection } from "prosemirror-state";
+import {
+  EditorState,
+  NodeSelection,
+  Selection,
+  TextSelection,
+} from "prosemirror-state";
 import type { MarkdownParser } from "prosemirror-markdown";
 import {
   AddMarkStep,
@@ -32,6 +37,7 @@ import type { CommentAnchor } from "@shared/editor/commands/comment";
 import insertFiles from "@shared/editor/commands/insertFiles";
 import { draftCommentAnchorPluginKey } from "@shared/editor/plugins/DraftCommentAnchorPlugin";
 import Styles from "@shared/editor/components/Styles";
+import { EditorStyleHelper } from "@shared/editor/styles/EditorStyleHelper";
 import type { EmbedDescriptor } from "@shared/editor/embeds";
 import type { CommandFactory, WidgetProps } from "@shared/editor/lib/Extension";
 import type { AnyExtension, AnyExtensionClass } from "@shared/editor/lib/types";
@@ -242,6 +248,13 @@ export class Editor extends React.PureComponent<
 
   isInitialized = false;
   isBlurred = true;
+  /**
+   * galadrim: whether the editor has had the focus since it was mounted. The
+   * selection of a freshly loaded document sits on its first node, so a page
+   * that begins with a database or a table showed it selected, frame or grips
+   * drawn, before anyone had clicked anywhere: nothing is drawn until then.
+   */
+  hasBeenFocused = false;
   extensions: ExtensionManager;
   elementRef = React.createRef<HTMLDivElement>();
   wrapperRef = React.createRef<HTMLDivElement>();
@@ -1008,9 +1021,29 @@ export class Editor extends React.PureComponent<
   };
 
   private handleEditorFocus = () => {
+    if (!this.hasBeenFocused) {
+      this.hasBeenFocused = true;
+      this.showSelectedNode();
+    }
     this.setState({ isEditorFocused: true });
     return false;
   };
+
+  /**
+   * galadrim: draws the node that was already selected when the editor first
+   * takes the focus, see `hasBeenFocused`: its node view kept it unselected.
+   */
+  private showSelectedNode() {
+    const { selection } = this.view.state;
+    if (!(selection instanceof NodeSelection)) {
+      return;
+    }
+    this.nodeRenderers.forEach((renderer) => {
+      if (renderer.props.getPos() === selection.from) {
+        renderer.setProp("isSelected", true);
+      }
+    });
+  }
 
   /**
    * Renders a React component into the editor's shared React tree and returns a
@@ -1083,6 +1116,7 @@ export class Editor extends React.PureComponent<
               grow={grow}
               readOnly={readOnly}
               readOnlyWriteCheckboxes={canUpdate}
+              $awaitingFocus={!readOnly && !this.hasBeenFocused}
               focusedCommentId={this.props.focusedCommentId}
               hoveredCommentId={this.state.hoveredCommentId ?? undefined}
               userId={this.props.userId}
@@ -1133,7 +1167,25 @@ const EditorContainer = styled(Styles)<{
   userId?: string;
   focusedCommentId?: string;
   hoveredCommentId?: string;
+  /** See `hasBeenFocused`. */
+  $awaitingFocus?: boolean;
 }>`
+  ${(props) =>
+    props.$awaitingFocus &&
+    css`
+      .ProseMirror-selectednode {
+        outline-color: transparent;
+      }
+
+      .${EditorStyleHelper.tableGrip},
+      .${EditorStyleHelper.tableGripRow},
+      .${EditorStyleHelper.tableGripColumn},
+      .${EditorStyleHelper.tableAddRow},
+      .${EditorStyleHelper.tableAddColumn} {
+        display: none;
+      }
+    `}
+
   ${(props) =>
     props.focusedCommentId &&
     css`
