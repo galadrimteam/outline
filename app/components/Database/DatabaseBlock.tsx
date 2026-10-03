@@ -39,14 +39,12 @@ import useMobile from "~/hooks/useMobile";
 import useStores from "~/hooks/useStores";
 import type Database from "~/models/Database";
 import { AuthorizationError, NotFoundError } from "~/utils/errors";
-import browserHistory from "~/utils/history";
 import lazyWithRetry from "~/utils/lazyWithRetry";
 import { databasePath } from "~/utils/routeHelpers";
 import type { SplitViewPane } from "~/utils/splitView";
-import { openRouteInSplit } from "~/utils/splitView";
 import { blockChrome } from "./blockChrome";
 import { boardColumns, isStackable, stackValue } from "./boardModel";
-import { openRowComments } from "./comments/openRowComments";
+import { openRowPeek } from "./rowPeek";
 import type { FilterRequest } from "./DatabaseBlockContext";
 import { DatabaseBlockContext } from "./DatabaseBlockContext";
 import { DatabaseHeader } from "./DatabaseHeader";
@@ -589,7 +587,7 @@ const LoadedView = observer(function LoadedView({
           history.push(path);
           return pane;
         }
-        openRouteInSplit(browserHistory, path);
+        openRowPeek(ui, path);
         return "secondary";
       } catch (_err) {
         toast.error(t("Couldn’t open the page"));
@@ -605,6 +603,7 @@ const LoadedView = observer(function LoadedView({
       history,
       share,
       t,
+      ui,
     ]
   );
 
@@ -618,11 +617,6 @@ const LoadedView = observer(function LoadedView({
   const handleOpen = React.useCallback(
     (recordId: string) => void handleOpenRecord(recordId),
     [handleOpenRecord]
-  );
-
-  const handleOpenComments = React.useCallback(
-    (recordId: string) => void openRowComments(openRecordPage, ui, recordId),
-    [openRecordPage, ui]
   );
 
   const handleCreateRecord = React.useCallback(
@@ -692,17 +686,10 @@ const LoadedView = observer(function LoadedView({
     () => ({
       onViewCreated,
       filterRequest,
-      onOpenComments: handleOpenComments,
       groupRequest,
       onEditGroups: handleEditGroups,
     }),
-    [
-      onViewCreated,
-      filterRequest,
-      handleOpenComments,
-      groupRequest,
-      handleEditGroups,
-    ]
+    [onViewCreated, filterRequest, groupRequest, handleEditGroups]
   );
 
   const viewProps: TableViewProps = {

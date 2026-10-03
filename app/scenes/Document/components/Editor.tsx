@@ -33,6 +33,7 @@ import useStores from "~/hooks/useStores";
 import { decodeURIComponentSafe } from "~/utils/urls";
 import MultiplayerEditor from "./AsyncMultiplayerEditor";
 import { isDatabasePage } from "~/components/Database/databasePage";
+import { isRowPeek } from "~/components/Database/rowPeek";
 import { PageComments } from "./Comments/PageComments";
 import { DatabaseProperties } from "./DatabaseProperties";
 import DocumentTitle from "./DocumentTitle";
@@ -232,6 +233,8 @@ function DocumentEditor(props: Props, ref: React.ForwardedRef<SharedEditor>) {
         databasePage={
           document instanceof Document && isDatabasePage(document.data)
         }
+        databaseRow={isDatabaseRow}
+        compact={document instanceof Document && isRowPeek(pane, document)}
         onChangeTitle={onChangeTitle}
         onChangeIcon={onChangeIcon}
         onGoToNextInput={handleGoToNextInput}
@@ -243,7 +246,7 @@ function DocumentEditor(props: Props, ref: React.ForwardedRef<SharedEditor>) {
           {isDatabaseRow && (
             <DatabaseProperties document={document} readOnly={!!readOnly} />
           )}
-          <PageComments document={document} showEmpty={isDatabaseRow} />
+          <PageComments document={document} />
         </PageHeader>
       )}
       {/* galadrim: no meta line under the title (last update, task count,

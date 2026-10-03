@@ -103,7 +103,6 @@ describe("TableView", () => {
   let listed: DatabaseRecord[];
   let commentCounts: Record<string, number>;
   let opened: string[];
-  let discussed: string[];
   let created: (DatabaseRecordOrder | undefined)[];
 
   beforeEach(() => {
@@ -122,7 +121,6 @@ describe("TableView", () => {
     listed = records;
     commentCounts = {};
     opened = [];
-    discussed = [];
     created = [];
     vi.mocked(client.post).mockReset();
     vi.mocked(client.post).mockImplementation(async (path, body) => {
@@ -160,6 +158,8 @@ describe("TableView", () => {
           };
         case "/databaseRecords.commentCounts":
           return { data: commentCounts };
+        case "/databaseRecords.open":
+          throw new Error("the comments popover is tested on its own");
         default:
           return {
             data: records,
@@ -213,7 +213,6 @@ describe("TableView", () => {
                   value={{
                     onViewCreated: () => undefined,
                     filterRequest: undefined,
-                    onOpenComments: (id) => discussed.push(id),
                   }}
                 >
                   <TableView
@@ -418,7 +417,7 @@ describe("TableView", () => {
     expect(opened).toEqual([]);
   });
 
-  it("opens the row from « Open » and its comments from its comment count", async () => {
+  it("opens the row from « Open » and its comments, on the spot, from its comment count", async () => {
     rowCommentCounts.invalidate(databaseId);
     commentCounts = { rec1: 3 };
     await render(makeView({ id: "viwTable21" }));
@@ -430,7 +429,9 @@ describe("TableView", () => {
         ?.querySelector<HTMLElement>("button[aria-label^='3 comment']")
         ?.click();
     });
-    expect(discussed).toEqual(["rec1"]);
+    expect(
+      document.querySelector("[role='dialog'][aria-label='Comments']")
+    ).not.toBeNull();
     expect(opened).toEqual([]);
     expect(title?.getAttribute("aria-selected")).toBe("false");
 

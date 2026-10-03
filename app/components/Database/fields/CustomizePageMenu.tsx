@@ -3,7 +3,10 @@ import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import styled from "styled-components";
-import type { DatabaseField } from "@shared/databases/types";
+import type {
+  DatabaseField,
+  DatabasePageDiscussions,
+} from "@shared/databases/types";
 import { s } from "@shared/styles";
 import { Popover, PopoverTrigger } from "~/components/primitives/Popover";
 import Switch from "~/components/Switch";
@@ -14,7 +17,11 @@ import { CompactSelect } from "../toolbar/components";
 import { FieldKindIcon } from "./FieldKindIcon";
 import { MenuHeading, MenuLabel, MenuPanel, MenuSeparator } from "./components";
 import type { PageLayout, PropertyVisibility } from "./pageLayout";
-import { propertyVisibility, withPropertyVisibility } from "./pageLayout";
+import {
+  pageDiscussions,
+  propertyVisibility,
+  withPropertyVisibility,
+} from "./pageLayout";
 
 interface Props {
   database: Database;
@@ -26,8 +33,8 @@ interface Props {
 
 /**
  * Notion's "Customize page": for every property, always show it, hide it when empty or always
- * hide it on the pages of the rows, and hide every empty property at once. Saved on the database,
- * for everyone.
+ * hide it on the pages of the rows, hide every empty property at once, and how the discussions
+ * of a page show under its properties. Saved on the database, for everyone.
  *
  * @param props the database, its row page properties and the trigger.
  * @returns the menu with its trigger.
@@ -58,6 +65,12 @@ export const CustomizePageMenu = observer(function CustomizePageMenu_({
     { value: "hidden", label: t("Always hide") },
   ];
 
+  const discussionOptions: CompactOption<DatabasePageDiscussions>[] = [
+    { value: "expanded", label: t("Expanded") },
+    { value: "minimal", label: t("Minimal") },
+    { value: "off", label: t("Off") },
+  ];
+
   return (
     <Popover>
       <PopoverTrigger>{children}</PopoverTrigger>
@@ -76,6 +89,16 @@ export const CustomizePageMenu = observer(function CustomizePageMenu_({
             inForm={false}
           />
         </Toggle>
+        <Row>
+          <MenuLabel>{t("Page discussions")}</MenuLabel>
+          <CompactSelect
+            ariaLabel={t("Page discussions")}
+            value={pageDiscussions(layout)}
+            options={discussionOptions}
+            width={150}
+            onChange={(discussions) => save({ ...layout, discussions })}
+          />
+        </Row>
         <MenuSeparator />
         <MenuHeading>{t("Properties")}</MenuHeading>
         {fields.map((field) => (

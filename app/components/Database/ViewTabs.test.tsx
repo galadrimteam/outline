@@ -174,16 +174,85 @@ describe("ViewTabs", () => {
     expect(button("More views")?.textContent).toBe("3 more…");
     expect(button("Add a view")).toBeDefined();
 
-    await openMenu(button("More views"));
-    expect(menuItems()).toEqual(["Vue 3", "Vue 4", "Vue 5"]);
-
-    const item = Array.from(
-      document.querySelectorAll("[role='menuitem']")
-    ).find((node) => node.textContent === "Vue 5");
     await act(async () => {
-      item?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      button("More views")?.click();
+    });
+    const panel = () =>
+      document.querySelector("[aria-label='More views'][role='dialog']");
+    const rows = () =>
+      Array.from(panel()?.querySelectorAll("button") ?? []).map(
+        (node) => node.textContent
+      );
+    expect(panel()?.querySelector("input")?.placeholder).toBe(
+      "Search for a view…"
+    );
+    expect(rows()).toEqual([...views.map((view) => view.name), "New view"]);
+    expect(panel()?.querySelector("[aria-current='true']")?.textContent).toBe(
+      "Vue 0"
+    );
+
+    await act(async () => {
+      button("Vue 5")?.click();
     });
     expect(onSelect).toHaveBeenCalledWith("viw5");
+  });
+
+  it("finds a view by its name in « N more » and creates one from there, as Notion", async () => {
+    strip.metrics = narrow();
+    const created = {
+      ...makeView(9),
+      name: "Board",
+      layout: DatabaseLayout.Board,
+    };
+    vi.mocked(client.post).mockResolvedValue({ data: created });
+    const onViewCreated = vi.fn();
+    await render({ onViewCreated });
+    await act(async () => {
+      button("More views")?.click();
+    });
+    const panel = () =>
+      document.querySelector("[aria-label='More views'][role='dialog']");
+    const input = panel()?.querySelector("input");
+    await act(async () => {
+      if (input) {
+        const setValue = Object.getOwnPropertyDescriptor(
+          HTMLInputElement.prototype,
+          "value"
+        )?.set;
+        setValue?.call(input, "vue 4");
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    });
+    expect(
+      Array.from(panel()?.querySelectorAll("button") ?? []).map(
+        (node) => node.textContent
+      )
+    ).toEqual(["Vue 4", "New view"]);
+
+    await act(async () => {
+      button("New view")?.click();
+    });
+    expect(
+      Array.from(panel()?.querySelectorAll("button") ?? []).map(
+        (node) => node.textContent
+      )
+    ).toEqual([
+      "Table",
+      "Board",
+      "Calendar",
+      "Gallery",
+      "List",
+      "Timeline",
+      "Form",
+    ]);
+    await act(async () => {
+      button("Board")?.click();
+    });
+    expect(client.post).toHaveBeenCalledWith(
+      "/databaseViews.create",
+      expect.objectContaining({ databaseId, layout: DatabaseLayout.Board })
+    );
+    expect(onViewCreated).toHaveBeenCalledWith(created);
   });
 
   it("draws a view's own icon in its tab, else its layout's", async () => {

@@ -1,9 +1,14 @@
 import { useLocation } from "react-router-dom";
 import useStores from "~/hooks/useStores";
+import type UiStore from "~/stores/UiStore";
 import browserHistory from "~/utils/history";
 import { isKeyboardWidget } from "~/utils/isKeyboardWidget";
 import type { SplitViewPane } from "~/utils/splitView";
-import { closeSplitPane, getSplitPath } from "~/utils/splitView";
+import {
+  closeSplitPane,
+  getSplitPath,
+  openRouteInSplit,
+} from "~/utils/splitView";
 
 /**
  * Whether a page is a row page shown beside its database: Notion's side peek, which opens here
@@ -67,6 +72,39 @@ export function escapeClosesPeek(target: EventTarget | null): boolean {
 const POPUP_ROLES = ["menu", "dialog", "alertdialog", "listbox"]
   .map((role) => `[role="${role}"]`)
   .join(",");
+
+/**
+ * The share of the split view the main pane keeps beside a side peek: Notion's peek takes half of
+ * the window, whatever the sidebar leaves to the main area.
+ *
+ * @param windowWidth the width of the window.
+ * @param mainWidth the width of the main area, which the split view divides.
+ * @returns the fraction of the main area left to the main pane.
+ */
+export function peekSplitRatio(windowWidth: number, mainWidth: number): number {
+  return 1 - windowWidth / 2 / mainWidth;
+}
+
+/**
+ * Opens a row page in the side peek. A peek opening beside a single pane takes Notion's width;
+ * one replacing another keeps the width it was given.
+ *
+ * @param ui the UI store, which holds the split of the view.
+ * @param path the path of the row page.
+ */
+export function openRowPeek(
+  ui: Pick<UiStore, "setSplitViewRatio">,
+  path: string
+): void {
+  if (!getSplitPath(browserHistory.location.search)) {
+    const main = window.document.querySelector("[role='main']");
+    const width = main?.getBoundingClientRect().width;
+    if (width) {
+      ui.setSplitViewRatio(peekSplitRatio(window.innerWidth, width));
+    }
+  }
+  openRouteInSplit(browserHistory, path);
+}
 
 /** Closes the side peek, as Notion's « Close » on the open row does. */
 export function closeRowPeek(): void {

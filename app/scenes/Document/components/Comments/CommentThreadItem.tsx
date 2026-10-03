@@ -2,7 +2,7 @@ import { differenceInMilliseconds } from "date-fns";
 import { runInAction } from "mobx";
 import { observer } from "mobx-react";
 import { DoneIcon } from "outline-icons";
-import { darken } from "polished";
+import { darken, transparentize } from "polished";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -11,7 +11,7 @@ import breakpoint from "styled-components-breakpoint";
 import EventBoundary from "@shared/components/EventBoundary";
 import { s, hover } from "@shared/styles";
 import type { ProsemirrorData } from "@shared/types";
-import { dateToRelative } from "@shared/utils/date";
+import { dateToRelative, locales } from "@shared/utils/date";
 import { Minute } from "@shared/utils/time";
 import type Comment from "~/models/Comment";
 import { Avatar } from "~/components/Avatar";
@@ -95,6 +95,11 @@ type Props = {
   onEditStart?: () => void;
   /** Callback when edit mode ends */
   onEditEnd?: () => void;
+  /**
+   * galadrim: drawn in the page as Notion's page discussions: a plain row with its author and the
+   * day it was written, a line down to the next comment of the thread, no bubble.
+   */
+  inPage?: boolean;
 };
 
 function CommentThreadItem({
@@ -110,13 +115,15 @@ function CommentThreadItem({
   forceEdit,
   onEditStart,
   onEditEnd,
+  inPage,
 }: Props) {
   const { setFocusedCommentId } = useDocumentContext();
   const { t } = useTranslation();
   const user = useCurrentUser();
   const [data, setData] = React.useState(comment.data);
-  const showAuthor = firstOfAuthor;
-  const showTime = useShowTime(comment.createdAt, previousCommentCreatedAt);
+  const showAuthor = inPage || firstOfAuthor;
+  const showTime =
+    useShowTime(comment.createdAt, previousCommentCreatedAt) || !!inPage;
   const showEdited =
     comment.updatedAt &&
     comment.updatedAt !== comment.createdAt &&
@@ -198,33 +205,53 @@ function CommentThreadItem({
   };
 
   return (
-    <Flex gap={8} align="flex-start">
-      {firstOfAuthor && (
-        <AvatarSpacer>
+    <Row
+      gap={inPage ? 10 : 8}
+      align="flex-start"
+      $inPage={inPage}
+      $threadLine={inPage && !lastOfThread}
+    >
+      {showAuthor && (
+        <AvatarSpacer $inPage={inPage}>
           <Avatar model={comment.createdBy} size={24} />
         </AvatarSpacer>
       )}
       <Bubble
         $firstOfThread={firstOfThread}
-        $firstOfAuthor={firstOfAuthor}
+        $firstOfAuthor={showAuthor}
         $lastOfThread={lastOfThread}
         $canReply={canReply}
+        $inPage={inPage}
         column
       >
-        {(showAuthor || showTime) && (
-          <Meta size="xsmall" type="secondary">
-            {showAuthor && <em>{comment.createdBy.name}</em>}
-            {showAuthor && showTime && <> &middot; </>}
-            {showTime && (
-              <Time dateTime={comment.createdAt} addSuffix shorten />
-            )}
+        {inPage ? (
+          <PageMeta>
+            <strong>{comment.createdBy.name}</strong>
+            <Time
+              dateTime={comment.createdAt}
+              relative={false}
+              format={dayFormats}
+            />
             {showEdited && (
-              <>
-                {" "}
-                (<Time dateTime={comment.updatedAt}>{t("edited")}</Time>)
-              </>
+              <Time dateTime={comment.updatedAt}>({t("edited")})</Time>
             )}
-          </Meta>
+          </PageMeta>
+        ) : (
+          (showAuthor || showTime) && (
+            <Meta size="xsmall" type="secondary">
+              {showAuthor && <em>{comment.createdBy.name}</em>}
+              {showAuthor && showTime && <> &middot; </>}
+              {showTime && (
+                <Time dateTime={comment.createdAt} addSuffix shorten />
+              )}
+              {showEdited && (
+                <>
+                  {" "}
+                  (<Time dateTime={comment.updatedAt}>{t("edited")}</Time>)
+                </>
+              )}
+            </Meta>
+          )
         )}
         {highlightedText && (
           <HighlightedText>{highlightedText}</HighlightedText>
@@ -303,9 +330,14 @@ function CommentThreadItem({
           )}
         </EventBoundary>
       </Bubble>
-    </Flex>
+    </Row>
   );
 }
+
+/** Notion dates a page discussion by its day, « 13/11/2025 »: date-fns' localized short date. */
+const dayFormats = Object.fromEntries(
+  Object.keys(locales).map((locale) => [locale, "P"])
+);
 
 const ResolveButton = ({
   comment,
@@ -348,10 +380,10 @@ const StyledCommentEditor = styled(CommentEditor)`
   }
 `;
 
-const AvatarSpacer = styled(Flex)`
+const AvatarSpacer = styled(Flex)<{ $inPage?: boolean }>`
   width: 24px;
   height: 24px;
-  margin-top: 4px;
+  margin-top: ${(props) => (props.$inPage ? 0 : 4)}px;
   align-items: flex-end;
   justify-content: flex-end;
   flex-shrink: 0;
@@ -406,6 +438,24 @@ const ReactionListContainer = styled(Flex)`
   padding-top: 6px;
 `;
 
+/** Notion's author line: the name in the text colour, the day smaller and greyer. */
+const PageMeta = styled.div`
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-height: 24px;
+  line-height: 24px;
+  margin-bottom: 1px;
+  font-size: 12px;
+  color: ${(props) => transparentize(0.5, props.theme.text)};
+
+  strong {
+    font-size: 14px;
+    font-weight: 500;
+    color: ${s("text")};
+  }
+`;
+
 const Meta = styled(Text)`
   margin-bottom: 2px;
 
@@ -415,12 +465,34 @@ const Meta = styled(Text)`
   }
 `;
 
+/** A comment with its avatar; in the page, Notion's line down the thread under the avatar. */
+const Row = styled(Flex)<{ $inPage?: boolean; $threadLine?: boolean }>`
+  position: relative;
+  padding-bottom: ${(props) => (props.$inPage ? 16 : 0)}px;
+
+  ${(props) =>
+    props.$threadLine &&
+    css`
+      &::before {
+        content: "";
+        position: absolute;
+        inset-inline-start: 11.5px;
+        top: 30px;
+        bottom: 4px;
+        width: 1px;
+        background: ${transparentize(0.88, props.theme.text)};
+      }
+    `}
+`;
+
 export const Bubble = styled(Flex)<{
   $firstOfThread?: boolean;
   $firstOfAuthor?: boolean;
   $lastOfThread?: boolean;
   $canReply?: boolean;
   $focused?: boolean;
+  /** Plain text in the page, as Notion's page discussions: no bubble, 14px. */
+  $inPage?: boolean;
 }>`
   position: relative;
   flex-grow: 1;
@@ -456,6 +528,23 @@ export const Bubble = styled(Flex)<{
   ${breakpoint("tablet")`
     font-size: 15px;
   `}
+
+  ${(props) =>
+    props.$inPage &&
+    css`
+      &&& {
+        background: none;
+        padding: 0;
+        margin-bottom: 0;
+        border-radius: 0;
+        font-size: 14px;
+      }
+
+      ${Actions} {
+        top: 0;
+        background: ${props.theme.background};
+      }
+    `}
 `;
 
 export default observer(CommentThreadItem);

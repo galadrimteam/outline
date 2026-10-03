@@ -8,6 +8,7 @@ import {
   pageIconSize,
   pageTitleMarginTop,
   pageTitleStyles,
+  peekIconSize,
 } from "./pageTitle";
 
 /**
@@ -53,6 +54,15 @@ describe("pageTitleMarginTop", () => {
     );
   });
 
+  it("puts the title of a row page in the side peek where Notion's peek does, its icon right above", () => {
+    const titleTop =
+      pageContentTop + pageTitleMarginTop(true, false, false, true);
+    expect(titleTop).toBe(116);
+    expect(titleTop - peekIconSize).toBe(80);
+    expect(pageTitleMarginTop(true, true, false, true)).toBe(56);
+    expect(pageTitleMarginTop(false, false, false, true)).toBe(36);
+  });
+
   it("always leaves room for the icon and its gap on mobile", () => {
     expect(pageTitleMarginTop(true, true)).toBeGreaterThanOrEqual(
       pageIconSize + pageIconGap
@@ -69,7 +79,12 @@ describe("pageTitleMarginTop", () => {
 describe("pageTitleStyles", () => {
   // Same shape as the title of a document: upstream margins first, in the rule
   // and in a media query, then the shared styles.
-  const Title = styled.div<{ $containsIcon: boolean; $databasePage?: boolean }>`
+  const Title = styled.div<{
+    $containsIcon: boolean;
+    $databasePage?: boolean;
+    $databaseRow?: boolean;
+    $compact?: boolean;
+  }>`
     margin-top: 8vh;
     font-weight: 600;
 
@@ -116,6 +131,22 @@ describe("pageTitleStyles", () => {
     expect(cssOf(<Title $containsIcon $databasePage />)).toContain(
       "font-size:40px"
     );
+  });
+
+  it("puts the properties of a row page right under its title, as Notion", () => {
+    const css = cssOf(<Title $containsIcon $databaseRow />);
+
+    expect(css).toContain("margin-bottom:2px");
+    expect(css).toContain("font-size:40px");
+  });
+
+  it("draws the title of a row page in the side peek smaller, as Notion's peek", () => {
+    const css = cssOf(<Title $containsIcon $databaseRow $compact />);
+
+    expect(css).toContain("font-size:32px");
+    expect(css).toContain("margin-bottom:10px");
+    expect(css).toContain("margin-top:56px");
+    expect(css).not.toContain("margin-top:198px");
   });
 
   it("uses the smaller margins without an icon", () => {

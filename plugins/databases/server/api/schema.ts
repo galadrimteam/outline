@@ -298,6 +298,9 @@ const zFieldMeta = z.object({
     .optional(),
   endFieldId: zIdOrEmpty,
   icon: z.string().min(1).max(100).optional(),
+  standsFor: z
+    .enum([DatabaseFieldType.CreatedBy, DatabaseFieldType.LastModifiedBy])
+    .optional(),
 });
 
 const zPageTab = z
@@ -324,6 +327,7 @@ const zSettingsPatch = z.object({
       fieldOrder: z.array(zEngineId).max(500).optional(),
       pinnedFieldIds: z.array(zEngineId).max(500).optional(),
       omittedFieldIds: z.array(zEngineId).max(500).optional(),
+      discussions: z.enum(["expanded", "minimal", "off"]).optional(),
     })
     .nullish(),
   iconFieldId: zEngineId.nullish(),
@@ -349,6 +353,7 @@ const zFieldOptions = z.object({
     .object({
       type: z.enum(["decimal", "percent", "currency"]).optional(),
       precision: z.number().int().min(0).max(10).optional(),
+      grouping: z.boolean().optional(),
       symbol: z.string().max(10).optional(),
       date: z.string().max(100).optional(),
       time: z.string().max(100).optional(),
