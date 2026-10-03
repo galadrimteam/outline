@@ -300,7 +300,7 @@ export const ViewTabs = observer(function ViewTabs({
   );
 
   return (
-    <Bar ref={barRef} data-database-chrome>
+    <Bar ref={barRef}>
       <Strip
         ref={stripRef}
         style={{ minWidth: `min(100%, ${minStripWidth}px)` }}
@@ -580,16 +580,13 @@ const TAB_GAP = 4;
 const ADD_WIDTH = 28;
 
 // Like Notion, no rule under the tabs; the toolbar wraps under them when both
-// do not fit. The block may fade the tabs and the toolbar in on hover through
-// --database-tabs-opacity and --database-actions-opacity.
+// do not fit.
 const Bar = styled.div`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   column-gap: 8px;
   min-width: 0;
-  opacity: var(--database-tabs-opacity, 1);
-  transition: opacity 100ms ease-in-out;
 `;
 
 const Strip = styled.div`
@@ -768,8 +765,6 @@ const Actions = styled.div<{ $isWrapped: boolean }>`
   max-width: 100%;
   margin-left: auto;
   padding: ${(props) => (props.$isWrapped ? "6px 0 2px" : "4px 0")};
-  opacity: var(--database-actions-opacity, 1);
-  transition: opacity 100ms ease-in-out;
 `;
 
 const ViewIconPicker = styled(IconPicker)`

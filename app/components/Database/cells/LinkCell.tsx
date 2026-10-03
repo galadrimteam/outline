@@ -32,7 +32,7 @@ import type {
   CellRendererProps,
 } from "./types";
 
-/** Relations: the titles of the linked rows, each opening the linked row's page. */
+/** Relations: the titles of the linked rows, each opening the linked row's page but on cards. */
 export const linkCell: CellDefinition = {
   Renderer: LinkRenderer,
   Editor: LinkEditor,
@@ -101,7 +101,9 @@ function LinkRenderer({ field, value, variant, wrap }: CellRendererProps) {
   return (
     <Container $variant={variant} $wrap={wrap}>
       {listed.map((link) => {
-        const path = linkedRecordPath(field, link.id);
+        // On a card, a click on a relation edits it, as in Notion, rather than leaving the page.
+        const path =
+          variant === "card" ? null : linkedRecordPath(field, link.id);
         const icon = linkIcon(link);
         const content = (
           <>

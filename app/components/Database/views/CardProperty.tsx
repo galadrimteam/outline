@@ -10,6 +10,7 @@ import type {
 } from "@shared/databases/types";
 import useStores from "~/hooks/useStores";
 import type Database from "~/models/Database";
+import { cellHostProps } from "../cells/components/EditorPopover";
 import { getCell } from "../cells/registry";
 import type { CellVariant } from "../cells/types";
 
@@ -105,6 +106,7 @@ export const CardProperty = observer(function CardProperty_({
 
   return (
     <Property
+      {...cellHostProps}
       className={className}
       title={title}
       role={editable ? "button" : undefined}

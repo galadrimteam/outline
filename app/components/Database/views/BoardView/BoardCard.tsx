@@ -23,6 +23,7 @@ import { isEmptyCell } from "~/stores/DatabaseRecordsStore";
 import { cellTitle } from "../../boardModel";
 import { compactPills } from "../../cells/components/ChoicePill";
 import { CommentCount } from "../../comments/CommentCount";
+import { usePeekedRecordId } from "../../rowPeek";
 import { CardProperty } from "../CardProperty";
 import {
   CardHeading,
@@ -75,6 +76,7 @@ export const SortableCard = observer(function SortableCard({
   const { databaseRecords } = useStores();
   const record = databaseRecords.recordById(database.id, recordId);
   const background = useCardBackground(database, view, record);
+  const isPeeked = usePeekedRecordId(database.id) === recordId;
   const data: CardDragData = { type: "card", container };
   const {
     attributes,
@@ -120,6 +122,7 @@ export const SortableCard = observer(function SortableCard({
       }}
       $size={view.overrides.cardSize}
       $isPlaceholder={isDragging}
+      $isPeeked={isPeeked}
       {...attributes}
       {...listeners}
       role="button"
@@ -158,6 +161,7 @@ export const StaticCard = observer(function StaticCard({
   const { databaseRecords } = useStores();
   const record = databaseRecords.recordById(database.id, recordId);
   const background = useCardBackground(database, view, record);
+  const isPeeked = usePeekedRecordId(database.id) === recordId;
 
   const handleClick = React.useCallback(
     () => onOpen(recordId),
@@ -184,6 +188,7 @@ export const StaticCard = observer(function StaticCard({
     <Card
       style={{ background }}
       $size={view.overrides.cardSize}
+      $isPeeked={isPeeked}
       role="button"
       tabIndex={0}
       aria-label={title || t("Untitled")}
@@ -422,6 +427,8 @@ const Card = styled.div<{
   $size?: DatabaseCardSize;
   $isPlaceholder?: boolean;
   $isOverlay?: boolean;
+  /** The card whose page is open in the side peek, framed as in Notion. */
+  $isPeeked?: boolean;
 }>`
   position: relative;
   display: flex;
@@ -455,6 +462,16 @@ const Card = styled.div<{
       0 0 0 2px ${s("accent")},
       rgba(15, 15, 15, 0.1) 0 2px 4px;
   }
+
+  ${(props) =>
+    props.$isPeeked &&
+    css`
+      &&& {
+        box-shadow:
+          0 0 0 2px ${props.theme.accent},
+          rgba(15, 15, 15, 0.1) 0 2px 4px;
+      }
+    `}
 
   ${(props) =>
     props.$isPlaceholder &&

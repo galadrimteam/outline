@@ -97,6 +97,25 @@ export function fieldKindOf(field: DatabaseField): FieldKindId | undefined {
 }
 
 /**
+ * Whether a formula stands for Notion's created or edited time: the migration brings those in as
+ * a formula on the row's own time, and Notion draws them with a clock rather than its Σ.
+ *
+ * @param field the property.
+ * @returns true for a date formula on the creation or last edit time of the row.
+ */
+export function isEditTimeFormula(
+  field: Pick<DatabaseField, "type" | "cellValueType" | "options">
+): boolean {
+  return (
+    field.type === DatabaseFieldType.Formula &&
+    field.cellValueType === "dateTime" &&
+    /\b(CREATED_TIME|LAST_MODIFIED_TIME)\(\)/.test(
+      field.options.expression ?? ""
+    )
+  );
+}
+
+/**
  * The name of a property kind.
  *
  * @param id the kind.

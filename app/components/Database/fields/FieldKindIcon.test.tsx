@@ -46,4 +46,20 @@ describe("FieldKindIcon", () => {
     expect(formula).toContain("<svg");
     expect(link).not.toEqual(formula);
   });
+
+  it("draws the clock of Notion's created time on the formula standing for it", () => {
+    const clock = renderToString(
+      <FieldKindIcon field={field({ type: DatabaseFieldType.CreatedTime })} />
+    );
+    const created = renderToString(
+      <FieldKindIcon
+        field={field({
+          type: DatabaseFieldType.Formula,
+          cellValueType: "dateTime",
+          options: { expression: "IF(CREATED_TIME() > X, CREATED_TIME(), Y)" },
+        })}
+      />
+    );
+    expect(created).toEqual(clock);
+  });
 });

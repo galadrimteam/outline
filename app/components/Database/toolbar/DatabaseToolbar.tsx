@@ -123,7 +123,7 @@ export const DatabaseToolbar = observer(function DatabaseToolbar({
   return (
     <Bar role="group" aria-label={t("View options")}>
       {(filterDirty || sortDirty) && (
-        <Draft data-sticky>
+        <Draft>
           <DraftButton type="button" onClick={handleReset}>
             {t("Reset")}
           </DraftButton>

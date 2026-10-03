@@ -9,6 +9,7 @@ import type {
 import { s } from "@shared/styles";
 import Tooltip from "~/components/Tooltip";
 import type Database from "~/models/Database";
+import { cellHostProps } from "../cells/components/EditorPopover";
 import { getCell } from "../cells/registry";
 import { FieldHeaderMenu } from "./FieldHeaderMenu";
 import { FieldKindIcon } from "./FieldKindIcon";
@@ -111,6 +112,7 @@ export const PropertyRow = observer(function PropertyRow_({
         )}
       </NameCell>
       <ValueCell
+        {...cellHostProps}
         role={editable ? "button" : undefined}
         tabIndex={editable && !editing ? 0 : undefined}
         $editable={editable}
@@ -143,11 +145,14 @@ export const PropertyRow = observer(function PropertyRow_({
   );
 });
 
+/** Height of a property line, Notion's. */
+const LINE_HEIGHT = 38;
+
 const Line = styled.div<{ $stacked: boolean }>`
   display: flex;
   flex-direction: ${(props) => (props.$stacked ? "column" : "row")};
   align-items: ${(props) => (props.$stacked ? "stretch" : "flex-start")};
-  min-height: 34px;
+  min-height: ${LINE_HEIGHT}px;
   margin-bottom: ${(props) => (props.$stacked ? "12px" : "0")};
   font-size: 14px;
 `;
@@ -162,7 +167,7 @@ const NameButton = styled.button<{ $stacked: boolean }>`
   display: ${(props) => (props.$stacked ? "inline-flex" : "flex")};
   font-size: ${(props) => (props.$stacked ? "13px" : "inherit")};
   font-weight: ${(props) => (props.$stacked ? 500 : "inherit")};
-  min-height: ${(props) => (props.$stacked ? "26px" : "34px")};
+  min-height: ${(props) => (props.$stacked ? "26px" : `${LINE_HEIGHT}px`)};
   align-items: center;
   gap: 6px;
   width: ${(props) => (props.$stacked ? "auto" : "100%")};
@@ -204,8 +209,8 @@ const ValueCell = styled.div<{ $editable: boolean; $editing: boolean }>`
   display: flex;
   align-items: center;
   min-width: 0;
-  min-height: 34px;
-  padding: 6px 8px;
+  min-height: ${LINE_HEIGHT}px;
+  padding: 8px;
   border-radius: 4px;
   outline: none;
   cursor: ${(props) => (props.$editable ? "var(--pointer)" : "default")};

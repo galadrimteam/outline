@@ -25,7 +25,7 @@ describe("linkCell renderer", () => {
     title: `Row ${index}`,
   }));
 
-  function render(variant: "table" | "property"): string {
+  function render(variant: "table" | "property" | "card"): string {
     return renderToString(
       <MemoryRouter>
         <linkCell.Renderer
@@ -49,5 +49,11 @@ describe("linkCell renderer", () => {
     const html = render("table");
     expect(html).toContain("Row 7");
     expect(html).not.toContain("more…");
+  });
+
+  it("leaves the click on a card's relation to its editor, as Notion opens the picker", () => {
+    expect(render("table")).toContain('href="/db/db-gantt/row/rec0"');
+    expect(render("card")).not.toContain("href=");
+    expect(render("card")).toContain("Row 7");
   });
 });

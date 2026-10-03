@@ -4,6 +4,7 @@ import {
   clampColumnWidth,
   columnWraps,
   defaultColumnWidth,
+  fitFrozenColumns,
   frozenEdge,
   insertionOrder,
   moveId,
@@ -41,7 +42,7 @@ describe("tableColumns", () => {
     expect(columns[1].width).toBe(150);
   });
 
-  it("freezes columns up to the frozen field, else the first one", () => {
+  it("freezes columns up to the frozen field, else none as in Notion", () => {
     const view = makeView({
       columnMeta: {
         title: { order: 0 },
@@ -50,11 +51,16 @@ describe("tableColumns", () => {
       },
     });
     expect(tableColumns(fields, view).map((c) => c.frozen)).toEqual([
-      true,
+      false,
       false,
       false,
       false,
     ]);
+    expect(
+      tableColumns(fields, { ...view, options: { frozenFieldId: "" } }).some(
+        (c) => c.frozen
+      )
+    ).toBe(false);
     const frozen = tableColumns(fields, {
       ...view,
       options: { frozenFieldId: "status" },
@@ -183,5 +189,26 @@ describe("frozenEdge", () => {
 
   it("is the gutter alone without columns", () => {
     expect(frozenEdge([])).toBe(GUTTER_WIDTH);
+  });
+});
+
+describe("fitFrozenColumns", () => {
+  const view = makeView({ options: { frozenFieldId: "title" } });
+  const wideTitle = tableColumns(fields, view, { title: 949 });
+
+  it("lets every column scroll when the frozen ones take more than half the width", () => {
+    expect(
+      fitFrozenColumns(wideTitle, 1092).some((column) => column.frozen)
+    ).toBe(false);
+  });
+
+  it("keeps the frozen columns that leave room for the others", () => {
+    const columns = tableColumns(fields, view);
+    expect(fitFrozenColumns(columns, 1092)).toBe(columns);
+    expect(fitFrozenColumns(columns, 1092)[0].frozen).toBe(true);
+  });
+
+  it("changes nothing before the table is measured", () => {
+    expect(fitFrozenColumns(wideTitle, 0)).toBe(wideTitle);
   });
 });
