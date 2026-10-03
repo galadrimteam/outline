@@ -323,6 +323,7 @@ const zSettingsPatch = z.object({
       tabs: z.array(zPageTab).max(20).optional(),
       fieldOrder: z.array(zEngineId).max(500).optional(),
       pinnedFieldIds: z.array(zEngineId).max(500).optional(),
+      omittedFieldIds: z.array(zEngineId).max(500).optional(),
     })
     .nullish(),
   iconFieldId: zEngineId.nullish(),

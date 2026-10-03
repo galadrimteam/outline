@@ -95,7 +95,7 @@ export const DatabaseProperties = observer(function DatabaseProperties_({
     database.fields,
     database.views,
     database.settings?.iconFieldId,
-    layout?.fieldOrder
+    layout
   );
   const { shown, hidden, pinned } = splitPageProperties(fields, record, layout);
   const inBreadcrumb =
