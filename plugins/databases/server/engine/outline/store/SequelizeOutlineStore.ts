@@ -206,6 +206,13 @@ export class SequelizeOutlineStore implements OutlineStore {
     this.cache.delete(tableId);
   }
 
+  async tableTeamId(tableId: string): Promise<string | null> {
+    const table = await EngineTable.findByPk(tableId, {
+      attributes: ["teamId"],
+    });
+    return table?.teamId ?? null;
+  }
+
   private static insertChunk = 1000;
 
   private static updateChunk = 500;

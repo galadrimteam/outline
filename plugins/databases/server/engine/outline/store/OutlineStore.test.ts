@@ -72,6 +72,13 @@ describe.each(stores)("%s", (_name, makeStore) => {
     expect(await store.base(created.table.baseId)).toHaveLength(1);
   });
 
+  it("tells which team owns a table without loading it", async () => {
+    const created = await createTable([{ cells: { [ids.name]: "One" } }]);
+
+    expect(await store.tableTeamId(created.table.id)).toBe(teamId);
+    expect(await store.tableTeamId("tblUnknown")).toBeNull();
+  });
+
   it("throws NotFoundError for an unknown table", async () => {
     await expect(store.table("tblUnknown")).rejects.toMatchObject({
       status: 404,

@@ -59,4 +59,11 @@ export interface OutlineStore {
 
   /** Deletes a table and everything in it. */
   deleteTable(tableId: string): Promise<void>;
+
+  /**
+   * The team owning a table, without loading its data.
+   *
+   * @returns the team id, null when the table does not exist.
+   */
+  tableTeamId(tableId: string): Promise<string | null>;
 }

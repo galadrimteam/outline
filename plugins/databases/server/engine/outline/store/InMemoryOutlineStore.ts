@@ -144,6 +144,10 @@ export class InMemoryOutlineStore implements OutlineStore {
     );
   }
 
+  async tableTeamId(tableId: string): Promise<string | null> {
+    return this.tables.get(tableId)?.table.teamId ?? null;
+  }
+
   private tables = new Map<string, TableSnapshot>();
 
   private historyRows: EngineHistoryRow[] = [];
