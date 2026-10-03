@@ -117,6 +117,33 @@ describe("DatabaseSettingsHelper", () => {
     );
   });
 
+  it("lets a timeline read the rows of the groups it folds, for « No date »", () => {
+    const settings = {
+      viewOverrides: {
+        viwTimeline: {
+          layout: DatabaseLayout.Timeline,
+          stackOrder: ["S1", ""],
+          hiddenStacks: [""],
+        },
+        viwFolded: {
+          layout: DatabaseLayout.Timeline,
+          hiddenStacks: [""],
+        },
+        viwList: { layout: DatabaseLayout.List, hiddenStacks: [""] },
+      },
+    };
+    expect(DatabaseSettingsHelper.groupLayout(settings, "viwTimeline")).toEqual(
+      { order: ["S1", ""], hidden: undefined }
+    );
+    expect(DatabaseSettingsHelper.groupLayout(settings, "viwFolded")).toBe(
+      undefined
+    );
+    expect(DatabaseSettingsHelper.groupLayout(settings, "viwList")).toEqual({
+      order: undefined,
+      hidden: [""],
+    });
+  });
+
   it("keeps a board's calculation and an inline load limit", () => {
     const settings = DatabaseSettingsHelper.mergeViewOverrides({}, "viwA", {
       groupCalculation: { func: "sum", fieldId: "fldEstimate" },
