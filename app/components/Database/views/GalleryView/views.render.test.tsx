@@ -14,6 +14,7 @@ import { DatabaseFieldType, DatabaseLayout } from "@shared/databases/types";
 import { light } from "@shared/styles/theme";
 import { ActionContextProvider } from "~/hooks/useActionContext";
 import stores from "~/stores";
+import type { RecordQueryParams } from "~/stores/DatabaseRecordsStore";
 import { client } from "~/utils/ApiClient";
 import { rowCommentCounts } from "../../comments/rowCommentCounts";
 import { DatabaseBlockContext } from "../../DatabaseBlockContext";
@@ -198,7 +199,8 @@ describe("database views", () => {
     handlers: {
       onOpenRecord?: (recordId: string) => void;
       onOpenComments?: (recordId: string) => void;
-    } = {}
+    } = {},
+    params: RecordQueryParams = {}
   ) {
     const database = stores.databases.add({
       id: databaseId,
@@ -211,7 +213,7 @@ describe("database views", () => {
       fields,
       views: [view],
     });
-    const query = stores.databaseRecords.query(databaseId, view.id, {});
+    const query = stores.databaseRecords.query(databaseId, view.id, params);
     await act(async () => {
       root.render(
         <Provider rootStore={stores}>
@@ -288,6 +290,95 @@ describe("database views", () => {
         section.querySelector("[aria-checked]")?.getAttribute("aria-checked")
       )
     ).toEqual(["true", "false"]);
+  });
+
+  it("leaves the group of the rows a formula leaves empty untitled, as Notion", async () => {
+    const formula = field({
+      id: "quality",
+      name: "Q Estim",
+      type: DatabaseFieldType.Formula,
+      isComputed: true,
+    });
+    fields.push(formula);
+    try {
+      vi.mocked(client.post).mockResolvedValue({
+        data: [
+          { id: "recA", fields: { name: "Sans qualité" } },
+          { id: "recB", fields: { name: "Juste", quality: "RAS" } },
+        ],
+        pagination: { offset: 0, limit: 100, total: 2 },
+      });
+      await render(
+        GalleryView,
+        makeView({
+          id: "viwFormula",
+          type: "gallery",
+          layout: DatabaseLayout.Gallery,
+          group: [{ fieldId: "quality", order: "asc" }],
+        })
+      );
+      const titles = Array.from(container.querySelectorAll("section")).map(
+        (section) => section.querySelector("button")?.textContent
+      );
+      expect(titles).toEqual(["1", "RAS1"]);
+    } finally {
+      fields.pop();
+    }
+  });
+
+  it("pages each group of a gallery on its own and counts all its rows", async () => {
+    const many: DatabaseRecord[] = [
+      ...Array.from({ length: 30 }, (_, index) => ({
+        id: `recTodo${index}`,
+        fields: { name: `À faire ${index}`, status: "À faire" },
+      })),
+      { id: "recDone", fields: { name: "Fini", status: "Terminé" } },
+    ];
+    vi.mocked(client.post).mockImplementation(
+      async (path: string, body?: object) => {
+        const { offset = 0, limit = 100 } = (body ?? {}) as {
+          offset?: number;
+          limit?: number;
+        };
+        return path === "/databaseRecords.list"
+          ? {
+              data: many.slice(offset, offset + limit),
+              pagination: { offset, limit, total: many.length },
+            }
+          : { data: {} };
+      }
+    );
+    await render(
+      GalleryView,
+      makeView({
+        id: "viwPaged",
+        type: "gallery",
+        layout: DatabaseLayout.Gallery,
+        group: [{ fieldId: "status", order: "asc" }],
+      }),
+      {},
+      { pageSize: 25 }
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    const sections = Array.from(container.querySelectorAll("section"));
+    expect(sections).toHaveLength(2);
+    const cards = (section: Element) =>
+      section.querySelectorAll("[role='button'][aria-label]").length;
+    expect(sections[0].querySelector("button")?.textContent).toContain("30");
+    expect(cards(sections[0])).toBe(25);
+    expect(cards(sections[1])).toBe(1);
+    const more = Array.from(sections[0].querySelectorAll("button")).find(
+      (button) => button.textContent === "Load more"
+    );
+    expect(more).toBeTruthy();
+    await act(async () => {
+      more?.click();
+    });
+    expect(cards(sections[0])).toBe(30);
+    expect(container.textContent?.match(/Load more/g) ?? []).toHaveLength(0);
   });
 
   it("draws gallery cards with the icon of their page and the colour of their option", async () => {

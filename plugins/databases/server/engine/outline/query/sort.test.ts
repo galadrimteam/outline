@@ -113,6 +113,10 @@ describe("sortRecords", () => {
       true,
       true,
     ]);
+    const unchecked = sortRecords(records(check, [true, null, false, true]), [
+      { field: check, order: "asc", emptiesLast: true },
+    ]).map((record) => record.cells.c);
+    expect(unchecked).toEqual([null, false, true, true]);
   });
 
   it("breaks ties with the view's manual order, then creation", () => {

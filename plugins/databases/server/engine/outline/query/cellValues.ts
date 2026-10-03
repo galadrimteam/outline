@@ -51,6 +51,16 @@ export function isEmptyCell(value: DatabaseCellValue | undefined): boolean {
 }
 
 /**
+ * Whether a cell holds a checked box; an empty cell is unchecked.
+ *
+ * @param value the cell value.
+ * @returns true when one of its elements is true.
+ */
+export function isChecked(value: DatabaseCellValue | undefined): boolean {
+  return cellItems(value).some((item) => item === true || item === "true");
+}
+
+/**
  * Whether an element is an object (person, linked row or attachment).
  *
  * @param item the element.

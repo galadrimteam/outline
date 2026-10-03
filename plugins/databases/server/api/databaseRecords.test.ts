@@ -1,6 +1,6 @@
 import FormData from "form-data";
 import type { DatabaseField } from "@shared/databases/types";
-import { DatabaseFieldType } from "@shared/databases/types";
+import { DatabaseFieldType, DatabaseLayout } from "@shared/databases/types";
 import { Document } from "@server/models";
 import {
   buildCollection,
@@ -457,6 +457,27 @@ describe("#databaseRecords reads", () => {
     });
     expect(engine.callsTo("groupPoints")[0].args[0]).toMatchObject({
       groupLayout: layout,
+    });
+  });
+
+  it("reads all the rows of a timeline, which lists those of its folded groups under « No date »", async () => {
+    await database.update({
+      settings: {
+        ...database.settings,
+        viewOverrides: {
+          viwGrid: {
+            layout: DatabaseLayout.Timeline,
+            stackOrder: ["S1", ""],
+            hiddenStacks: [""],
+          },
+        },
+      },
+    });
+    await server.post("/api/databaseRecords.list", user, {
+      body: { databaseId: database.id, viewId: "viwGrid" },
+    });
+    expect(engine.callsTo("listRecords")[0].args[0]).toMatchObject({
+      groupLayout: { order: ["S1", ""], hidden: undefined },
     });
   });
 
