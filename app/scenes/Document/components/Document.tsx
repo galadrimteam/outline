@@ -21,10 +21,17 @@ import LoadingIndicator from "~/components/LoadingIndicator";
 import PageTitle from "~/components/PageTitle";
 import PlaceholderDocument from "~/components/PlaceholderDocument";
 import RegisterKeyDown from "~/components/RegisterKeyDown";
+import { useSplitView } from "~/components/SplitView/context";
+import {
+  closeRowPeek,
+  escapeClosesPeek,
+  isRowPeek,
+} from "~/components/Database/rowPeek";
 import { MeasuredContainer } from "~/components/MeasuredContainer";
 import type { Editor as TEditor } from "~/editor";
 import type { Properties } from "~/types";
 import { useLocationSidebarContext } from "~/hooks/useLocationSidebarContext";
+import useKeyDown from "~/hooks/useKeyDown";
 import useStores from "~/hooks/useStores";
 import isTextInput from "~/utils/isTextInput";
 import { client } from "~/utils/ApiClient";
@@ -40,6 +47,9 @@ import Notices from "./Notices";
 import References from "./References";
 import RevisionViewer from "./RevisionViewer";
 import SharedHeader from "./SharedHeader";
+
+/** Escape closes a row page's side peek from wherever it is pressed, see `escapeClosesPeek`. */
+const peekKeyOptions = { allowInInput: true };
 
 type LocationState = {
   title?: string;
@@ -85,6 +95,7 @@ function DocumentScene({
   const { auth, ui, dialogs } = useStores();
   const { t } = useTranslation();
   const history = useHistory();
+  const { pane } = useSplitView();
   const location = useLocation<LocationState>();
   const sidebarContext = useLocationSidebarContext();
   const { team, user } = auth;
@@ -287,14 +298,26 @@ function DocumentScene({
     [document, dialogs, t, onSave]
   );
 
+  const rowPeek = isRowPeek(pane, document);
+
   const goBack = useCallback(() => {
-    if (!readOnly) {
+    if (!readOnly && !rowPeek) {
       history.push({
         pathname: document.url,
         state: { sidebarContext },
       });
     }
-  }, [readOnly, history, document, sidebarContext]);
+  }, [readOnly, rowPeek, history, document, sidebarContext]);
+
+  const closePeek = useCallback(
+    (event: KeyboardEvent) => {
+      if (rowPeek && escapeClosesPeek(event.target)) {
+        closeRowPeek();
+      }
+    },
+    [rowPeek]
+  );
+  useKeyDown("Escape", closePeek, peekKeyOptions);
 
   // Render
   const isShare = !!shareId;
