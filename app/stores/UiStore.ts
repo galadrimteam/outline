@@ -102,6 +102,11 @@ class UiStore {
   @observable
   secondaryRightSidebar: RightSidebarPanel | null = null;
 
+  // The page asked to bring its discussions into view, by document or database
+  // record id, until it does. Not persisted.
+  @observable
+  pageCommentsRequest: string | null = null;
+
   // The fraction of the split view's width occupied by the primary pane. Not
   // persisted, reset when the split view closes.
   @observable
@@ -412,6 +417,17 @@ class UiStore {
       this.rightSidebar = panel;
       this.persist();
     }
+  };
+
+  /**
+   * Asks a page to bring its discussions into view and focus the form that starts one, as a
+   * click on the comment count of a database row does in Notion. The page answers once it shows.
+   *
+   * @param id the document id or the database record id of the page, null once answered.
+   */
+  @action
+  setPageCommentsRequest = (id: string | null): void => {
+    this.pageCommentsRequest = id;
   };
 
   @action

@@ -24,9 +24,10 @@ interface Props {
 
 /**
  * The discussions of the page itself, under its title (and the properties of a database row),
- * like Notion's « Comments »: every open thread that is not anchored to a passage, collapsed to
- * its first and last comments from three on, then the form that starts a new one. A thread
- * replies in place and its resolved threads leave the page; all of them stay in the sidebar.
+ * like Notion's « Comments »: every open thread that is not anchored to a passage, folded to its
+ * first and last comments from three replies on, then the form that starts a new one. A thread
+ * replies in place and a resolved one leaves the page; all of them stay in the sidebar. A page
+ * asked through `ui.setPageCommentsRequest` scrolls to them and focuses the form.
  *
  * @param props the page and whether the form shows when it has no discussion.
  * @returns the discussions, or nothing when there are none to show.
@@ -36,13 +37,15 @@ export const PageComments = observer(function PageComments_({
   showEmpty,
 }: Props) {
   const { t } = useTranslation();
-  const { comments } = useStores();
+  const { comments, ui } = useStores();
   const { anchoredCommentIds } = useDocumentContext();
   const user = useCurrentUser({ rejectOnEmpty: false });
   const team = useCurrentTeam({ rejectOnEmpty: false });
   const { isShare } = useShare();
   const can = usePolicy(document);
+  const sectionRef = React.useRef<HTMLElement>(null);
   const [focusedId, setFocusedId] = React.useState<string | null>(null);
+  const [formKey, setFormKey] = React.useState(0);
   const [draft, onSaveDraft] = usePersistedState<ProsemirrorData | undefined>(
     `draft-${document.id}-page`,
     undefined
@@ -50,21 +53,36 @@ export const PageComments = observer(function PageComments_({
   const handleBlur = React.useCallback(() => setFocusedId(null), []);
 
   // anchors are only known once an editor holds the document
-  if (!user || isShare || !team?.commentingEnabled || !anchoredCommentIds) {
-    return null;
-  }
+  const enabled =
+    !!user && !isShare && !!team?.commentingEnabled && !!anchoredCommentIds;
+  const threads =
+    enabled && anchoredCommentIds
+      ? comments.pageThreadsInDocument(document.id, anchoredCommentIds)
+      : [];
+  const canStart = enabled && !!can.comment;
+  const visible = threads.length > 0 || (!!showEmpty && canStart);
+  const request = ui.pageCommentsRequest;
+  const requested =
+    !!request &&
+    (request === document.id || request === document.databaseRecordId);
 
-  const threads = comments.pageThreadsInDocument(
-    document.id,
-    anchoredCommentIds
-  );
-  const canStart = !!can.comment;
-  if (!threads.length && !(showEmpty && canStart)) {
+  React.useEffect(() => {
+    if (!requested || !enabled) {
+      return;
+    }
+    ui.setPageCommentsRequest(null);
+    sectionRef.current?.scrollIntoView({ block: "center" });
+    if (canStart) {
+      setFormKey((key) => key + 1);
+    }
+  }, [requested, enabled, canStart, ui]);
+
+  if (!visible) {
     return null;
   }
 
   return (
-    <Section aria-label={t("Comments")}>
+    <Section ref={sectionRef} aria-label={t("Comments")}>
       <Heading>{t("Comments")}</Heading>
       {threads.map((thread) => (
         <CommentThread
@@ -81,11 +99,12 @@ export const PageComments = observer(function PageComments_({
       ))}
       {canStart && (
         <CommentForm
+          key={formKey}
           documentId={document.id}
           draft={draft}
           onSaveDraft={onSaveDraft}
           placeholder={`${t("Add a comment")}…`}
-          autoFocus={false}
+          autoFocus={formKey > 0}
           standalone
         />
       )}
@@ -93,14 +112,17 @@ export const PageComments = observer(function PageComments_({
   );
 });
 
-/** Notion folds a discussion from its second reply on, keeping the first and last comments. */
-const COLLAPSE_REPLIES = 2;
+/** Notion folds a discussion from its third reply on, keeping its first and last comments. */
+const COLLAPSE_REPLIES = 3;
 
 const Section = styled.section`
   margin-top: 16px;
+  scroll-margin: 80px;
 
   [data-comment-thread] {
     margin: 0 0 32px;
+    margin-inline-start: 0;
+    margin-inline-end: 0;
   }
 `;
 

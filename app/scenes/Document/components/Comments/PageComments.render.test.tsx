@@ -5,6 +5,7 @@ import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "styled-components";
+import { vi } from "vitest";
 import { light } from "@shared/styles/theme";
 import { ProsemirrorHelper } from "@shared/utils/ProsemirrorHelper";
 import {
@@ -164,29 +165,33 @@ describe("PageComments", () => {
     );
   });
 
-  it("folds a thread of three comments to its first and last ones, like Notion", async () => {
-    allow(true);
+  const thread = (replies: number) => {
     comment(open, thomas, "2025-06-13T08:54:27.033Z");
-    comment(
-      "00000000-0000-4000-8000-0000000000c1",
-      me,
-      "2025-07-21T16:32:03Z",
-      {
-        parentCommentId: open,
-      }
-    );
-    comment(
-      "00000000-0000-4000-8000-0000000000c2",
-      thomas,
-      "2025-08-05T09:45:43Z",
-      {
-        parentCommentId: open,
-      }
-    );
+    for (let index = 1; index <= replies; index++) {
+      comment(
+        `00000000-0000-4000-8000-0000000000c${index}`,
+        index % 2 ? me : thomas,
+        `2025-07-2${index}T16:32:03.000Z`,
+        { parentCommentId: open }
+      );
+    }
+  };
+
+  it("shows a thread of two replies in full", async () => {
+    allow(true);
+    thread(2);
+    await render(true);
+
+    expect(threads()[0].textContent).not.toContain("Show");
+  });
+
+  it("folds a thread from its third reply on to its first and last comments, like Notion", async () => {
+    allow(true);
+    thread(3);
     await render(true);
 
     expect(threads()).toHaveLength(1);
-    expect(threads()[0].textContent).toContain("Show 1 reply");
+    expect(threads()[0].textContent).toContain("Show 2");
   });
 
   it("replies in place: a click opens the reply form, not the sidebar", async () => {
@@ -220,6 +225,26 @@ describe("PageComments", () => {
     allow(false);
     await render(true);
     expect(section()).toBe(null);
+  });
+
+  it("comes into view with its form focused when the page is asked to", async () => {
+    allow(true);
+    comment(open, thomas, "2025-11-13T09:20:21.340Z");
+    const scrolled = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = scrolled;
+    await render(true);
+    expect(scrolled).not.toHaveBeenCalled();
+
+    await act(async () => {
+      stores.ui.setPageCommentsRequest("rec-other");
+    });
+    expect(scrolled).not.toHaveBeenCalled();
+
+    await act(async () => {
+      stores.ui.setPageCommentsRequest(documentId);
+    });
+    expect(scrolled).toHaveBeenCalledTimes(1);
+    expect(stores.ui.pageCommentsRequest).toBe(null);
   });
 
   it("shows the threads but no form to a reader who cannot comment", async () => {
