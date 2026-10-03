@@ -52,6 +52,23 @@ export function usersOf(
   return toArray(value).filter(isUserItem);
 }
 
+/**
+ * The people a value holds, eg a rollup of a person property, when it holds people only.
+ *
+ * @param value the cell value.
+ * @returns the people, empty when the value holds anything else.
+ */
+export function peopleOf(
+  value: CellRendererProps["value"]
+): DatabaseUserValue[] {
+  const items = toArray(value);
+  const people = items.filter(
+    (item): item is DatabaseUserValue =>
+      isUserItem(item) && ("email" in item || "outlineUserId" in item)
+  );
+  return people.length === items.length ? people : [];
+}
+
 function UserRenderer({ value, variant, wrap }: CellRendererProps) {
   const { t } = useTranslation();
   const people = usersOf(value);
@@ -62,10 +79,31 @@ function UserRenderer({ value, variant, wrap }: CellRendererProps) {
     ) : null;
   }
 
+  return <PeopleChips people={people} variant={variant} wrap={wrap} />;
+}
+
+interface PeopleProps {
+  people: DatabaseUserValue[];
+  /** Draws the avatars alone, as on Notion's timeline bars. */
+  avatarsOnly?: boolean;
+}
+
+/**
+ * People as a person cell draws them: an avatar and a name each.
+ *
+ * @param props the people and where they are drawn.
+ * @returns the chips.
+ */
+export function PeopleChips({
+  people,
+  variant,
+  wrap,
+  avatarsOnly,
+}: PeopleProps & Pick<CellRendererProps, "variant" | "wrap">) {
   return (
     <Chips $variant={variant} $wrap={wrap}>
       {people.map((person) => (
-        <Person key={person.id} person={person} />
+        <Person key={person.id} person={person} avatarOnly={avatarsOnly} />
       ))}
     </Chips>
   );
@@ -73,8 +111,10 @@ function UserRenderer({ value, variant, wrap }: CellRendererProps) {
 
 const Person = observer(function Person_({
   person,
+  avatarOnly,
 }: {
   person: DatabaseUserValue;
+  avatarOnly?: boolean;
 }) {
   const { users } = useStores();
   const user = person.outlineUserId
@@ -94,8 +134,9 @@ const Person = observer(function Person_({
           }
         }
         alt={name}
+        showTooltip={avatarOnly}
       />
-      <PersonName>{name}</PersonName>
+      {!avatarOnly && <PersonName>{name}</PersonName>}
     </PersonChip>
   );
 });

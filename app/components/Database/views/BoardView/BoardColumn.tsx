@@ -6,7 +6,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { observer } from "mobx-react";
-import { HiddenIcon, MoreIcon, PlusIcon } from "outline-icons";
+import { EyeIcon, HiddenIcon, MoreIcon, PlusIcon } from "outline-icons";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import styled, { css, useTheme } from "styled-components";
@@ -26,9 +26,13 @@ import type { BoardColumn as BoardColumnModel } from "../../boardModel";
 import { EMPTY_STACK } from "../../boardModel";
 import type { DatabaseToneColors } from "../../colors";
 import { toneColors } from "../../colors";
+import { useDatabaseBlock } from "../../DatabaseBlockContext";
+import { GroupByIcon } from "../../toolbar/icons";
+import { useViewUpdate } from "../../toolbar/useViewUpdate";
 import { SortableCard, StaticCard } from "./BoardCard";
 import { ColumnCalculationValue } from "./ColumnCalculationValue";
-import { NewCardForm } from "./NewCardForm";
+import { columnCalculation } from "./groupCalculation";
+import { NewCardForm, fieldsToFill } from "./NewCardForm";
 import { borderBox } from "./styles";
 
 /** Drag data of a column header. */
@@ -123,8 +127,31 @@ export const ColumnHeader = observer(function ColumnHeader({
   const theme = useTheme();
   const tone = toneColors(column.color, theme);
   const name = columnName(column.key, field, t);
+  const block = useDatabaseBlock();
+  const updateView = useViewUpdate(database.id, view);
+  const canEditView = !view.isLocked;
+  const isCalculationShown = columnCalculation(database, view).kind !== "none";
 
   const menuAction = useMenuAction([
+    createAction({
+      name: t("Edit groups"),
+      section: "Database",
+      icon: <GroupByIcon />,
+      visible: canEditView && !!block?.onEditGroups,
+      perform: () => block?.onEditGroups?.(),
+    }),
+    createAction({
+      name: isCalculationShown ? t("Hide calculation") : t("Show calculation"),
+      section: "Database",
+      icon: isCalculationShown ? <HiddenIcon /> : <EyeIcon />,
+      visible: canEditView,
+      perform: () =>
+        void updateView({
+          overrides: {
+            groupCalculation: { func: isCalculationShown ? "none" : "count" },
+          },
+        }),
+    }),
     createAction({
       name: t("Hide group"),
       section: "Database",
@@ -235,10 +262,16 @@ export const CardList = observer(function CardList({
     [onCreate]
   );
 
+  const newCardFields = fieldsToFill(view, cardFields);
+
   return (
     <Cards ref={setNodeRef}>
       {adding === "top" && (
-        <NewCardForm onSubmit={handleSubmitTop} onClose={handleClose} />
+        <NewCardForm
+          fields={newCardFields}
+          onSubmit={handleSubmitTop}
+          onClose={handleClose}
+        />
       )}
       <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
         {cardIds.map((recordId) => (
@@ -267,7 +300,11 @@ export const CardList = observer(function CardList({
       ))}
       {footer}
       {adding === "bottom" ? (
-        <NewCardForm onSubmit={handleSubmitBottom} onClose={handleClose} />
+        <NewCardForm
+          fields={newCardFields}
+          onSubmit={handleSubmitBottom}
+          onClose={handleClose}
+        />
       ) : (
         !readOnly && (
           <NewPageButton

@@ -166,6 +166,7 @@ export const DatabaseToolbar = observer(function DatabaseToolbar({
       {canSave && layoutSupportsGrouping(view.layout) && (
         <ToolbarPopover
           label={isBoard ? t("Group by") : t("Group")}
+          openRequest={block?.groupRequest}
           active={isGrouped}
           icon={<GroupByIcon size={20} />}
           width={400}

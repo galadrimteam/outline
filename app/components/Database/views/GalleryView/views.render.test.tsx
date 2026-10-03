@@ -558,6 +558,146 @@ describe("database views", () => {
     expect(opened).toEqual(["rec2"]);
   });
 
+  it("offers Notion's group actions in a column's menu, the calculation hidden from there", async () => {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+    await render(
+      BoardView,
+      makeView({
+        type: "kanban",
+        layout: DatabaseLayout.Board,
+        options: { stackFieldId: "status" },
+        overrides: { stackOrder: ["Terminé"], hiddenStacks: ["", "À faire"] },
+      })
+    );
+    await settle();
+    const trigger = container.querySelector<HTMLElement>(
+      "[aria-label='Group options']"
+    );
+    await act(async () => {
+      trigger?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
+      );
+    });
+    const items = Array.from(
+      document.querySelectorAll<HTMLElement>("[role='menuitem']")
+    );
+    expect(items.map((item) => item.textContent)).toEqual([
+      "Hide calculation",
+      "Hide group",
+    ]);
+
+    vi.mocked(client.post).mockClear();
+    await act(async () => {
+      items[0].click();
+    });
+    expect(
+      vi
+        .mocked(client.post)
+        .mock.calls.some(
+          ([path, body]) =>
+            path === "/databaseViews.update" &&
+            JSON.stringify(body).includes('"groupCalculation":{"func":"none"}')
+        )
+    ).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it("lists the empty properties of a new card as Notion's « Add … », not the one its column gives", async () => {
+    await render(
+      BoardView,
+      makeView({
+        type: "kanban",
+        layout: DatabaseLayout.Board,
+        options: { stackFieldId: "status" },
+        columnMeta: {
+          status: { order: 1, visible: true },
+          estimate: { order: 2, visible: true },
+        },
+        overrides: { stackOrder: ["Terminé"], hiddenStacks: ["", "À faire"] },
+      })
+    );
+    await settle();
+    const newPage = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "New page"
+    );
+    await act(async () => {
+      newPage?.click();
+    });
+
+    expect(
+      container.querySelector("textarea[aria-label='Card name']")
+    ).not.toBeNull();
+    expect(container.textContent).toContain("Add Estimation");
+    expect(container.textContent).not.toContain("Add Statut");
+  });
+
+  it("types a card's title in place from its ✎, without opening the row", async () => {
+    const opened: string[] = [];
+    await render(BoardView, boardView(), {
+      onOpenRecord: (id) => opened.push(id),
+    });
+    await settle();
+
+    const rename = cardOf("Maquettes")?.querySelector<HTMLElement>(
+      "button[aria-label='Rename']"
+    );
+    expect(rename).toBeTruthy();
+    await act(async () => {
+      rename?.click();
+    });
+    const input = cardOf("Maquettes")?.querySelector<HTMLTextAreaElement>(
+      "textarea[aria-label='Card name']"
+    );
+    expect(input?.value).toBe("Maquettes");
+    expect(document.activeElement).toBe(input);
+    expect(
+      cardOf("Maquettes")?.querySelector("button[aria-label='Rename']")
+    ).toBeNull();
+
+    vi.mocked(client.post).mockClear();
+    vi.mocked(client.post).mockImplementation(async (path: string) =>
+      path === "/databaseRecords.update"
+        ? { data: { ...records[0], fields: { ...records[0].fields } } }
+        : {
+            data: records,
+            pagination: { offset: 0, limit: 50, total: records.length },
+          }
+    );
+    await act(async () => {
+      if (input) {
+        Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          "value"
+        )?.set?.call(input, "Maquettes v2");
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
+        );
+      }
+    });
+
+    expect(
+      vi
+        .mocked(client.post)
+        .mock.calls.some(
+          ([path, body]) =>
+            path === "/databaseRecords.update" &&
+            JSON.stringify(body).includes('"name":"Maquettes v2"')
+        )
+    ).toBe(true);
+    expect(container.querySelector("textarea[aria-label='Card name']")).toBe(
+      null
+    );
+    expect(opened).toEqual([]);
+  });
+
   it("opens the comments of a card's row on the spot from its comment count", async () => {
     rowCommentCounts.invalidate(databaseId);
     vi.mocked(client.post).mockImplementation(async (path: string) => {
@@ -690,5 +830,75 @@ describe("database views", () => {
       left: parseFloat(bar?.style.left ?? "0") - 64,
       behavior: "smooth",
     });
+  });
+
+  it("opens a row from the label kept at the left edge, not from its ‹", async () => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
+    Element.prototype.scrollTo = vi.fn();
+    const opened: string[] = [];
+    await render(
+      TimelineView,
+      makeView({
+        overrides: {
+          layout: DatabaseLayout.Timeline,
+          timeline: { startFieldId: "start", endFieldId: "end", zoom: "week" },
+        },
+      }),
+      { onOpenRecord: (id) => opened.push(id) }
+    );
+    const bar = container.querySelector<HTMLElement>(
+      "[aria-label^='Maquettes,']"
+    );
+    const scroller = container.querySelector("[aria-busy]")?.lastElementChild;
+    await act(async () => {
+      if (scroller && bar) {
+        scroller.scrollLeft = parseFloat(bar.style.left) + 2 * 64;
+        scroller.dispatchEvent(new Event("scroll"));
+      }
+    });
+    const back = container.querySelector<HTMLElement>(
+      "[aria-label='Go to the start']"
+    );
+
+    act(() => back?.click());
+    expect(opened).toEqual([]);
+    act(() => back?.parentElement?.click());
+    expect(opened).toEqual(["rec1"]);
+  });
+
+  it("centres on today once a timeline drawn hidden, as in a folded toggle, shows", async () => {
+    let width = 0;
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(
+      () => width
+    );
+    const resized: Array<() => void> = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: () => void) {
+          resized.push(callback);
+        }
+        observe() {}
+        disconnect() {}
+      }
+    );
+    await render(
+      TimelineView,
+      makeView({
+        overrides: {
+          layout: DatabaseLayout.Timeline,
+          timeline: { startFieldId: "start", endFieldId: "end", zoom: "week" },
+        },
+      })
+    );
+    const scroller = container.querySelector("[aria-busy]")?.lastElementChild;
+    expect(scroller?.scrollLeft).toBe(0);
+
+    width = 400;
+    await act(async () => {
+      resized.forEach((callback) => callback());
+    });
+    expect(scroller?.scrollLeft).toBeGreaterThan(0);
+    vi.unstubAllGlobals();
   });
 });

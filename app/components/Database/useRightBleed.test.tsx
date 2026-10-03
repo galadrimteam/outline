@@ -1,6 +1,7 @@
 import * as React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { announceContentsChange } from "./rightBleed";
 import { useRightBleed } from "./useRightBleed";
 
 const box = (left: number, width: number) =>
@@ -90,6 +91,24 @@ describe("useRightBleed", () => {
       window.dispatchEvent(new Event("resize"));
     });
     expect(result).toBe(260 + 1000 - 1218);
+  });
+
+  it("stops before the contents rail once it appears in the margin", async () => {
+    await render(true);
+    const rail = document.createElement("nav");
+    rail.setAttribute("data-document-contents", "");
+    rail.getBoundingClientRect = () => box(1404, 16);
+    container.querySelector("div")?.appendChild(rail);
+    await act(async () => {
+      announceContentsChange();
+    });
+    expect(result).toBe(1404 - 24 - 1218);
+
+    rail.remove();
+    await act(async () => {
+      announceContentsChange();
+    });
+    expect(result).toBe(260 + 1180 - 1218);
   });
 
   it("gives no room to a block out of the page's flow", async () => {

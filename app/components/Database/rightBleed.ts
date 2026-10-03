@@ -1,5 +1,19 @@
-/** Attribute of the document's contents panel (scenes/Document), which a database block must not run over. */
+/**
+ * Attribute of the document's contents panel or of its rail of dashes (scenes/Document), which a
+ * database block must not run over.
+ */
 export const CONTENTS_PANEL_ATTRIBUTE = "data-document-contents";
+
+/** Window event telling the blocks that a contents panel or rail appeared or went. */
+export const CONTENTS_CHANGE_EVENT = "outline-document-contents";
+
+/**
+ * Tells the database blocks to measure their room again: a rail fixed in the margin changes no
+ * size they observe.
+ */
+export function announceContentsChange() {
+  window.dispatchEvent(new Event(CONTENTS_CHANGE_EVENT));
+}
 
 /** Room kept between a database block and a contents panel on its right. */
 const CONTENTS_GAP = 24;
