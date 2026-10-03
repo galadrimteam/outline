@@ -1,6 +1,6 @@
+import type { DatabaseEngineTarget } from "../engine";
 import { engineFor } from "../engine";
 import type { DatabaseRef } from "../engine/DatabaseEngine";
-import type { TableEngineName } from "./tableEngine";
 
 // notion-to-teable.mjs names a second database of the same name inside a project « Points (2) », a third « Points (3) »:
 // Notion shows them all as « Points ». A « (1) » is Notion's own, from a duplicated database.
@@ -29,7 +29,7 @@ export function notionDatabaseName(engineName: string | null): string | null {
  */
 export async function engineTableName(
   teamId: string,
-  engine: TableEngineName,
+  engine: DatabaseEngineTarget["engine"],
   ref: DatabaseRef
 ): Promise<string | null> {
   try {

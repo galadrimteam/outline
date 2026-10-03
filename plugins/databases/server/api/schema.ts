@@ -477,6 +477,18 @@ export type DatabasesConvertEmbedsReq = z.infer<
   typeof DatabasesConvertEmbedsSchema
 >;
 
+export const DatabasesFixImportedTitlesSchema = BaseSchema.extend({
+  body: z.object({
+    /** Only the databases of this collection; else every database of the team. */
+    collectionId: z.uuid().optional(),
+    dryRun: z.boolean().default(false),
+  }),
+});
+
+export type DatabasesFixImportedTitlesReq = z.infer<
+  typeof DatabasesFixImportedTitlesSchema
+>;
+
 export const DatabasesMoveToOutlineEngineSchema = BaseSchema.extend({
   body: z.object({
     /** A database of the Teable base to move: the whole base moves. */
