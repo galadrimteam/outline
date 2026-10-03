@@ -517,6 +517,11 @@ export interface DatabaseSettings {
      * every other one behind « Show details ».
      */
     pinnedFieldIds?: string[];
+    /**
+     * Columns the migration keeps for its own use (a row's Notion link, Notion's frozen created
+     * and edited times): in the database, never on its row pages.
+     */
+    omittedFieldIds?: string[];
   };
   /** The field holding a row's emoji (the migration writes one called « Icon »). */
   iconFieldId?: string;

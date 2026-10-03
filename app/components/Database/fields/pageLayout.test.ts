@@ -46,11 +46,20 @@ describe("pageFields", () => {
       },
     });
     expect(
-      pageFields([title, icon, status, notes, priority], [table], "icon", [
-        "status",
-        "notes",
-      ]).map((field) => field.id)
+      pageFields([title, icon, status, notes, priority], [table], "icon", {
+        fieldOrder: ["status", "notes"],
+      }).map((field) => field.id)
     ).toEqual(["status", "notes", "priority"]);
+  });
+
+  it("leaves out the columns the layout omits, hidden ones too", () => {
+    const notion = makeField({ id: "notion" });
+    expect(
+      pageFields([title, status, notes, notion], [], undefined, {
+        hiddenFieldIds: ["notes", "notion"],
+        omittedFieldIds: ["notion"],
+      }).map((field) => field.id)
+    ).toEqual(["status", "notes"]);
   });
 
   it("shows a date range as one property, its start", () => {

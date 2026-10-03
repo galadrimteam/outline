@@ -27,37 +27,38 @@ export interface PageProperties {
 
 /**
  * The properties listed on a row page, without the title and the icon, which the page header
- * shows, nor the end field of a date range, which shows with its start as one property. They
- * follow the page order of the layout (Notion's own page order), then the order of the database's
- * first table for the properties it does not list.
+ * shows, nor the end field of a date range, which shows with its start as one property, nor the
+ * columns the layout omits. They follow the page order of the layout (Notion's own page order),
+ * then the order of the database's first table for the properties it does not list.
  *
  * @param fields the database fields.
  * @param views the database views.
  * @param iconFieldId the field holding the row emoji.
- * @param fieldOrder the page order of the layout, if any.
+ * @param layout the page layout of the database, if any.
  * @returns the properties in order.
  */
 export function pageFields(
   fields: DatabaseField[],
   views: DatabaseView[],
   iconFieldId?: string,
-  fieldOrder?: string[]
+  layout?: PageLayout
 ): DatabaseField[] {
   const ordered = [...views].sort((a, b) => a.order - b.order);
   const reference =
     ordered.find((view) => view.layout === DatabaseLayout.Table) ?? ordered[0];
   const sorted = byPageOrder(
     reference ? orderedFields(fields, reference) : fields,
-    fieldOrder
+    layout?.fieldOrder
   );
-  const rangeEnds = new Set(
-    fields.flatMap((field) =>
+  const left = new Set([
+    ...fields.flatMap((field) =>
       field.meta?.endFieldId ? [field.meta.endFieldId] : []
-    )
-  );
+    ),
+    ...(layout?.omittedFieldIds ?? []),
+  ]);
   return sorted.filter(
     (field) =>
-      !field.isPrimary && field.id !== iconFieldId && !rangeEnds.has(field.id)
+      !field.isPrimary && field.id !== iconFieldId && !left.has(field.id)
   );
 }
 
