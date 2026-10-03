@@ -6,6 +6,7 @@ import {
   evaluateFilter,
   insertIds,
   isEmptyCell,
+  statisticKey,
   toOptimisticValue,
 } from "./DatabaseRecordsStore";
 
@@ -289,5 +290,31 @@ describe("DatabaseRecordsStore", () => {
         stores.databaseRecords.recordById(databaseId, "r1")?.fields[status]
       ).toBe("B")
     );
+  });
+  it("keeps a column's last statistic, never replaced by an older answer", async () => {
+    const query = stores.databaseRecords.query(databaseId, viewId, column("A"));
+    const answers: Array<(value: number) => void> = [];
+    vi.mocked(client.post).mockImplementation(
+      (() =>
+        new Promise((resolve) => {
+          answers.push((value) =>
+            resolve({ data: { fldEstimate: { value } } })
+          );
+        })) as never
+    );
+
+    const older = query.aggregate({ fldEstimate: "sum" });
+    const newer = query.aggregate({ fldEstimate: "sum" });
+    answers[1](5);
+    await newer;
+    answers[0](2);
+    await older;
+
+    expect(query.statistics.get(statisticKey("fldEstimate", "sum"))).toBe(5);
+    expect(
+      stores.databaseRecords
+        .query(databaseId, viewId, column("A"))
+        .statistics.get(statisticKey("fldEstimate", "sum"))
+    ).toBe(5);
   });
 });
