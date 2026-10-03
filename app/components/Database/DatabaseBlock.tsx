@@ -44,7 +44,6 @@ import lazyWithRetry from "~/utils/lazyWithRetry";
 import { databasePath } from "~/utils/routeHelpers";
 import type { SplitViewPane } from "~/utils/splitView";
 import { openRouteInSplit } from "~/utils/splitView";
-import type { BlockReveal } from "./blockChrome";
 import { blockChrome } from "./blockChrome";
 import { boardColumns, isStackable, stackValue } from "./boardModel";
 import { openRowComments } from "./comments/openRowComments";
@@ -453,7 +452,7 @@ const DatabaseFrame = observer(function DatabaseFrame({
     />
   );
   return (
-    <Frame $fullPage={fullPage} $selected={isSelected} $reveal={chrome.reveal}>
+    <Frame $fullPage={fullPage} $selected={isSelected}>
       {activeView ? (
         <LoadedView
           database={database}
@@ -671,7 +670,7 @@ const LoadedView = observer(function LoadedView({
   return (
     <DatabaseBlockContext.Provider value={context}>
       {headingAbove && (
-        <HeaderRow data-database-chrome>
+        <HeaderRow>
           {heading}
           {options}
         </HeaderRow>
@@ -922,7 +921,7 @@ function SearchBox({
   }
 
   return (
-    <SearchField data-sticky>
+    <SearchField>
       <SearchIcon size={18} />
       <SearchInput
         ref={inputRef}
@@ -986,7 +985,6 @@ const OptionsAnchor = styled.div<{ $floating: boolean }>`
 const Frame = styled.div<{
   $fullPage: boolean;
   $selected?: boolean;
-  $reveal?: BlockReveal;
   /** Framed, for the states that are not a database yet: picker, errors. */
   $boxed?: boolean;
 }>`
@@ -1012,26 +1010,6 @@ const Frame = styled.div<{
       border-radius: 12px;
     `}
 
-  ${(props) =>
-    (props.$reveal === "actions" || props.$reveal === "all") &&
-    css`
-      --database-actions-opacity: 0;
-      --database-tabs-opacity: ${props.$reveal === "all" ? 0 : 1};
-
-      &:hover,
-      &:focus-within,
-      &:has([data-database-chrome] [data-state="open"]),
-      &:has([data-sticky]) {
-        --database-actions-opacity: 1;
-        --database-tabs-opacity: 1;
-      }
-
-      @media (hover: none) {
-        --database-actions-opacity: 1;
-        --database-tabs-opacity: 1;
-      }
-    `}
-
   &:hover ${OptionsAnchor} {
     opacity: 1;
   }
@@ -1039,8 +1017,6 @@ const Frame = styled.div<{
   ${(props) =>
     props.$selected &&
     css`
-      --database-actions-opacity: 1;
-      --database-tabs-opacity: 1;
       outline: 2px solid ${props.theme.selected};
       outline-offset: 4px;
       border-radius: 4px;
