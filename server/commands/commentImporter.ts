@@ -48,19 +48,25 @@ export interface CommentImportResult {
   created: boolean;
   /** Whether the document carries a mark for the comment. */
   anchored: boolean;
+  /** Whether a replay handed a comment kept under the importing account to its author. */
+  reattributed: boolean;
 }
 
 /**
  * Imports a comment written elsewhere with its author, date and resolved
  * state. A comment that already exists with the same id is returned untouched,
- * so an import can be replayed. The comment is published with the `import`
- * source, which notifies nobody, and anchoring does not mark the document as
- * updated. When the anchor text is not in the document, the comment is kept
- * as a document comment. The caller authorizes the acting user on the document.
+ * so an import can be replayed, unless it is still under the importing account
+ * and the replay names another author: an author who had no account at the
+ * first import is then handed the comment, with the content of the replay
+ * (see `reattribute`). The comment is published with the `import` source,
+ * which notifies nobody, and anchoring does not mark the document as updated.
+ * When the anchor text is not in the document, the comment is kept as a
+ * document comment. The caller authorizes the acting user on the document.
  *
  * @param ctx the request context, whose user is the importing admin.
  * @param props the comment to import.
- * @returns the comment, whether it was created and whether it is anchored.
+ * @returns the comment, whether it was created or reattributed and whether it
+ *   is anchored.
  * @throws ValidationError when the id belongs to a comment of another document,
  *   or the author or the resolver is not a user of the team.
  */
@@ -79,10 +85,14 @@ export async function commentImporter(
         "A comment with this id belongs to another document"
       );
     }
+    const reattributed = await reattribute(ctx, existing, props);
     return {
-      comment: existing,
+      comment: reattributed
+        ? await Comment.findByPk(id, { transaction, rejectOnEmpty: true })
+        : existing,
       created: false,
       anchored: hasCommentMark(document, id),
+      reattributed,
     };
   }
 
@@ -131,7 +141,55 @@ export async function commentImporter(
     rejectOnEmpty: true,
   });
 
-  return { comment, created: true, anchored };
+  return { comment, created: true, anchored, reattributed: false };
+}
+
+/**
+ * An author without an account is imported under the importing account, the
+ * caller writing their name into the comment. Once they have an account, a
+ * replay that names them hands them the comment and its content, now without
+ * the name, and the thread they resolved. Only the importing account's own
+ * comments are moved, and only to another user of the team.
+ */
+async function reattribute(
+  ctx: APIContext,
+  existing: Comment,
+  props: CommentImportProps
+) {
+  const { transaction } = ctx.state;
+  const { user } = ctx.state.auth;
+  if (existing.createdById !== user.id || props.createdById === user.id) {
+    return false;
+  }
+
+  const author = await findTeamUser(
+    user.teamId,
+    props.createdById,
+    "createdById",
+    transaction
+  );
+  const resolvedByImporter =
+    !existing.parentCommentId &&
+    !!existing.resolvedAt &&
+    existing.resolvedById === user.id;
+  const resolver = resolvedByImporter
+    ? await findTeamUser(
+        user.teamId,
+        props.resolvedById ?? author.id,
+        "resolvedById",
+        transaction
+      )
+    : null;
+
+  await existing.update(
+    {
+      createdById: author.id,
+      data: props.data,
+      ...(resolver ? { resolvedById: resolver.id } : {}),
+    },
+    { transaction, silent: true }
+  );
+  return true;
 }
 
 async function findTeamUser(

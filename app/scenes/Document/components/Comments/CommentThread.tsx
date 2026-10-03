@@ -40,6 +40,10 @@ type Props = {
   collapseThreshold?: number;
   /** Number of replies to display when collapsed */
   collapseNumDisplayed?: number;
+  /** Called when the thread is clicked, focuses it in the comments sidebar by default */
+  onFocus?: () => void;
+  /** Called on a click outside the focused thread, unfocuses it in the sidebar by default */
+  onBlur?: () => void;
 };
 
 function CommentThread({
@@ -49,6 +53,8 @@ function CommentThread({
   focused,
   collapseThreshold = 5,
   collapseNumDisplayed = 3,
+  onFocus,
+  onBlur,
 }: Props) {
   const [scrollOnMount] = React.useState(focused && !window.location.hash);
   // Whether to play the entrance animation, captured once at mount so that
@@ -108,7 +114,11 @@ function CommentThread({
       !target.closest("." + EditorStyleHelper.commentGutter) &&
       event.defaultPrevented === false
     ) {
-      setFocusedCommentId(null);
+      if (onBlur) {
+        onBlur();
+      } else {
+        setFocusedCommentId(null);
+      }
     }
   });
 
@@ -117,7 +127,11 @@ function CommentThread({
   }, [editor, thread.id]);
 
   const handleClickThread = () => {
-    setFocusedCommentId(thread.id);
+    if (onFocus) {
+      onFocus();
+    } else {
+      setFocusedCommentId(thread.id);
+    }
   };
 
   const handleClickExpand = (ev: React.SyntheticEvent) => {

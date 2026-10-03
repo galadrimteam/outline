@@ -1201,6 +1201,78 @@ describe("#comments.import", () => {
     expect(documentAfter.updatedAt).toEqual(documentBefore.updatedAt);
   });
 
+  it("should hand a comment kept under the importing account to its author on a replay", async () => {
+    const { admin, author, document } = await setup();
+    const id = randomUUID();
+    const first = await server.post("/api/comments.import", admin, {
+      body: {
+        id,
+        documentId: document.id,
+        createdById: admin.id,
+        createdAt: writtenAt,
+        text: "**Thomas** : question",
+        resolvedAt,
+      },
+    });
+    expect((await first.json()).data.resolvedById).toEqual(admin.id);
+
+    const res = await server.post("/api/comments.import", admin, {
+      body: {
+        id,
+        documentId: document.id,
+        createdById: author.id,
+        createdAt: writtenAt,
+        text: "question",
+        resolvedAt,
+      },
+    });
+    const body = await res.json();
+
+    expect(res.status).toEqual(200);
+    expect(body.created).toEqual(false);
+    expect(body.reattributed).toEqual(true);
+    expect(body.data).toMatchObject({
+      createdById: author.id,
+      createdBy: { id: author.id },
+      createdAt: writtenAt.toISOString(),
+      resolvedAt: resolvedAt.toISOString(),
+      resolvedById: author.id,
+    });
+    expect(JSON.stringify(body.data.data)).not.toContain("Thomas");
+    expect(JSON.stringify(body.data.data)).toContain("question");
+  });
+
+  it("should leave a comment under the account of another admin on a replay", async () => {
+    const { team, admin, author, document } = await setup();
+    const other = await buildAdmin({ teamId: team.id });
+    const id = randomUUID();
+    await server.post("/api/comments.import", admin, {
+      body: {
+        id,
+        documentId: document.id,
+        createdById: admin.id,
+        createdAt: writtenAt,
+        text: "**Thomas** : question",
+      },
+    });
+
+    const res = await server.post("/api/comments.import", other, {
+      body: {
+        id,
+        documentId: document.id,
+        createdById: author.id,
+        createdAt: writtenAt,
+        text: "question",
+      },
+    });
+    const body = await res.json();
+
+    expect(res.status).toEqual(200);
+    expect(body.reattributed).toEqual(false);
+    expect(body.data.createdById).toEqual(admin.id);
+    expect(JSON.stringify(body.data.data)).toContain("Thomas");
+  });
+
   it("should refuse an id already used on another document", async () => {
     const { admin, author, document } = await setup();
     const other = await buildDocument({

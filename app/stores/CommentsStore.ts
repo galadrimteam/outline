@@ -88,6 +88,24 @@ export default class CommentsStore extends Store<Comment> {
   }
 
   /**
+   * Returns the open discussions of the page itself, the unresolved threads that are not anchored
+   * to its content (a draft is never one), oldest first, as Notion lists them under the title.
+   *
+   * @param documentId ID of the document to get comments for
+   * @param anchoredIds IDs of the threads anchored to the content of the document
+   * @returns Array of comments
+   */
+  pageThreadsInDocument(
+    documentId: string,
+    anchoredIds: ReadonlySet<string>
+  ): Comment[] {
+    return this.unresolvedThreadsInDocument(documentId).filter(
+      (comment: Comment) =>
+        !comment.isNew && !comment.pendingAnchor && !anchoredIds.has(comment.id)
+    );
+  }
+
+  /**
    * Returns the total number of unresolved comments in the given document.
    *
    * @param documentId ID of the document to get comments for
