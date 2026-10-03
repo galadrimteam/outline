@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next";
+import type { DatabaseCellValueType } from "@shared/databases/types";
 import {
   DatabaseFieldType,
   DatabaseStatusGroup,
@@ -112,7 +113,10 @@ describe("uniqueFieldName", () => {
 });
 
 describe("isEditTimeFormula", () => {
-  const formula = (expression: string, cellValueType = "dateTime") =>
+  const formula = (
+    expression: string,
+    cellValueType: DatabaseCellValueType = "dateTime"
+  ) =>
     makeField({
       type: DatabaseFieldType.Formula,
       cellValueType,
