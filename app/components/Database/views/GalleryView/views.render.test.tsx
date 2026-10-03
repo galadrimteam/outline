@@ -198,7 +198,6 @@ describe("database views", () => {
     view: DatabaseView,
     handlers: {
       onOpenRecord?: (recordId: string) => void;
-      onOpenComments?: (recordId: string) => void;
     } = {},
     params: RecordQueryParams = {}
   ) {
@@ -230,7 +229,6 @@ describe("database views", () => {
                   value={{
                     onViewCreated: () => undefined,
                     filterRequest: undefined,
-                    onOpenComments: handlers.onOpenComments,
                   }}
                 >
                   <View
@@ -560,21 +558,22 @@ describe("database views", () => {
     expect(opened).toEqual(["rec2"]);
   });
 
-  it("opens the comments of a card's row from its comment count", async () => {
+  it("opens the comments of a card's row on the spot from its comment count", async () => {
     rowCommentCounts.invalidate(databaseId);
-    vi.mocked(client.post).mockImplementation(async (path: string) =>
-      path === "/databaseRecords.commentCounts"
+    vi.mocked(client.post).mockImplementation(async (path: string) => {
+      if (path === "/databaseRecords.open") {
+        throw new Error("the popover's content is tested on its own");
+      }
+      return path === "/databaseRecords.commentCounts"
         ? { data: { rec1: 2 } }
         : {
             data: records,
             pagination: { offset: 0, limit: 50, total: records.length },
-          }
-    );
+          };
+    });
     const opened: string[] = [];
-    const discussed: string[] = [];
     await render(BoardView, boardView(), {
       onOpenRecord: (id) => opened.push(id),
-      onOpenComments: (id) => discussed.push(id),
     });
     await settle();
 
@@ -585,7 +584,9 @@ describe("database views", () => {
     await act(async () => {
       count?.click();
     });
-    expect(discussed).toEqual(["rec1"]);
+    expect(
+      document.querySelector("[role='dialog'][aria-label='Comments']")
+    ).not.toBeNull();
     expect(opened).toEqual([]);
   });
 

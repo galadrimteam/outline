@@ -44,7 +44,6 @@ import { databasePath } from "~/utils/routeHelpers";
 import type { SplitViewPane } from "~/utils/splitView";
 import { blockChrome } from "./blockChrome";
 import { boardColumns, isStackable, stackValue } from "./boardModel";
-import { openRowComments } from "./comments/openRowComments";
 import { openRowPeek } from "./rowPeek";
 import type { FilterRequest } from "./DatabaseBlockContext";
 import { DatabaseBlockContext } from "./DatabaseBlockContext";
@@ -620,11 +619,6 @@ const LoadedView = observer(function LoadedView({
     [handleOpenRecord]
   );
 
-  const handleOpenComments = React.useCallback(
-    (recordId: string) => void openRowComments(openRecordPage, ui, recordId),
-    [openRecordPage, ui]
-  );
-
   const handleCreateRecord = React.useCallback(
     async (
       fields?: Record<string, DatabaseCellInput>,
@@ -687,9 +681,8 @@ const LoadedView = observer(function LoadedView({
     () => ({
       onViewCreated,
       filterRequest,
-      onOpenComments: handleOpenComments,
     }),
-    [onViewCreated, filterRequest, handleOpenComments]
+    [onViewCreated, filterRequest]
   );
 
   const viewProps: TableViewProps = {

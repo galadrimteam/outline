@@ -102,12 +102,6 @@ export const PageComments = observer(function PageComments_({
 const Section = styled.section`
   margin-top: 22px;
   scroll-margin: 80px;
-
-  [data-comment-thread] {
-    margin: 0 0 16px;
-    margin-inline-start: 0;
-    margin-inline-end: 0;
-  }
 `;
 
 /** Notion's label of the page discussions: small, medium weight, its text colour at 65 %. */

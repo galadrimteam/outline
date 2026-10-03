@@ -46,6 +46,8 @@ type Props = {
   onBlur?: () => void;
   /** galadrim: drawn in the page as Notion's page discussions, see CommentThreadItem. */
   inPage?: boolean;
+  /** galadrim: the passage the thread is anchored to, when no editor holds its page. */
+  anchorText?: string;
 };
 
 function CommentThread({
@@ -58,6 +60,7 @@ function CommentThread({
   onFocus,
   onBlur,
   inPage,
+  anchorText,
 }: Props) {
   const [scrollOnMount] = React.useState(focused && !window.location.hash);
   // Whether to play the entrance animation, captured once at mount so that
@@ -88,7 +91,9 @@ function CommentThread({
     ProsemirrorHelper.getAnchorTextForComment(
       editor?.getComments() ?? [],
       thread.id
-    ) ?? thread.pendingAnchor?.anchorText;
+    ) ??
+    anchorText ??
+    thread.pendingAnchor?.anchorText;
 
   const commentsInThread = comments
     .inThread(thread.id)
@@ -253,6 +258,7 @@ function CommentThread({
       transition={{ layout: { duration: 0.2, ease: "easeOut" } }}
       $focused={focused}
       $recessed={recessed}
+      $inPage={inPage}
       onClick={handleClickThread}
     >
       {/* The entrance transform lives on an inner element so it does not
@@ -408,10 +414,11 @@ const ShowMore = styled.div<{ $inPage?: boolean }>`
 const Thread = styled(m.div)<{
   $focused: boolean;
   $recessed: boolean;
+  $inPage?: boolean;
 }>`
-  margin: 12px 12px 32px;
-  margin-inline-end: 18px;
-  margin-inline-start: 12px;
+  margin: ${(props) => (props.$inPage ? "0 0 16px" : "12px 12px 32px")};
+  margin-inline-end: ${(props) => (props.$inPage ? 0 : 18)}px;
+  margin-inline-start: ${(props) => (props.$inPage ? 0 : 12)}px;
   position: relative;
   transition: opacity 100ms ease-out;
 

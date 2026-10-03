@@ -17,8 +17,6 @@ export interface DatabaseBlockContextValue {
   onViewCreated: (view: DatabaseView) => void;
   /** The last request to filter on a property, eg « Filter » in a column menu. */
   filterRequest: FilterRequest | undefined;
-  /** Opens the comments of a row, from the comment count of a card or a table row. */
-  onOpenComments?: (recordId: string) => void;
 }
 
 /** Provided by `DatabaseBlock` around its toolbar and view. */

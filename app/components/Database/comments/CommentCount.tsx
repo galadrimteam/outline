@@ -3,9 +3,11 @@ import { CommentIcon } from "outline-icons";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import styled, { css } from "styled-components";
+import useShare from "@shared/hooks/useShare";
 import { s } from "@shared/styles";
 import useStores from "~/hooks/useStores";
 import { useDatabaseBlock } from "../DatabaseBlockContext";
+import { RowCommentsPopover } from "./RowCommentsPopover";
 import { rowCommentCounts } from "./rowCommentCounts";
 
 interface Props {
@@ -21,7 +23,8 @@ interface Props {
 /**
  * The number of open comments on a row's page, as a card or a table row shows
  * it in Notion. Nothing is drawn while there is none. Inside a database block
- * a click opens the row's comments, and nothing else.
+ * a click opens the row's discussions in a popover on the spot, as Notion
+ * does, and nothing else.
  *
  * @param props the row and its page.
  * @returns the count, or nothing.
@@ -34,7 +37,8 @@ export const CommentCount = observer(function CommentCount_({
 }: Props) {
   const { t } = useTranslation();
   const { comments } = useStores();
-  const onOpenComments = useDatabaseBlock()?.onOpenComments;
+  const { isShare } = useShare();
+  const interactive = !!useDatabaseBlock() && !isShare;
   const hasPage = documentId !== null;
 
   React.useEffect(() => {
@@ -42,14 +46,6 @@ export const CommentCount = observer(function CommentCount_({
       rowCommentCounts.request(databaseId, recordId);
     }
   }, [databaseId, recordId, hasPage]);
-
-  const handleClick = React.useCallback(
-    (event: React.MouseEvent) => {
-      event.stopPropagation();
-      onOpenComments?.(recordId);
-    },
-    [onOpenComments, recordId]
-  );
 
   if (!hasPage) {
     return null;
@@ -64,7 +60,7 @@ export const CommentCount = observer(function CommentCount_({
   }
 
   const label = t("{{ count }} comment", { count });
-  if (!onOpenComments) {
+  if (!interactive) {
     return (
       <Count className={className} role="note" aria-label={label}>
         <CommentIcon size={16} />
@@ -74,20 +70,22 @@ export const CommentCount = observer(function CommentCount_({
   }
 
   return (
-    <CountButton
-      type="button"
-      className={className}
-      aria-label={label}
-      title={t("Open comments")}
-      onClick={handleClick}
-      onPointerDown={stopPropagation}
-      onMouseDown={stopPropagation}
-      onTouchStart={stopPropagation}
-      onKeyDown={stopPropagation}
-    >
-      <CommentIcon size={16} />
-      {count}
-    </CountButton>
+    <RowCommentsPopover databaseId={databaseId} recordId={recordId}>
+      <CountButton
+        type="button"
+        className={className}
+        aria-label={label}
+        title={t("Open comments")}
+        onClick={stopPropagation}
+        onPointerDown={stopPropagation}
+        onMouseDown={stopPropagation}
+        onTouchStart={stopPropagation}
+        onKeyDown={stopPropagation}
+      >
+        <CommentIcon size={16} />
+        {count}
+      </CountButton>
+    </RowCommentsPopover>
   );
 });
 

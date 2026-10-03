@@ -19,6 +19,10 @@ interface Props {
   showForm: boolean;
   /** Changing it mounts the form again, focused. */
   formKey: number;
+  /** The passages of the anchored threads, when no editor holds the page. */
+  anchors?: ReadonlyMap<string, string>;
+  /** The thread shown with its reply form at first. */
+  initialFocusedId?: string;
 }
 
 /**
@@ -34,9 +38,13 @@ export const DiscussionList = observer(function DiscussionList_({
   fold,
   showForm,
   formKey,
+  anchors,
+  initialFocusedId,
 }: Props) {
   const { t } = useTranslation();
-  const [focusedId, setFocusedId] = React.useState<string | null>(null);
+  const [focusedId, setFocusedId] = React.useState<string | null>(
+    initialFocusedId ?? null
+  );
   const [draft, onSaveDraft] = usePersistedState<ProsemirrorData | undefined>(
     `draft-${document.id}-page`,
     undefined
@@ -57,6 +65,7 @@ export const DiscussionList = observer(function DiscussionList_({
           onFocus={() => setFocusedId(thread.id)}
           onBlur={handleBlur}
           inPage
+          anchorText={anchors?.get(thread.id)}
         />
       ))}
       {showForm && (
