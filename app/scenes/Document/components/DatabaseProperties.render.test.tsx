@@ -146,9 +146,6 @@ describe("DatabaseProperties", () => {
     expect(text).not.toContain("Nom");
     expect(text).toContain("Add a property");
     expect(text).toContain("Customize page");
-    expect(
-      container.querySelector(`a[href='/db/${databaseId}']`)
-    ).not.toBeNull();
   });
 
   it("draws property lines 38 px high, as Notion", async () => {
@@ -182,7 +179,11 @@ describe("DatabaseProperties", () => {
     expect(text).not.toContain("Statut");
   });
 
-  it("leaves the link to the database to the breadcrumb when it leads there", async () => {
+  it("does not name the database above the properties, the breadcrumb leads to it", async () => {
+    await render({}, false);
+    expect(container.querySelector(`a[href='/db/${databaseId}']`)).toBeNull();
+    expect(container.textContent).not.toContain("Suivi");
+
     await render({}, false, "60000000-0000-4000-8000-000000000003");
     expect(container.querySelector(`a[href='/db/${databaseId}']`)).toBeNull();
   });

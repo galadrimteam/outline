@@ -1,14 +1,12 @@
 import { observer } from "mobx-react";
 import {
   CollapsedIcon,
-  DatabaseIcon,
   HistoryIcon,
   PlusIcon,
   SettingsIcon,
 } from "outline-icons";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import styled, { css } from "styled-components";
 import type { DatabaseCellInput, DatabaseField } from "@shared/databases/types";
@@ -35,8 +33,8 @@ interface Props {
  * The properties of a database row, under the title of its page, like Notion: one line per
  * property edited in place, the properties hidden by the page layout behind « N more properties »
  * (or, with pinned properties, every other one behind « Show details »), then, on hover, "Add a
- * property", "Customize page" and the history. A link back to the database shows only when the
- * breadcrumb does not lead to it. Values follow the database live.
+ * property", "Customize page" and the history. Nothing names the database above them, as in Notion:
+ * the breadcrumb leads to it. Values follow the database live.
  *
  * @param props the row page and whether it is read-only.
  * @returns the properties, or nothing while they load or when the database cannot be read.
@@ -98,8 +96,6 @@ export const DatabaseProperties = observer(function DatabaseProperties_({
     layout
   );
   const { shown, hidden, pinned } = splitPageProperties(fields, record, layout);
-  const inBreadcrumb =
-    !!database.documentId && database.documentId === document.parentDocumentId;
   const collapsed = hidden.length > 0 && !showHidden;
 
   const renderRow = (field: DatabaseField, stacked: boolean) => (
@@ -136,13 +132,6 @@ export const DatabaseProperties = observer(function DatabaseProperties_({
 
   return (
     <Wrapper aria-label={t("Properties")}>
-      {!inBreadcrumb && (
-        <Back to={database.url || `/db/${database.id}`}>
-          <DatabaseIcon size={16} />
-          <span>{database.title || t("Untitled database")}</span>
-        </Back>
-      )}
-
       {pinned && <Actions>{toggle}</Actions>}
       {shown.map((field) => renderRow(field, pinned))}
       {showHidden && hidden.map((field) => renderRow(field, false))}
@@ -189,23 +178,6 @@ export const DatabaseProperties = observer(function DatabaseProperties_({
 
 const Wrapper = styled.section`
   margin: 4px 0 0;
-`;
-
-const Back = styled(Link)`
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin: 0 0 8px 6px;
-  font-size: 13px;
-  color: ${s("textTertiary")};
-
-  svg {
-    fill: currentColor;
-  }
-
-  &:hover {
-    color: ${s("textSecondary")};
-  }
 `;
 
 const Actions = styled.div`
