@@ -1,5 +1,9 @@
 import { DatabaseFieldType, DatabaseLayout } from "@shared/databases/types";
-import type { DatabaseField, DatabaseView } from "@shared/databases/types";
+import type {
+  DatabaseField,
+  DatabaseSettings,
+  DatabaseView,
+} from "@shared/databases/types";
 import { DatabaseSettingsHelper } from "./DatabaseSettingsHelper";
 
 const view = (id: string): DatabaseView => ({
@@ -118,7 +122,7 @@ describe("DatabaseSettingsHelper", () => {
   });
 
   it("lets a timeline read the rows of the groups it folds, for « No date »", () => {
-    const settings = {
+    const settings: DatabaseSettings = {
       viewOverrides: {
         viwTimeline: {
           layout: DatabaseLayout.Timeline,
