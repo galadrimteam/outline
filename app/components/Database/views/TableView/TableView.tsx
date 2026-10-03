@@ -35,8 +35,15 @@ import { cellValueToText } from "../../cells/format";
 import { getCell } from "../../cells/registry";
 import { orderPatch, orderedFields } from "../../toolbar/columns";
 import type { DatabaseViewProps } from "../../types";
+import { useElementWidth } from "../../useElementWidth";
 import { GroupAddRow, GroupHeaderRow, PositionedLine } from "./GroupRows";
-import { GUTTER_WIDTH, moveId, tableColumns, tableRowLayout } from "./layout";
+import {
+  GUTTER_WIDTH,
+  fitFrozenColumns,
+  moveId,
+  tableColumns,
+  tableRowLayout,
+} from "./layout";
 import { moveCell, navigationKey } from "./navigation";
 import type { AddDisplayRow, GroupPathItem, RecordDisplayRow } from "./rows";
 import { buildDisplayRows, dropSide, pathChange, pathPrefill } from "./rows";
@@ -109,6 +116,7 @@ export const TableView = observer(function TableView_({
 }: TableViewProps) {
   const { t } = useTranslation();
   const { databaseRecords, databases, dialogs } = useStores();
+  const scrollerRef = React.useRef<HTMLDivElement>(null);
   const gridRef = React.useRef<HTMLDivElement>(null);
   const bodyRef = React.useRef<HTMLDivElement>(null);
   const editingRef = React.useRef(false);
@@ -134,9 +142,11 @@ export const TableView = observer(function TableView_({
   }, [editing]);
 
   const fields = database.fields;
+  const scrollerWidth = useElementWidth(scrollerRef);
   const columns = React.useMemo(
-    () => tableColumns(fields ?? [], view, widths),
-    [fields, view, widths]
+    () =>
+      fitFrozenColumns(tableColumns(fields ?? [], view, widths), scrollerWidth),
+    [fields, view, widths, scrollerWidth]
   );
   const layout = tableRowLayout(view.options.rowHeight, columns);
   const template = `${GUTTER_WIDTH}px ${columns
@@ -898,7 +908,11 @@ export const TableView = observer(function TableView_({
           onClear={() => setSelected([])}
         />
       )}
-      <Scroller data-scrolled={scrolled || undefined} onScroll={handleScroll}>
+      <Scroller
+        ref={scrollerRef}
+        data-scrolled={scrolled || undefined}
+        onScroll={handleScroll}
+      >
         <Grid
           ref={gridRef}
           role="grid"
