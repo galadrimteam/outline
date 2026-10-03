@@ -750,4 +750,74 @@ describe("database views", () => {
       behavior: "smooth",
     });
   });
+
+  it("opens a row from the label kept at the left edge, not from its ‹", async () => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
+    Element.prototype.scrollTo = vi.fn();
+    const opened: string[] = [];
+    await render(
+      TimelineView,
+      makeView({
+        overrides: {
+          layout: DatabaseLayout.Timeline,
+          timeline: { startFieldId: "start", endFieldId: "end", zoom: "week" },
+        },
+      }),
+      { onOpenRecord: (id) => opened.push(id) }
+    );
+    const bar = container.querySelector<HTMLElement>(
+      "[aria-label^='Maquettes,']"
+    );
+    const scroller = container.querySelector("[aria-busy]")?.lastElementChild;
+    await act(async () => {
+      if (scroller && bar) {
+        scroller.scrollLeft = parseFloat(bar.style.left) + 2 * 64;
+        scroller.dispatchEvent(new Event("scroll"));
+      }
+    });
+    const back = container.querySelector<HTMLElement>(
+      "[aria-label='Go to the start']"
+    );
+
+    act(() => back?.click());
+    expect(opened).toEqual([]);
+    act(() => back?.parentElement?.click());
+    expect(opened).toEqual(["rec1"]);
+  });
+
+  it("centres on today once a timeline drawn hidden, as in a folded toggle, shows", async () => {
+    let width = 0;
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(
+      () => width
+    );
+    const resized: Array<() => void> = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: () => void) {
+          resized.push(callback);
+        }
+        observe() {}
+        disconnect() {}
+      }
+    );
+    await render(
+      TimelineView,
+      makeView({
+        overrides: {
+          layout: DatabaseLayout.Timeline,
+          timeline: { startFieldId: "start", endFieldId: "end", zoom: "week" },
+        },
+      })
+    );
+    const scroller = container.querySelector("[aria-busy]")?.lastElementChild;
+    expect(scroller?.scrollLeft).toBe(0);
+
+    width = 400;
+    await act(async () => {
+      resized.forEach((callback) => callback());
+    });
+    expect(scroller?.scrollLeft).toBeGreaterThan(0);
+    vi.unstubAllGlobals();
+  });
 });

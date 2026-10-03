@@ -26,6 +26,7 @@ import type Database from "~/models/Database";
 import { isEmptyCell } from "~/stores/DatabaseRecordsStore";
 import { isLinkItem, toArray } from "../../cells/format";
 import { getCell } from "../../cells/registry";
+import { PeopleChips, peopleOf } from "../../cells/UserCell";
 import { MenuItem, MenuLabel, MenuPanel } from "../../fields/components";
 import { CompactSelect } from "../../toolbar/components";
 import type { RecordGroup } from "../../toolbar/grouping";
@@ -35,6 +36,7 @@ import type { DatabaseViewProps } from "../../types";
 import type { DaySpan } from "../CalendarView/calendarModel";
 import { defaultDateField } from "../../newViewDefaults";
 import { recordSpan } from "../CalendarView/calendarModel";
+import { useElementWidth } from "../../useElementWidth";
 import { useDateLocale } from "../CalendarView/useDateLocale";
 import { GroupLabel } from "../GroupLabel";
 import {
@@ -119,6 +121,7 @@ export const TimelineView = observer(function TimelineView({
   const [preview, setPreview] = React.useState<{ id: string; span: DaySpan }>();
   const [visible, setVisible] = React.useState<VisibleSpan>(ALL_VISIBLE);
   const scrollerRef = React.useRef<HTMLDivElement>(null);
+  const scrollerWidth = useElementWidth(scrollerRef);
   const markerId = `timeline-arrow-${React.useId().replace(/:/g, "")}`;
 
   React.useEffect(() => {
@@ -331,12 +334,14 @@ export const TimelineView = observer(function TimelineView({
     [canConfigure, update, settings]
   );
 
+  // A timeline drawn hidden, as in a folded toggle, has no width to centre
+  // today in: it does so once it shows.
   React.useLayoutEffect(() => {
-    if (!scrolledOnce.current && query.isLoaded) {
+    if (!scrolledOnce.current && query.isLoaded && scrollerWidth > 0) {
       scrolledOnce.current = true;
       scrollToToday();
     }
-  }, [zoom, query.isLoaded, scrollToToday]);
+  }, [zoom, query.isLoaded, scrollerWidth, scrollToToday]);
 
   const handleToggleTable = React.useCallback(() => {
     const next = !showTable;
@@ -958,6 +963,12 @@ const Track = observer(function Track({
     onCommit(record, dragSpan(savedSpan, mode, step));
   };
 
+  // The label drawn beside or over the edge of a bar opens the row as the bar does, as in Notion.
+  const handleLabelClick = (ev: React.MouseEvent<HTMLElement>) => {
+    ev.stopPropagation();
+    onOpen(record.id);
+  };
+
   const geometry: BarGeometry | undefined = span
     ? barGeometry(span, rangeStart, px)
     : undefined;
@@ -1040,13 +1051,14 @@ const Track = observer(function Track({
         <OutsideTitle
           aria-hidden
           style={{ left: geometry.left + Math.max(geometry.width, 6) + 6 }}
+          onClick={handleLabelClick}
         >
           {labelContent}
         </OutsideTitle>
       )}
       {geometry && hidden.start && (
         <StartLane style={{ left: geometry.left }}>
-          <PinnedLabel style={{ left: pinLeft + 6 }}>
+          <PinnedLabel style={{ left: pinLeft + 6 }} onClick={handleLabelClick}>
             <EdgeButton
               type="button"
               aria-label={t("Go to the start")}
@@ -1094,7 +1106,7 @@ interface BarLabelProps {
 
 /**
  * What a bar shows, as on Notion's: the row's icon and title, then the
- * properties the view shows that have a value.
+ * properties the view shows that have a value, people as avatars alone.
  */
 const BarLabel = observer(function BarLabel({
   database,
@@ -1108,15 +1120,21 @@ const BarLabel = observer(function BarLabel({
         .filter((field) => !isEmptyCell(record.fields[field.id]))
         .map((field) => {
           const { Renderer } = getCell(field.type);
+          const value = record.fields[field.id];
+          const people = peopleOf(value);
           return (
             <LabelProperty key={field.id}>
-              <Renderer
-                field={field}
-                value={record.fields[field.id]}
-                database={database}
-                record={record}
-                variant="table"
-              />
+              {people.length ? (
+                <PeopleChips people={people} variant="table" avatarsOnly />
+              ) : (
+                <Renderer
+                  field={field}
+                  value={value}
+                  database={database}
+                  record={record}
+                  variant="table"
+                />
+              )}
             </LabelProperty>
           );
         })}
@@ -1531,7 +1549,7 @@ const OutsideTitle = styled.span`
   max-width: 320px;
   font-size: 13px;
   color: ${s("textSecondary")};
-  pointer-events: none;
+  cursor: var(--pointer);
   ${ellipsis()}
 `;
 
@@ -1561,6 +1579,8 @@ const PinnedLabel = styled.div`
   gap: 6px;
   max-width: 480px;
   height: 100%;
+  cursor: var(--pointer);
+  pointer-events: auto;
 `;
 
 const PinnedText = styled.span`
