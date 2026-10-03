@@ -9,6 +9,7 @@ import type {
 } from "@shared/databases/types";
 import type Database from "~/models/Database";
 import { getCell } from "../../cells/registry";
+import { cellHostProps } from "../../cells/components/EditorPopover";
 import { CommentCount } from "../../comments/CommentCount";
 import { RowIcon } from "../../RowIcon";
 import type { TableColumn } from "./layout";
@@ -134,6 +135,7 @@ export const TableCell = observer(function TableCell_({
       role="gridcell"
       aria-selected={isActive}
       data-cell={`${record.id}:${field.id}`}
+      {...cellHostProps}
       $frozen={column.frozen}
       $left={column.left}
       $scrollMarginLeft={column.frozen ? 0 : scrollMarginLeft}

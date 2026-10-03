@@ -9,6 +9,7 @@ import type {
 import { s } from "@shared/styles";
 import Tooltip from "~/components/Tooltip";
 import type Database from "~/models/Database";
+import { cellHostProps } from "../cells/components/EditorPopover";
 import { getCell } from "../cells/registry";
 import { FieldHeaderMenu } from "./FieldHeaderMenu";
 import { FieldKindIcon } from "./FieldKindIcon";
@@ -111,6 +112,7 @@ export const PropertyRow = observer(function PropertyRow_({
         )}
       </NameCell>
       <ValueCell
+        {...cellHostProps}
         role={editable ? "button" : undefined}
         tabIndex={editable && !editing ? 0 : undefined}
         $editable={editable}
