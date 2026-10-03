@@ -26,6 +26,7 @@ import {
   databaseRowsLinker,
 } from "./databaseRowDocumentCreator";
 import { databaseRowsTreeUpdater } from "./databaseRowsTreeUpdater";
+import documentMover from "./documentMover";
 
 async function setup() {
   const team = await buildTeam();
@@ -454,6 +455,56 @@ describe("a database that keeps its rows in the sidebar", () => {
     expect(
       structure.getDocumentTree(project.id)?.children.map((node) => node.id)
     ).toEqual([subPage.id]);
+  });
+});
+
+describe("a row page kept in the tree", () => {
+  it("moves, is archived and restored like a page, sub-pages with it", async () => {
+    const { team, user, collection, home, database } = await setup();
+    await database.update({ settings: { rowsInSidebar: true } });
+    const project = await databaseRowDocumentCreator(
+      { user },
+      { database, recordId: "rec1", title: "Delisle" }
+    );
+    const subPage = await buildDocument({
+      teamId: team.id,
+      userId: user.id,
+      collectionId: collection.id,
+      parentDocumentId: project.id,
+    });
+    const elsewhere = await buildDocument({
+      teamId: team.id,
+      userId: user.id,
+      collectionId: collection.id,
+    });
+
+    await withAPIContext(user, (ctx) =>
+      documentMover(ctx, {
+        document: project,
+        collectionId: collection.id,
+        parentDocumentId: elsewhere.id,
+      })
+    );
+    let structure = await loadStructure(collection.id);
+    expect(structure.getDocumentTree(home.id)?.children).toEqual([]);
+    expect(structure.getDocumentTree(elsewhere.id)?.children).toEqual([
+      expect.objectContaining({
+        id: project.id,
+        children: [expect.objectContaining({ id: subPage.id })],
+      }),
+    ]);
+
+    await withAPIContext(user, (ctx) => project.archiveWithCtx(ctx));
+    structure = await loadStructure(collection.id);
+    expect(structure.getDocumentTree(project.id)).toBeNull();
+
+    await withAPIContext(user, (ctx) =>
+      project.restoreTo(ctx, { collectionId: collection.id })
+    );
+    structure = await loadStructure(collection.id);
+    expect(structure.getDocumentTree(project.id)).not.toBeNull();
+    const reloaded = await Document.findByPk(project.id);
+    expect(reloaded?.databaseId).toEqual(database.id);
   });
 });
 
