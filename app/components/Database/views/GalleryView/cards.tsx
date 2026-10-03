@@ -17,9 +17,9 @@ import { toneColors } from "../../colors";
 import { attachmentsOf, isImageAttachment } from "../../cells/AttachmentCell";
 import { compactPills } from "../../cells/components/ChoicePill";
 import { isEmptyCellValue } from "../../cells/format";
-import { getCell } from "../../cells/registry";
 import { RowIcon } from "../../RowIcon";
 import { cardFields } from "../../toolbar/columns";
+import { CardProperty } from "../CardProperty";
 
 /** Font size of the title of a board or gallery card, in px. */
 export const cardTitleFontSize = 15;
@@ -221,6 +221,8 @@ interface PropertiesProps {
   showNames?: boolean;
   /** Lays values on one line (list rows) instead of one per line (cards). */
   inline?: boolean;
+  /** False when a click on a property edits it, as in Notion, instead of opening the row. */
+  readOnly?: boolean;
 }
 
 /**
@@ -236,6 +238,7 @@ export const CardProperties = observer(function CardProperties({
   fields,
   showNames,
   inline,
+  readOnly = true,
 }: PropertiesProps) {
   const filled = fields.filter(
     (field) => !isEmptyCellValue(record.fields[field.id])
@@ -246,21 +249,20 @@ export const CardProperties = observer(function CardProperties({
 
   return (
     <Properties $inline={inline}>
-      {filled.map((field) => {
-        const { Renderer } = getCell(field.type);
-        return (
-          <Property key={field.id} $inline={inline} title={field.name}>
-            {showNames && <PropertyName>{field.name}</PropertyName>}
-            <Renderer
-              field={field}
-              value={record.fields[field.id]}
-              database={database}
-              record={record}
-              variant={inline ? "table" : "card"}
-            />
-          </Property>
-        );
-      })}
+      {filled.map((field) => (
+        <Property
+          key={field.id}
+          database={database}
+          field={field}
+          record={record}
+          readOnly={readOnly}
+          variant={inline ? "table" : "card"}
+          title={field.name}
+          $inline={inline}
+        >
+          {showNames && <PropertyName>{field.name}</PropertyName>}
+        </Property>
+      ))}
     </Properties>
   );
 });
@@ -317,13 +319,14 @@ const Untitled = styled.span`
   color: ${s("placeholder")};
 `;
 
+// Notion's measures: the title 26px after the icon's left edge, weight 500.
 const Heading = styled.div<{ $empty: boolean }>`
   display: flex;
   align-items: flex-start;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
   font-size: ${cardTitleFontSize}px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: ${cardTitleLineHeight};
   overflow-wrap: anywhere;
   color: ${(props) => (props.$empty ? props.theme.placeholder : props.theme.text)};
@@ -341,7 +344,7 @@ const Properties = styled.div<{ $inline?: boolean }>`
   min-width: 0;
 `;
 
-const Property = styled.div<{ $inline?: boolean }>`
+const Property = styled(CardProperty)<{ $inline?: boolean }>`
   min-width: 0;
   max-width: ${(props) => (props.$inline ? "220px" : "none")};
   font-size: ${(props) => (props.$inline ? 13 : 12)}px;

@@ -15,6 +15,8 @@ import { light } from "@shared/styles/theme";
 import { ActionContextProvider } from "~/hooks/useActionContext";
 import stores from "~/stores";
 import { client } from "~/utils/ApiClient";
+import { rowCommentCounts } from "../../comments/rowCommentCounts";
+import { DatabaseBlockContext } from "../../DatabaseBlockContext";
 import { DatabaseToolbar } from "../../toolbar/DatabaseToolbar";
 import type { DatabaseViewProps } from "../../types";
 import { BoardView } from "../BoardView";
@@ -162,6 +164,18 @@ describe("database views", () => {
       addEventListener() {},
       removeEventListener() {},
     })) as unknown as typeof window.matchMedia;
+    // jsdom's selector engine throws on the board's `:has()` rules once a Radix popover, whose
+    // ids hold colons, is open; browsers do not.
+    const computedStyle = window.getComputedStyle.bind(window);
+    vi.spyOn(window, "getComputedStyle").mockImplementation(
+      (element, pseudo) => {
+        try {
+          return computedStyle(element, pseudo);
+        } catch {
+          return document.createElement("div").style;
+        }
+      }
+    );
     vi.mocked(client.post).mockReset();
     vi.mocked(client.post).mockResolvedValue({
       data: records,
@@ -175,11 +189,16 @@ describe("database views", () => {
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
+    vi.restoreAllMocks();
   });
 
   async function render(
     View: React.ComponentType<DatabaseViewProps>,
-    view: DatabaseView
+    view: DatabaseView,
+    handlers: {
+      onOpenRecord?: (recordId: string) => void;
+      onOpenComments?: (recordId: string) => void;
+    } = {}
   ) {
     const database = stores.databases.add({
       id: databaseId,
@@ -205,14 +224,22 @@ describe("database views", () => {
                   query={query}
                   readOnly={false}
                 />
-                <View
-                  database={database}
-                  view={view}
-                  query={query}
-                  readOnly={false}
-                  onOpenRecord={() => undefined}
-                  onCreateRecord={async () => undefined}
-                />
+                <DatabaseBlockContext.Provider
+                  value={{
+                    onViewCreated: () => undefined,
+                    filterRequest: undefined,
+                    onOpenComments: handlers.onOpenComments,
+                  }}
+                >
+                  <View
+                    database={database}
+                    view={view}
+                    query={query}
+                    readOnly={false}
+                    onOpenRecord={handlers.onOpenRecord ?? (() => undefined)}
+                    onCreateRecord={async () => undefined}
+                  />
+                </DatabaseBlockContext.Provider>
               </ActionContextProvider>
             </ThemeProvider>
           </MemoryRouter>
@@ -328,6 +355,97 @@ describe("database views", () => {
         )
     ).toBe(true);
     expect(container.textContent).toContain("New page");
+  });
+
+  const boardView = () =>
+    makeView({
+      type: "kanban",
+      layout: DatabaseLayout.Board,
+      options: { stackFieldId: "status" },
+      columnMeta: { status: { order: 1, visible: true } },
+    });
+
+  const settle = () =>
+    act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+
+  const cardOf = (title: string) =>
+    Array.from(
+      container.querySelectorAll<HTMLElement>("[role='button'][aria-label]")
+    ).find((card) => card.getAttribute("aria-label") === title);
+
+  it("edits only the property clicked on a board card, without opening the row", async () => {
+    const opened: string[] = [];
+    await render(BoardView, boardView(), {
+      onOpenRecord: (id) => opened.push(id),
+    });
+    await settle();
+
+    const property = cardOf("Maquettes")?.querySelector<HTMLElement>(
+      "[role='button'][aria-label='Statut']"
+    );
+    expect(property).toBeTruthy();
+    await act(async () => {
+      property?.click();
+    });
+    expect(
+      document.querySelector("[aria-label='Edit options'] input")
+    ).not.toBeNull();
+    expect(opened).toEqual([]);
+
+    await act(async () => {
+      cardOf("Intégration")?.click();
+    });
+    expect(opened).toEqual(["rec2"]);
+  });
+
+  it("opens the comments of a card's row from its comment count", async () => {
+    rowCommentCounts.invalidate(databaseId);
+    vi.mocked(client.post).mockImplementation(async (path: string) =>
+      path === "/databaseRecords.commentCounts"
+        ? { data: { rec1: 2 } }
+        : {
+            data: records,
+            pagination: { offset: 0, limit: 50, total: records.length },
+          }
+    );
+    const opened: string[] = [];
+    const discussed: string[] = [];
+    await render(BoardView, boardView(), {
+      onOpenRecord: (id) => opened.push(id),
+      onOpenComments: (id) => discussed.push(id),
+    });
+    await settle();
+
+    const count = cardOf("Maquettes")?.querySelector<HTMLElement>(
+      "button[aria-label^='2 comment']"
+    );
+    expect(count?.textContent).toBe("2");
+    await act(async () => {
+      count?.click();
+    });
+    expect(discussed).toEqual(["rec1"]);
+    expect(opened).toEqual([]);
+  });
+
+  it("edits the property clicked on a gallery card", async () => {
+    const opened: string[] = [];
+    await render(
+      GalleryView,
+      makeView({ type: "gallery", layout: DatabaseLayout.Gallery }),
+      { onOpenRecord: (id) => opened.push(id) }
+    );
+    const property = container.querySelector<HTMLElement>(
+      "[role='button'][aria-label='Statut']"
+    );
+    await act(async () => {
+      property?.click();
+    });
+    expect(
+      document.querySelector("[aria-label='Edit options'] input")
+    ).not.toBeNull();
+    expect(opened).toEqual([]);
   });
 
   it("draws a month calendar with dated rows only", async () => {

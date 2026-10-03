@@ -4,8 +4,11 @@ import breakpoint from "styled-components-breakpoint";
 import { s } from "@shared/styles";
 import { GUTTER_WIDTH } from "./layout";
 
-/** Height of the header and footer lines. */
-export const HEADER_HEIGHT = 34;
+/** Height of the line of column headers, as Notion's. */
+export const HEADER_HEIGHT = 36;
+
+/** Height of the line of calculations. */
+export const FOOTER_HEIGHT = 34;
 
 // The gutter lies in the page margin, like Notion's row handles: lines start
 // where the columns do.
@@ -44,13 +47,23 @@ export const Scroller = styled.div`
   `};
 `;
 
-/** The table, as wide as its columns. */
+/**
+ * The table, as wide as its columns. Inside a document the editor makes every
+ * element content-box: a cell's padding would then add to its `min-height:
+ * 100%` and push it, and the « Open » button centred on it, below its row.
+ * `&&` outranks the editor's rule.
+ */
 export const Grid = styled.div`
   position: relative;
   min-width: 100%;
   font-size: 14px;
   color: ${s("text")};
   outline: none;
+
+  &&,
+  && * {
+    box-sizing: border-box;
+  }
 `;
 
 /** A line of the table laid out on the column grid. */
@@ -63,7 +76,7 @@ export const Line = styled.div<{ $template: string }>`
 /** The line of column headers. */
 export const HeaderLine = styled(Line)`
   height: ${HEADER_HEIGHT}px;
-  color: ${s("textSecondary")};
+  color: ${s("textTertiary")};
 
   &::before {
     content: "";
@@ -123,16 +136,16 @@ const frozen = css<{ $frozen?: boolean; $left?: number }>`
 `;
 
 /**
- * The left gutter of a line, in the page margin: drag handle and checkbox.
- * It only hides the columns scrolled under it once the table scrolls
- * sideways, so that it never covers the frame of the block.
+ * The left gutter of a line, in the page margin: « + » and drag handle as in
+ * Notion, and the checkbox of the selected rows. It only hides the columns
+ * scrolled under it once the table scrolls sideways, so that it never covers
+ * the frame of the block.
  */
 export const Gutter = styled.div`
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 2px;
-  padding-right: 4px;
+  padding-right: 10px;
   position: sticky;
   left: 0;
   z-index: 3;
@@ -142,17 +155,30 @@ export const Gutter = styled.div`
   }
 `;
 
-/** A control in the gutter shown on hover (or while selected). */
-export const GutterControl = styled.div<{ $visible?: boolean }>`
+/** A control in the gutter shown on hover (or while rows are selected). */
+export const GutterControl = styled.div<{
+  $visible?: boolean;
+  $width?: number;
+}>`
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  flex-shrink: 0;
+  width: ${(props) => props.$width ?? 20}px;
+  height: ${(props) => (props.$width ? 24 : 20)}px;
+  border-radius: 4px;
   opacity: ${(props) => (props.$visible ? 1 : 0)};
   color: ${s("textTertiary")};
   transition: opacity 100ms ease;
+
+  svg {
+    fill: currentColor;
+  }
+
+  &[role="button"]:hover {
+    background: ${s("listItemHoverBackground")};
+  }
 `;
 
 /** A header cell. */
@@ -178,12 +204,13 @@ export const HeaderButton = styled.button`
   background: none;
   font: inherit;
   font-size: 14px;
-  color: ${s("textSecondary")};
+  color: ${s("textTertiary")};
   text-align: left;
   cursor: var(--pointer);
 
   svg {
     flex-shrink: 0;
+    margin: 0 1px;
     fill: currentColor;
   }
 
@@ -244,34 +271,51 @@ export const Cell = styled.div<{
     `}
 `;
 
-/** The "Open" button of the title cell. */
+/**
+ * The "Open" button of the title cell, as Notion draws it: over the end of the
+ * title, level with its first line, its frame a shadow rather than a border.
+ */
 export const OpenButton = styled.button`
   position: absolute;
-  top: 50%;
-  right: 6px;
-  transform: translateY(-50%);
+  top: 6px;
+  right: 4px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   height: 24px;
   padding: 0 6px;
-  border: 1px solid ${s("divider")};
-  border-radius: 4px;
+  border: 0;
+  border-radius: 6px;
   background: ${s("background")};
   font: inherit;
   font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.02em;
+  line-height: 18px;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
-  color: ${s("textSecondary")};
+  white-space: nowrap;
+  color: ${s("textTertiary")};
   opacity: 0;
   cursor: var(--pointer);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  box-shadow: ${(props) =>
+    props.theme.isDark
+      ? "0 0 0 1px rgba(255, 255, 255, 0.094), 0 2px 6px rgba(0, 0, 0, 0.2)"
+      : "rgba(25, 25, 25, 0.027) 0 8px 12px, rgba(25, 25, 25, 0.027) 0 2px 6px, rgba(42, 28, 0, 0.07) 0 0 0 1px"};
+
+  svg {
+    flex-shrink: 0;
+    fill: currentColor;
+  }
 
   &:hover,
   &:focus-visible {
     opacity: 1;
-    background: ${s("listItemHoverBackground")};
+    background:
+      linear-gradient(
+        ${s("listItemHoverBackground")},
+        ${s("listItemHoverBackground")}
+      ),
+      ${s("background")};
   }
 `;
 
@@ -321,7 +365,7 @@ export const NewButton = styled.button`
 
 /** The line of calculations under the rows. */
 export const FooterLine = styled(Line)`
-  min-height: ${HEADER_HEIGHT}px;
+  min-height: ${FOOTER_HEIGHT}px;
 
   &::after {
     display: none;

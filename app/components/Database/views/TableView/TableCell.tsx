@@ -177,5 +177,5 @@ const TitleIcon = styled(RowIcon)`
 
 const TitleCommentCount = styled(CommentCount)`
   flex-shrink: 0;
-  margin-left: 6px;
+  margin-left: 5px;
 `;

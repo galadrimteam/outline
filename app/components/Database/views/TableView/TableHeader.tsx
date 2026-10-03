@@ -113,8 +113,8 @@ export const TableHeader = observer(function TableHeader_({
   return (
     <HeaderLine role="row" $template={template}>
       <Gutter role="presentation">
-        {!readOnly && rowCount > 0 && (
-          <GutterControl $visible={selectedCount > 0} data-gutter-control>
+        {!readOnly && selectedCount > 0 && (
+          <GutterControl $visible data-gutter-control>
             <SelectionCheckbox
               checked={selectedCount > 0 && selectedCount === rowCount}
               indeterminate={selectedCount > 0 && selectedCount < rowCount}

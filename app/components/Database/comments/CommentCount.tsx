@@ -2,9 +2,10 @@ import { observer } from "mobx-react";
 import { CommentIcon } from "outline-icons";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
-import styled from "styled-components";
+import styled, { css } from "styled-components";
 import { s } from "@shared/styles";
 import useStores from "~/hooks/useStores";
+import { useDatabaseBlock } from "../DatabaseBlockContext";
 import { rowCommentCounts } from "./rowCommentCounts";
 
 interface Props {
@@ -19,7 +20,8 @@ interface Props {
 
 /**
  * The number of open comments on a row's page, as a card or a table row shows
- * it in Notion. Nothing is drawn while there is none.
+ * it in Notion. Nothing is drawn while there is none. Inside a database block
+ * a click opens the row's comments, and nothing else.
  *
  * @param props the row and its page.
  * @returns the count, or nothing.
@@ -32,6 +34,7 @@ export const CommentCount = observer(function CommentCount_({
 }: Props) {
   const { t } = useTranslation();
   const { comments } = useStores();
+  const onOpenComments = useDatabaseBlock()?.onOpenComments;
   const hasPage = documentId !== null;
 
   React.useEffect(() => {
@@ -39,6 +42,14 @@ export const CommentCount = observer(function CommentCount_({
       rowCommentCounts.request(databaseId, recordId);
     }
   }, [databaseId, recordId, hasPage]);
+
+  const handleClick = React.useCallback(
+    (event: React.MouseEvent) => {
+      event.stopPropagation();
+      onOpenComments?.(recordId);
+    },
+    [onOpenComments, recordId]
+  );
 
   if (!hasPage) {
     return null;
@@ -52,28 +63,72 @@ export const CommentCount = observer(function CommentCount_({
     return null;
   }
 
+  const label = t("{{ count }} comment", { count });
+  if (!onOpenComments) {
+    return (
+      <Count className={className} role="note" aria-label={label}>
+        <CommentIcon size={16} />
+        {count}
+      </Count>
+    );
+  }
+
   return (
-    <Count
+    <CountButton
+      type="button"
       className={className}
-      role="note"
-      aria-label={t("{{ count }} comment", { count })}
+      aria-label={label}
+      title={t("Open comments")}
+      onClick={handleClick}
+      onPointerDown={stopPropagation}
+      onMouseDown={stopPropagation}
+      onTouchStart={stopPropagation}
+      onKeyDown={stopPropagation}
     >
       <CommentIcon size={16} />
       {count}
-    </Count>
+    </CountButton>
   );
 });
 
-const Count = styled.span`
+/** Keeps a click on the count from dragging, selecting or opening what holds it. */
+function stopPropagation(event: React.SyntheticEvent) {
+  event.stopPropagation();
+}
+
+const count = css`
   display: inline-flex;
   align-items: center;
-  gap: 1px;
+  gap: 3px;
   font-size: 12px;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: ${s("textTertiary")};
 
   svg {
     flex-shrink: 0;
     fill: currentColor;
+  }
+`;
+
+const Count = styled.span`
+  ${count}
+`;
+
+// Notion's own measures: 20px tall, 2px before the icon and 5px after the number.
+const CountButton = styled.button`
+  ${count}
+  height: 20px;
+  margin: 0;
+  padding: 0 5px 0 2px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  font-family: inherit;
+  line-height: 20px;
+  cursor: var(--pointer);
+
+  &:hover {
+    background: ${s("listItemHoverBackground")};
   }
 `;

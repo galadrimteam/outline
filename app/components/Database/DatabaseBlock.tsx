@@ -15,7 +15,11 @@ import { useTranslation } from "react-i18next";
 import { useHistory } from "react-router-dom";
 import { toast } from "sonner";
 import styled, { css } from "styled-components";
-import type { DatabaseCellInput, DatabaseView } from "@shared/databases/types";
+import type {
+  DatabaseCellInput,
+  DatabaseRecordOrder,
+  DatabaseView,
+} from "@shared/databases/types";
 import { appendFilterNode, createFilterItem } from "@shared/databases/filters";
 import { DatabaseLayout } from "@shared/databases/types";
 import type { DatabaseAttrs } from "@shared/editor/nodes/Database";
@@ -38,10 +42,12 @@ import { AuthorizationError, NotFoundError } from "~/utils/errors";
 import browserHistory from "~/utils/history";
 import lazyWithRetry from "~/utils/lazyWithRetry";
 import { databasePath } from "~/utils/routeHelpers";
+import type { SplitViewPane } from "~/utils/splitView";
 import { openRouteInSplit } from "~/utils/splitView";
 import type { BlockReveal } from "./blockChrome";
 import { blockChrome } from "./blockChrome";
 import { boardColumns, isStackable, stackValue } from "./boardModel";
+import { openRowComments } from "./comments/openRowComments";
 import type { FilterRequest } from "./DatabaseBlockContext";
 import { DatabaseBlockContext } from "./DatabaseBlockContext";
 import { DatabaseHeader } from "./DatabaseHeader";
@@ -514,7 +520,7 @@ const LoadedView = observer(function LoadedView({
 }: LoadedViewProps) {
   const share = useDatabaseShare();
   const { t } = useTranslation();
-  const { databaseRecords } = useStores();
+  const { databaseRecords, ui } = useStores();
   const history = useHistory();
   const { pane } = useSplitView();
   const isMobile = useMobile();
@@ -535,8 +541,8 @@ const LoadedView = observer(function LoadedView({
     }
   }, [query, view.layout]);
 
-  const handleOpenRecord = React.useCallback(
-    async (recordId: string) => {
+  const openRecordPage = React.useCallback(
+    async (recordId: string): Promise<SplitViewPane | undefined> => {
       try {
         const document = await databaseRecords.open(database.id, recordId);
         const path = share.rowPath(document.path);
@@ -547,11 +553,13 @@ const LoadedView = observer(function LoadedView({
           isMobile
         ) {
           history.push(path);
-        } else {
-          openRouteInSplit(browserHistory, path);
+          return pane;
         }
+        openRouteInSplit(browserHistory, path);
+        return "secondary";
       } catch (_err) {
         toast.error(t("Couldn’t open the page"));
+        return undefined;
       }
     },
     [
@@ -566,15 +574,30 @@ const LoadedView = observer(function LoadedView({
     ]
   );
 
+  const handleOpenRecord = React.useCallback(
+    async (recordId: string) => {
+      await openRecordPage(recordId);
+    },
+    [openRecordPage]
+  );
+
   const handleOpen = React.useCallback(
     (recordId: string) => void handleOpenRecord(recordId),
     [handleOpenRecord]
   );
 
+  const handleOpenComments = React.useCallback(
+    (recordId: string) => void openRowComments(openRecordPage, ui, recordId),
+    [openRecordPage, ui]
+  );
+
   const handleCreateRecord = React.useCallback(
-    async (fields?: Record<string, DatabaseCellInput>) => {
+    async (
+      fields?: Record<string, DatabaseCellInput>,
+      order?: DatabaseRecordOrder
+    ) => {
       try {
-        await databaseRecords.create(database.id, fields ?? {});
+        await databaseRecords.create(database.id, fields ?? {}, order);
       } catch (err) {
         toast.error(t("Couldn’t create the row"));
         throw err;
@@ -627,8 +650,12 @@ const LoadedView = observer(function LoadedView({
   );
 
   const context = React.useMemo(
-    () => ({ onViewCreated, filterRequest }),
-    [onViewCreated, filterRequest]
+    () => ({
+      onViewCreated,
+      filterRequest,
+      onOpenComments: handleOpenComments,
+    }),
+    [onViewCreated, filterRequest, handleOpenComments]
   );
 
   const viewProps: TableViewProps = {

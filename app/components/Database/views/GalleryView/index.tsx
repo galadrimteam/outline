@@ -74,6 +74,7 @@ export const GalleryView = observer(function GalleryView({
           coverFit={!!view.options.isCoverFit}
           showNames={view.options.isFieldNameHidden === false}
           coverOf={(r) => recordCover(view, r)}
+          readOnly={readOnly}
           onOpen={onOpenRecord}
         />
       ))}
@@ -191,6 +192,7 @@ interface CardProps {
   coverFit: boolean;
   showNames: boolean;
   coverOf: (record: DatabaseRecord) => ReturnType<typeof recordCover>;
+  readOnly: boolean;
   onOpen: (recordId: string) => void;
 }
 
@@ -204,6 +206,7 @@ const GalleryCard = observer(function GalleryCard({
   coverFit,
   showNames,
   coverOf,
+  readOnly,
   onOpen,
 }: CardProps) {
   const theme = useTheme();
@@ -231,6 +234,7 @@ const GalleryCard = observer(function GalleryCard({
           record={record}
           fields={fields}
           showNames={showNames}
+          readOnly={readOnly}
         />
         <SubItemCount database={database} record={record} />
         <CommentCount
