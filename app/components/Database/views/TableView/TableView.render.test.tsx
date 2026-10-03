@@ -8,6 +8,7 @@ import type {
   DatabaseField,
   DatabaseGroupPoint,
   DatabaseRecord,
+  DatabaseRecordOrder,
   DatabaseSettings,
   DatabaseView,
 } from "@shared/databases/types";
@@ -19,7 +20,6 @@ import type { RecordQueryParams } from "~/stores/DatabaseRecordsStore";
 import { client } from "~/utils/ApiClient";
 import { rowCommentCounts } from "../../comments/rowCommentCounts";
 import { DatabaseBlockContext } from "../../DatabaseBlockContext";
-import type { DatabaseRecordOrder } from "@shared/databases/types";
 import { makeField, makeView } from "./testFixtures";
 import { TableView } from ".";
 

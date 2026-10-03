@@ -541,7 +541,7 @@ const LoadedView = observer(function LoadedView({
     }
   }, [query, view.layout]);
 
-  const handleOpenRecord = React.useCallback(
+  const openRecordPage = React.useCallback(
     async (recordId: string): Promise<SplitViewPane | undefined> => {
       try {
         const document = await databaseRecords.open(database.id, recordId);
@@ -574,14 +574,21 @@ const LoadedView = observer(function LoadedView({
     ]
   );
 
+  const handleOpenRecord = React.useCallback(
+    async (recordId: string) => {
+      await openRecordPage(recordId);
+    },
+    [openRecordPage]
+  );
+
   const handleOpen = React.useCallback(
     (recordId: string) => void handleOpenRecord(recordId),
     [handleOpenRecord]
   );
 
   const handleOpenComments = React.useCallback(
-    (recordId: string) => void openRowComments(handleOpenRecord, ui, recordId),
-    [handleOpenRecord, ui]
+    (recordId: string) => void openRowComments(openRecordPage, ui, recordId),
+    [openRecordPage, ui]
   );
 
   const handleCreateRecord = React.useCallback(
