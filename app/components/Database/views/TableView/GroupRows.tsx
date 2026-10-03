@@ -2,12 +2,12 @@ import { observer } from "mobx-react";
 import { CollapsedIcon, PlusIcon } from "outline-icons";
 import type * as React from "react";
 import { useTranslation } from "react-i18next";
-import styled from "styled-components";
+import styled, { css } from "styled-components";
 import { s } from "@shared/styles";
 import type Database from "~/models/Database";
 import { GroupLabel } from "../GroupLabel";
 import type { AddDisplayRow, GroupDisplayRow } from "./rows";
-import { NewButton, SpanningContent, SpanningLine } from "./styles";
+import { NewButton, OpenLine, SpanningContent, SpanningLine } from "./styles";
 
 interface PositionProps {
   index: number;
@@ -42,7 +42,7 @@ export const GroupHeaderRow = observer(function GroupHeaderRow_({
   const field = database.fieldById(row.fieldId);
 
   return (
-    <GroupLine
+    <GroupTitleLine
       ref={measureElement}
       role="row"
       data-index={index}
@@ -66,7 +66,7 @@ export const GroupHeaderRow = observer(function GroupHeaderRow_({
         )}
         <Count>{row.count}</Count>
       </GroupContent>
-    </GroupLine>
+    </GroupTitleLine>
   );
 });
 
@@ -149,12 +149,20 @@ const Positioned = styled.div`
   width: 100%;
 `;
 
-const GroupLine = styled(SpanningLine)`
+const positioned = css`
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   min-height: 34px;
+`;
+
+const GroupLine = styled(SpanningLine)`
+  ${positioned}
+`;
+
+const GroupTitleLine = styled(OpenLine)`
+  ${positioned}
 `;
 
 const GroupContent = styled(SpanningContent)`

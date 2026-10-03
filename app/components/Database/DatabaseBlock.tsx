@@ -70,6 +70,8 @@ import type { TableViewProps } from "./views/TableView";
 import { subItemsOf, topLevelFilter } from "./views/TableView/subItems";
 import { useActiveView } from "./useActiveView";
 import { useDatabaseTitleSync } from "./useDatabaseTitleSync";
+import { BLEED_VARIABLE } from "./views/bleed";
+import { useRightBleed } from "./useRightBleed";
 import { ViewTabs } from "./ViewTabs";
 
 const BoardView = lazyWithRetry(() =>
@@ -120,6 +122,7 @@ export const DatabaseBlock = observer(function DatabaseBlock(
           title={attrs.title}
           isEditable={props.isEditable}
           isSelected={props.isSelected}
+          isInPageFlow={isInPageFlow(props)}
           actions={actions}
         />
       ) : (
@@ -134,6 +137,28 @@ export const DatabaseBlock = observer(function DatabaseBlock(
 });
 
 type UpdateAttrs = (patch: Partial<DatabaseAttrs>) => void;
+
+/** The blocks that leave a database in the flow of the page's text. */
+const FLOW_CONTAINERS = new Set(["container_toggle"]);
+
+/**
+ * Whether the block sits in the flow of the page's text, possibly in a
+ * toggle, rather than in a box such as a callout: only then may it run right
+ * of the text, as Notion's wide databases do.
+ */
+function isInPageFlow({ view, getPos }: ComponentProps): boolean {
+  try {
+    const $pos = view.state.doc.resolve(getPos());
+    for (let depth = $pos.depth; depth > 0; depth--) {
+      if (!FLOW_CONTAINERS.has($pos.node(depth).type.name)) {
+        return false;
+      }
+    }
+    return true;
+  } catch (_err) {
+    return false;
+  }
+}
 
 interface NodeActions {
   /** Writes attributes of the block's node. */
@@ -321,6 +346,8 @@ interface FrameProps {
   title: string | null;
   isEditable: boolean;
   isSelected: boolean;
+  /** Whether the block may run right of the text column (see `isInPageFlow`). */
+  isInPageFlow: boolean;
   actions: NodeActions;
 }
 
@@ -353,10 +380,13 @@ const DatabaseFrame = observer(function DatabaseFrame({
   title,
   isEditable,
   isSelected,
+  isInPageFlow,
   actions,
 }: FrameProps) {
   const { updateAttrs } = actions;
   const editor = useEditor();
+  const [frame, setFrame] = React.useState<HTMLDivElement | null>(null);
+  const bleed = useRightBleed(frame, isInPageFlow);
   const { t } = useTranslation();
   const { databases, policies } = useStores();
   const share = useDatabaseShare();
@@ -452,7 +482,12 @@ const DatabaseFrame = observer(function DatabaseFrame({
     />
   );
   return (
-    <Frame $fullPage={fullPage} $selected={isSelected}>
+    <Frame
+      ref={setFrame}
+      $fullPage={fullPage}
+      $selected={isSelected}
+      style={{ [BLEED_VARIABLE]: `${bleed}px` } as React.CSSProperties}
+    >
       {activeView ? (
         <LoadedView
           database={database}

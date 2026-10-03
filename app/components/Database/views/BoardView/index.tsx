@@ -58,6 +58,7 @@ import {
 } from "../../boardModel";
 import { groupPrefill } from "../../toolbar/grouping";
 import type { DatabaseViewProps } from "../../types";
+import { bleedRight } from "../bleed";
 import { CardOverlay } from "./BoardCard";
 import { BoardColumn, columnDndId, columnWidths } from "./BoardColumn";
 import { BoardLanes } from "./BoardLanes";
@@ -592,6 +593,7 @@ const Scroller = styled.div`
   overflow-y: auto;
   max-height: var(--database-view-max-height, none);
   padding-bottom: 12px;
+  ${bleedRight}
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
   scrollbar-color: ${s("scrollbarThumb")} transparent;

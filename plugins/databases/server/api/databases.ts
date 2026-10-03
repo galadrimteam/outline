@@ -21,6 +21,7 @@ import { presentDatabase, presentPolicies } from "@server/presenters";
 import { QueryHelper } from "@server/storage/QueryHelper";
 import type { APIContext } from "@server/types";
 import { databaseCreator } from "../commands/databaseCreator";
+import { importedDatabaseTitlesFixer } from "../commands/importedDatabaseTitlesFixer";
 import { importedRowPagesCleaner } from "../commands/importedRowPagesCleaner";
 import { engineFor, refFor } from "../engine";
 import { engineOfTable } from "../utils/tableEngine";
@@ -380,6 +381,28 @@ router.post(
     }
     await new ConvertTeableEmbedsTask().schedule(props);
     ctx.body = { success: true };
+  }
+);
+
+router.post(
+  "databases.fixImportedTitles",
+  rateLimiter(DatabaseRateLimit.Create),
+  auth({ role: UserRole.Admin }),
+  validate(T.DatabasesFixImportedTitlesSchema),
+  async (ctx: APIContext<T.DatabasesFixImportedTitlesReq>) => {
+    const { user } = ctx.state.auth;
+    const { collectionId, dryRun } = ctx.input.body;
+
+    if (collectionId) {
+      const collection = await Collection.findByPk(collectionId, {
+        userId: user.id,
+      });
+      authorize(user, "update", collection);
+    }
+
+    ctx.body = {
+      data: await importedDatabaseTitlesFixer(user, { collectionId, dryRun }),
+    };
   }
 );
 

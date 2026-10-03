@@ -1,6 +1,11 @@
 import type { ProsemirrorData } from "@shared/types";
 import type { DatabaseNodeCopy } from "./databaseNodes";
-import { databaseIdsIn, rewriteDatabaseNodes } from "./databaseNodes";
+import {
+  databaseIdsIn,
+  retitleDatabaseNodes,
+  rewriteDatabaseNodes,
+  showsAsFullPage,
+} from "./databaseNodes";
 
 function databaseNode(
   databaseId: string,
@@ -85,5 +90,45 @@ describe("rewriteDatabaseNodes", () => {
 
     expect(rewritten).toEqual(0);
     expect(result).toBe(doc);
+  });
+});
+
+describe("showsAsFullPage", () => {
+  it("is true only for a database a node draws as the whole page", () => {
+    const page: ProsemirrorData = {
+      type: "doc",
+      content: [
+        {
+          ...databaseNode("db-page"),
+          attrs: { databaseId: "db-page", fullPage: true },
+        },
+        databaseNode("db-inline"),
+      ],
+    };
+    expect(showsAsFullPage(page, "db-page")).toBe(true);
+    expect(showsAsFullPage(page, "db-inline")).toBe(false);
+    expect(showsAsFullPage(doc, "db-epics")).toBe(false);
+  });
+});
+
+describe("retitleDatabaseNodes", () => {
+  it("writes the title on every node of the database, at any depth", () => {
+    const { doc: result, rewritten } = retitleDatabaseNodes(
+      doc,
+      "db-kanban",
+      "Delisle Suivi Kanban"
+    );
+
+    expect(rewritten).toEqual(2);
+    expect(result.content?.[1].attrs?.title).toBe("Delisle Suivi Kanban");
+    expect(result.content?.[3].attrs?.title).toBe("Delisle Suivi Kanban");
+    expect(result.content?.[2]).toBe(doc.content?.[2]);
+  });
+
+  it("returns the document itself when the nodes already bear the title", () => {
+    expect(retitleDatabaseNodes(doc, "db-epics", "Suivi")).toEqual({
+      doc,
+      rewritten: 0,
+    });
   });
 });

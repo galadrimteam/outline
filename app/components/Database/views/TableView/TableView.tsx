@@ -56,6 +56,7 @@ import {
   Grid,
   HEADER_HEIGHT,
   NewButton,
+  OpenLine,
   Scroller,
   SpanningContent,
   SpanningLine,
@@ -1072,14 +1073,14 @@ export const TableView = observer(function TableView_({
             </SpanningLine>
           )}
           {!grouped && canCreate && (
-            <SpanningLine $template={template}>
+            <OpenLine $template={template}>
               <SpanningContent>
                 <NewButton type="button" onClick={() => void handleCreate()}>
                   <PlusIcon size={18} />
                   {t("New page")}
                 </NewButton>
               </SpanningContent>
-            </SpanningLine>
+            </OpenLine>
           )}
           {calculationsInGroups ? null : renderFooter(results)}
         </Grid>

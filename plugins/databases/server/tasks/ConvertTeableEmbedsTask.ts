@@ -10,11 +10,10 @@ import { Collection, Database, Document, User } from "@server/models";
 import { DocumentHelper } from "@server/models/helpers/DocumentHelper";
 import { BaseTask, TaskPriority } from "@server/queues/tasks/base/BaseTask";
 import { sequelize } from "@server/storage/database";
-import { engineFor } from "../engine";
 import env from "../env";
 import type { TableEngineName } from "../utils/tableEngine";
 import { engineOfTable } from "../utils/tableEngine";
-import type { DatabaseRef } from "../engine/DatabaseEngine";
+import { engineTableName, notionDatabaseName } from "../utils/tableNames";
 import type { ResolvedDatabase, TeableEmbed } from "../utils/teableEmbeds";
 import { convertTeableEmbeds, findTeableEmbeds } from "../utils/teableEmbeds";
 
@@ -146,10 +145,19 @@ export class ConvertTeableEmbedsTask extends BaseTask<ConvertTeableEmbedsProps> 
     };
   }
 
-  private convertDocument(
+  private async convertDocument(
     documentId: string,
     run: ConversionRun
   ): Promise<number> {
+    const unlocked = await Document.unscoped().findOne({
+      where: { id: documentId, teamId: run.teamId },
+    });
+    if (unlocked) {
+      await run.resolver.learnTables(
+        findTeableEmbeds(await DocumentHelper.toJSON(unlocked))
+      );
+    }
+
     return sequelize.transaction(async (transaction) => {
       await sequelize.query(`SET LOCAL lock_timeout = '5s';`, { transaction });
 
@@ -205,10 +213,19 @@ export class ConvertTeableEmbedsTask extends BaseTask<ConvertTeableEmbedsProps> 
     });
   }
 
-  private convertCollection(
+  private async convertCollection(
     collectionId: string,
     run: ConversionRun
   ): Promise<number> {
+    const unlocked = await Collection.unscoped().findOne({
+      where: { id: collectionId, teamId: run.teamId },
+    });
+    if (unlocked) {
+      await run.resolver.learnTables(
+        findTeableEmbeds(await DocumentHelper.toJSON(unlocked))
+      );
+    }
+
     return sequelize.transaction(async (transaction) => {
       await sequelize.query(`SET LOCAL lock_timeout = '5s';`, { transaction });
 
@@ -277,6 +294,13 @@ interface KnownDatabase {
   title: string;
 }
 
+/** What the engines say of a table. */
+interface KnownTable {
+  engine: TableEngineName;
+  /** The name Notion shows for it, null when it has none. */
+  name: string | null;
+}
+
 interface ResolverOptions {
   teamId: string;
   createdById: string;
@@ -297,7 +321,44 @@ class DatabaseResolver {
   /** The databases a dry run would register, by table id. */
   private planned = new Map<string, KnownDatabase>();
 
+  /** The tables read so far, by table id. */
+  private tables = new Map<string, KnownTable>();
+
   public constructor(private readonly options: ResolverOptions) {}
+
+  /**
+   * Reads the engine and the name of the tables of some embeds ahead of their
+   * conversion. Read while the conversion holds its transaction, they would
+   * need a second database connection, and a read that fails there must not
+   * leave the database named after something else. A table that cannot be
+   * read now is read again when its database is registered.
+   *
+   * @param embeds the embeds about to be converted.
+   */
+  public async learnTables(embeds: TeableEmbed[]): Promise<void> {
+    if (!this.options.canRegister) {
+      return;
+    }
+    for (const embed of embeds) {
+      if (this.tables.has(embed.tableId)) {
+        continue;
+      }
+      try {
+        this.tables.set(
+          embed.tableId,
+          await this.readTable(embed.tableId, embed.baseId)
+        );
+      } catch (err) {
+        Logger.warn(
+          "Could not read an embedded table ahead of its conversion",
+          {
+            tableId: embed.tableId,
+            error: toError(err).message,
+          }
+        );
+      }
+    }
+  }
 
   /**
    * Resolves the tables of the given embeds.
@@ -365,7 +426,10 @@ class DatabaseResolver {
     }
 
     const embed = embeds.find((e) => e.fullPage) ?? embeds[0];
-    const engineName = await engineOfTable(this.options.teamId, tableId);
+    const table =
+      this.tables.get(tableId) ?? (await this.readTable(tableId, embed.baseId));
+    this.tables.set(tableId, table);
+    const engineName = table.engine;
     if (engineName === "teable" && !env.isTeableConfigured) {
       return null;
     }
@@ -375,15 +439,13 @@ class DatabaseResolver {
       { ...target, collectionId: target.collectionId },
       transaction
     );
-    const title = (
-      anchor.title ??
-      embed.heading ??
-      (await tableName(this.options.teamId, engineName, {
-        externalBaseId: embed.baseId,
-        externalTableId: tableId,
-      })) ??
-      target.title
-    ).slice(0, 255);
+    // A database filling its page bears the page's title, as Notion's database
+    // page does. Shown inside a page, it bears its table's, which is its Notion
+    // name, and never the title of the page holding it.
+    const title = (anchor.title ?? table.name ?? embed.heading ?? "").slice(
+      0,
+      255
+    );
 
     if (this.options.dryRun) {
       const planned = {
@@ -434,6 +496,23 @@ class DatabaseResolver {
         transaction,
       });
     }
+  }
+
+  private async readTable(
+    tableId: string,
+    baseId: string
+  ): Promise<KnownTable> {
+    const engine = await engineOfTable(this.options.teamId, tableId);
+    const name =
+      engine === "teable" && !env.isTeableConfigured
+        ? null
+        : notionDatabaseName(
+            await engineTableName(this.options.teamId, engine, {
+              externalBaseId: baseId,
+              externalTableId: tableId,
+            })
+          );
+    return { engine, name };
   }
 
   private async chooseAnchor(
@@ -583,26 +662,6 @@ class DatabaseResolver {
           title: parent.title,
         }
       : null;
-  }
-}
-
-/** The table's name in its engine, or null when the engine cannot tell. */
-async function tableName(
-  teamId: string,
-  engine: TableEngineName,
-  ref: DatabaseRef
-): Promise<string | null> {
-  try {
-    return (
-      (await engineFor({ engine, teamId }).describeTable("system", ref)).name ||
-      null
-    );
-  } catch (error) {
-    Logger.warn("Could not read the name of an engine table", {
-      tableId: ref.externalTableId,
-      error: toError(error).message,
-    });
-    return null;
   }
 }
 

@@ -880,6 +880,60 @@ describe("#databases.convertEmbeds", () => {
   });
 });
 
+describe("#databases.fixImportedTitles", () => {
+  it("requires an admin", async () => {
+    const user = await buildUser();
+    const res = await server.post("/api/databases.fixImportedTitles", user, {
+      body: { dryRun: true },
+    });
+    expect(res.status).toEqual(403);
+  });
+
+  it("lists the databases it would give back their Notion name", async () => {
+    const admin = await buildAdmin();
+    const collection = await buildCollection({
+      teamId: admin.teamId,
+      userId: admin.id,
+    });
+    const database = await buildDatabase({
+      teamId: admin.teamId,
+      collectionId: collection.id,
+      title: "Delisle",
+    });
+    const content = {
+      type: "doc",
+      content: [
+        {
+          type: "database",
+          attrs: { databaseId: database.id, fullPage: false, title: "Delisle" },
+        },
+      ],
+    };
+    await buildDocument({
+      teamId: admin.teamId,
+      userId: admin.id,
+      collectionId: collection.id,
+      title: "Delisle",
+      content,
+    });
+    vi.spyOn(engine, "describeTable").mockResolvedValue({ name: "Points" });
+
+    const res = await server.post("/api/databases.fixImportedTitles", admin, {
+      body: { collectionId: collection.id, dryRun: true },
+    });
+    const body = await res.json();
+
+    expect(res.status).toEqual(200);
+    expect(body.data).toEqual({
+      databases: 1,
+      renamed: [{ id: database.id, from: "Delisle", to: "Points" }],
+      rewritten: 0,
+      failed: 0,
+    });
+    expect((await database.reload()).title).toEqual("Delisle");
+  });
+});
+
 describe("#databases.moveToOutlineEngine", () => {
   let store: InMemoryOutlineStore;
 

@@ -476,6 +476,7 @@ function DocumentScene({
                 <ContentsContainer
                   docFullWidth={document.fullWidth}
                   position={tocPos}
+                  data-document-contents
                 >
                   <Contents />
                 </ContentsContainer>

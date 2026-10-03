@@ -30,6 +30,60 @@ export function databaseIdsIn(doc: ProsemirrorData): string[] {
 }
 
 /**
+ * Whether a document shows a database as its whole page.
+ *
+ * @param doc the document as JSON.
+ * @param databaseId the database.
+ * @returns true when one of its `database` nodes is full page.
+ */
+export function showsAsFullPage(
+  doc: ProsemirrorData,
+  databaseId: string
+): boolean {
+  const visit = (node: ProsemirrorData): boolean =>
+    (node.type === "database" &&
+      node.attrs?.databaseId === databaseId &&
+      node.attrs?.fullPage === true) ||
+    !!node.content?.some(visit);
+  return visit(doc);
+}
+
+/**
+ * Writes a database's title on its `database` nodes, which text exports show.
+ *
+ * @param doc the document as JSON.
+ * @param databaseId the database.
+ * @param title its title.
+ * @returns the rewritten document (the input itself when nothing changed) and
+ * the number of nodes rewritten.
+ */
+export function retitleDatabaseNodes(
+  doc: ProsemirrorData,
+  databaseId: string,
+  title: string
+): { doc: ProsemirrorData; rewritten: number } {
+  let rewritten = 0;
+  const visit = (node: ProsemirrorData): ProsemirrorData => {
+    const content = node.content?.map(visit);
+    const next =
+      content && content.some((child, index) => child !== node.content?.[index])
+        ? { ...node, content }
+        : node;
+    if (
+      node.type !== "database" ||
+      node.attrs?.databaseId !== databaseId ||
+      node.attrs?.title === title
+    ) {
+      return next;
+    }
+    rewritten += 1;
+    return { ...next, attrs: { ...node.attrs, title } };
+  };
+  const result = visit(doc);
+  return { doc: rewritten ? result : doc, rewritten };
+}
+
+/**
  * Points the `database` nodes of a document at copied databases, with the
  * views of the copies. A linked view keeps only the views that were copied.
  *
