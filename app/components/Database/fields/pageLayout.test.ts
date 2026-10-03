@@ -127,6 +127,15 @@ describe("splitPageProperties", () => {
     ]);
     expect(split.hidden.map((field) => field.id)).toEqual(["notes"]);
   });
+
+  it("folds every property behind details when the layout pins none", () => {
+    const split = splitPageProperties([status, notes], record, {
+      pinnedFieldIds: [],
+    });
+    expect(split.pinned).toBe(true);
+    expect(split.shown).toEqual([]);
+    expect(split.hidden.map((field) => field.id)).toEqual(["status", "notes"]);
+  });
 });
 
 describe("pageDiscussions", () => {

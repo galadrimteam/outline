@@ -126,10 +126,12 @@ export function formatNumber(
   locale?: string
 ): string {
   const precision = formatting?.precision;
-  const digits =
-    precision === undefined
+  const digits = {
+    useGrouping: formatting?.grouping !== false,
+    ...(precision === undefined
       ? { maximumFractionDigits: 10 }
-      : { minimumFractionDigits: precision, maximumFractionDigits: precision };
+      : { minimumFractionDigits: precision, maximumFractionDigits: precision }),
+  };
 
   if (formatting?.type === "percent") {
     return `${new Intl.NumberFormat(locale, digits).format(value * 100)} %`

@@ -64,6 +64,8 @@ export interface DatabaseSelectChoice {
 export interface DatabaseFieldFormatting {
   type?: "decimal" | "percent" | "currency";
   precision?: number;
+  /** Whether thousands are separated (« 2 775 »); false shows « 2775 », as Notion's « Number ». */
+  grouping?: boolean;
   symbol?: string;
   date?: string;
   time?: string;
@@ -525,7 +527,7 @@ export interface DatabaseSettings {
     fieldOrder?: string[];
     /**
      * Notion's page layout with pinned properties: only these show on row pages, in this order,
-     * every other one behind « Show details ».
+     * every other one behind « Show details ». An empty list folds them all.
      */
     pinnedFieldIds?: string[];
     /**
