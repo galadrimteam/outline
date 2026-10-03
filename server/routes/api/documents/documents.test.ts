@@ -6292,8 +6292,7 @@ describe("#documents.create", () => {
     const res = await server.post("/api/documents.create", user, {
       body: {
         collectionId: collection.id,
-        title:
-          "This is a really long title that is not acceptable to Outline because it is so ridiculously long that we need to have a limit somewhere",
+        title: "x".repeat(DocumentValidation.maxTitleLength + 1),
         text: " ",
       },
     });
