@@ -6,6 +6,7 @@ import type {
   DatabaseView,
   DatabaseViewOverrides,
 } from "@shared/databases/types";
+import { DatabaseLayout } from "@shared/databases/types";
 import type { DatabaseSchema } from "../engine/DatabaseEngine";
 
 /** A settings patch: a null entry of `viewOverrides` or `fieldMeta` removes it. */
@@ -64,6 +65,8 @@ export class DatabaseSettingsHelper {
   /**
    * Returns the order and the folded groups a view gives its groups (its
    * `stackOrder` and `hiddenStacks`), for the engine to read the view's rows.
+   * A timeline reads the rows of the groups it folds too: Notion still lists
+   * them under « No date », and the timeline leaves their groups out itself.
    *
    * @param settings the database's settings.
    * @param viewId the view, if any.
@@ -74,10 +77,14 @@ export class DatabaseSettingsHelper {
     viewId: string | undefined
   ): DatabaseGroupLayout | undefined {
     const overrides = viewId ? settings?.viewOverrides?.[viewId] : undefined;
-    if (!overrides?.stackOrder?.length && !overrides?.hiddenStacks?.length) {
+    const hidden =
+      overrides?.layout === DatabaseLayout.Timeline
+        ? undefined
+        : overrides?.hiddenStacks;
+    if (!overrides?.stackOrder?.length && !hidden?.length) {
       return undefined;
     }
-    return { order: overrides.stackOrder, hidden: overrides.hiddenStacks };
+    return { order: overrides?.stackOrder, hidden };
   }
 
   /**

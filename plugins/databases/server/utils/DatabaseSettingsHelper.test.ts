@@ -1,5 +1,9 @@
 import { DatabaseFieldType, DatabaseLayout } from "@shared/databases/types";
-import type { DatabaseField, DatabaseView } from "@shared/databases/types";
+import type {
+  DatabaseField,
+  DatabaseSettings,
+  DatabaseView,
+} from "@shared/databases/types";
 import { DatabaseSettingsHelper } from "./DatabaseSettingsHelper";
 
 const view = (id: string): DatabaseView => ({
@@ -115,6 +119,33 @@ describe("DatabaseSettingsHelper", () => {
     expect(DatabaseSettingsHelper.groupLayout(settings, undefined)).toBe(
       undefined
     );
+  });
+
+  it("lets a timeline read the rows of the groups it folds, for « No date »", () => {
+    const settings: DatabaseSettings = {
+      viewOverrides: {
+        viwTimeline: {
+          layout: DatabaseLayout.Timeline,
+          stackOrder: ["S1", ""],
+          hiddenStacks: [""],
+        },
+        viwFolded: {
+          layout: DatabaseLayout.Timeline,
+          hiddenStacks: [""],
+        },
+        viwList: { layout: DatabaseLayout.List, hiddenStacks: [""] },
+      },
+    };
+    expect(DatabaseSettingsHelper.groupLayout(settings, "viwTimeline")).toEqual(
+      { order: ["S1", ""], hidden: undefined }
+    );
+    expect(DatabaseSettingsHelper.groupLayout(settings, "viwFolded")).toBe(
+      undefined
+    );
+    expect(DatabaseSettingsHelper.groupLayout(settings, "viwList")).toEqual({
+      order: undefined,
+      hidden: [""],
+    });
   });
 
   it("keeps a board's calculation and an inline load limit", () => {

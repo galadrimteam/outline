@@ -67,7 +67,8 @@ describe("aggregate", () => {
     expect(stat("n", "average")).toBe(2);
     expect(stat("n", "max")).toBe(3);
     expect(stat("n", "min")).toBe(1);
-    expect(aggregate(table, [], { n: "sum" }).n.value).toBeNull();
+    expect(aggregate(table, [], { n: "sum" }).n.value).toBe(0);
+    expect(aggregate(table, [], { n: "average" }).n.value).toBeNull();
   });
 
   it("counts checked and unchecked boxes", () => {

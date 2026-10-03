@@ -5,10 +5,16 @@ import type {
 } from "@shared/databases/types";
 import { DatabaseFieldType } from "@shared/databases/types";
 import type { CellItem } from "./cellValues";
-import { cellItems, isObjectItem, itemId, itemTitle } from "./cellValues";
+import {
+  cellItems,
+  isChecked,
+  isObjectItem,
+  itemId,
+  itemTitle,
+} from "./cellValues";
 import type { ComputedRecord } from "./contract";
 import type { QueryField } from "./fields";
-import { fieldTimeZone, showsTime } from "./fields";
+import { fieldTimeZone, isSingleBoolean, showsTime } from "./fields";
 import { looseNumber } from "./formula/values";
 import { startOf } from "./time/calendar";
 
@@ -52,11 +58,12 @@ export function sortLevels(
 
 /**
  * Returns what a cell is ordered by, as Teable orders: numbers numerically,
- * dates by day (by instant when the field shows a time), selects by the
- * order of their choices, people and links by title, text in French
- * alphabetical order (case, accents and numbers read naturally), lists by
- * their first element then the rest. Days are those of the field's zone
- * (UTC when it names none, as for grouping).
+ * boxes unchecked (empty included) before checked, dates by day (by instant
+ * when the field shows a time), selects by the order of their choices,
+ * people and links by title, text in French alphabetical order (case,
+ * accents and numbers read naturally), lists by their first element then the
+ * rest. Days are those of the field's zone (UTC when it names none, as for
+ * grouping).
  *
  * @param field the field.
  * @param cell the cell value.
@@ -66,6 +73,9 @@ export function sortValue(
   field: QueryField,
   cell: DatabaseCellValue | undefined
 ): SortValue {
+  if (isSingleBoolean(field)) {
+    return isChecked(cell) ? 1 : 0;
+  }
   const items = cellItems(cell);
   if (!items.length) {
     return null;

@@ -7,6 +7,7 @@ import type { CellItem } from "./cellValues";
 import {
   cellItems,
   isAttachmentItem,
+  isChecked,
   isEmptyCell,
   isObjectItem,
   itemId,
@@ -25,9 +26,10 @@ export interface StatisticValue {
 /**
  * Computes one statistic per field over records, as Teable's footers do:
  * counts are whole numbers, percentages go from 0 to 100 unrounded, sums,
- * averages and extremes are left to the reader to format, dates come back
- * as ISO 8601, date ranges as whole days or months. A list cell counts its
- * elements for unique values and numbers, and once for emptiness.
+ * averages and extremes are left to the reader to format (a sum of nothing
+ * is 0, as Notion shows over an empty board column), dates come back as ISO
+ * 8601, date ranges as whole days or months. A list cell counts its elements
+ * for unique values and numbers, and once for emptiness.
  *
  * @param table the table.
  * @param records the selected records.
@@ -64,10 +66,7 @@ function statistic(
   const total = cells.length;
   const percent = (count: number) => (count / Math.max(total, 1)) * 100;
   const filled = () => cells.filter((cell) => !isEmptyCell(cell)).length;
-  const checked = () =>
-    cells.filter((cell) =>
-      cellItems(cell).some((item) => item === true || item === "true")
-    ).length;
+  const checked = () => cells.filter((cell) => isChecked(cell)).length;
   const unique = () =>
     new Set(cells.flatMap((cell) => cellItems(cell).map(uniqueKey(field))))
       .size;
@@ -95,12 +94,8 @@ function statistic(
       return percent(checked());
     case "percentUnChecked":
       return percent(total - checked());
-    case "sum": {
-      const values = numbers(cells);
-      return values.length
-        ? values.reduce((sum, value) => sum + value, 0)
-        : null;
-    }
+    case "sum":
+      return numbers(cells).reduce((sum, value) => sum + value, 0);
     case "average": {
       const values = numbers(cells);
       return values.length
