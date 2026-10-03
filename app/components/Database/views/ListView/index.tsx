@@ -66,6 +66,7 @@ export const ListView = observer(function ListView({
           database={database}
           record={record}
           fields={fields}
+          readOnly={readOnly}
           onOpen={onOpenRecord}
         />
       ))}
@@ -123,6 +124,7 @@ interface RowProps {
   database: Database;
   record: DatabaseRecord;
   fields: DatabaseField[];
+  readOnly: boolean;
   onOpen: (recordId: string) => void;
 }
 
@@ -130,6 +132,7 @@ const ListRow = observer(function ListRow({
   database,
   record,
   fields,
+  readOnly,
   onOpen,
 }: RowProps) {
   const icon = useRowIcon(database, record);
@@ -152,6 +155,7 @@ const ListRow = observer(function ListRow({
             database={database}
             record={record}
             fields={fields}
+            readOnly={readOnly}
             inline
           />
           <CommentCount
