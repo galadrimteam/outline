@@ -10,6 +10,7 @@ import {
   useDocumentContext,
 } from "~/components/DocumentContext";
 import type { Editor } from "~/editor";
+import { CONTENTS_CHANGE_EVENT } from "~/components/Database/rightBleed";
 import stores from "~/stores";
 import ContentsRail from "./ContentsRail";
 
@@ -75,6 +76,20 @@ describe("ContentsRail", () => {
       "Titre b",
       "Titre c",
     ]);
+  });
+
+  it("tells the databases of the page to keep clear of it", async () => {
+    const announced = vi.fn();
+    window.addEventListener(CONTENTS_CHANGE_EVENT, announced);
+    await render([heading("a", 1), heading("b", 2)]);
+    expect(container.querySelector("nav[data-document-contents]")).not.toBe(
+      null
+    );
+    expect(announced).toHaveBeenCalledTimes(1);
+
+    await render([heading("a", 1)]);
+    expect(announced).toHaveBeenCalledTimes(2);
+    window.removeEventListener(CONTENTS_CHANGE_EVENT, announced);
   });
 
   it("is not shown for a page with a single heading", async () => {

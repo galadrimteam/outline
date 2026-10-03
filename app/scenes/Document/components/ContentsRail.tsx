@@ -1,9 +1,11 @@
 import { observer } from "mobx-react";
+import * as React from "react";
 import { useTranslation } from "react-i18next";
 import styled from "styled-components";
 import breakpoint from "styled-components-breakpoint";
 import { EmojiText } from "@shared/components/EmojiText";
 import { depths, s } from "@shared/styles";
+import { announceContentsChange } from "~/components/Database/rightBleed";
 import { useSplitView } from "~/components/SplitView/context";
 import useStores from "~/hooks/useStores";
 import { useDocumentContents } from "./useDocumentContents";
@@ -25,12 +27,23 @@ function ContentsRail() {
   const { items, activeSlug, minLevel, handleClick } = useDocumentContents();
 
   // The margin it sits in belongs to the right sidebar or the other pane then.
-  if (items.length < MIN_HEADINGS || isSplitView || ui.getRightSidebar(pane)) {
+  const isShown =
+    items.length >= MIN_HEADINGS && !isSplitView && !ui.getRightSidebar(pane);
+
+  React.useEffect(() => {
+    if (!isShown) {
+      return;
+    }
+    announceContentsChange();
+    return announceContentsChange;
+  }, [isShown]);
+
+  if (!isShown) {
     return null;
   }
 
   return (
-    <Rail aria-label={t("Contents")}>
+    <Rail aria-label={t("Contents")} data-document-contents>
       <Dashes aria-hidden>
         {items.map(({ heading }) => (
           <Dash
