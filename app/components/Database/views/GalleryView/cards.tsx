@@ -319,13 +319,14 @@ const Untitled = styled.span`
   color: ${s("placeholder")};
 `;
 
+// Notion's measures: the title 26px after the icon's left edge, weight 500.
 const Heading = styled.div<{ $empty: boolean }>`
   display: flex;
   align-items: flex-start;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
   font-size: ${cardTitleFontSize}px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: ${cardTitleLineHeight};
   overflow-wrap: anywhere;
   color: ${(props) => (props.$empty ? props.theme.placeholder : props.theme.text)};
