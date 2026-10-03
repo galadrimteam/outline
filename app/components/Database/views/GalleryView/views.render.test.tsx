@@ -164,6 +164,18 @@ describe("database views", () => {
       addEventListener() {},
       removeEventListener() {},
     })) as unknown as typeof window.matchMedia;
+    // jsdom's selector engine throws on the board's `:has()` rules once a Radix popover, whose
+    // ids hold colons, is open; browsers do not.
+    const computedStyle = window.getComputedStyle.bind(window);
+    vi.spyOn(window, "getComputedStyle").mockImplementation(
+      (element, pseudo) => {
+        try {
+          return computedStyle(element, pseudo);
+        } catch {
+          return document.createElement("div").style;
+        }
+      }
+    );
     vi.mocked(client.post).mockReset();
     vi.mocked(client.post).mockResolvedValue({
       data: records,
@@ -177,6 +189,7 @@ describe("database views", () => {
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
+    vi.restoreAllMocks();
   });
 
   async function render(
