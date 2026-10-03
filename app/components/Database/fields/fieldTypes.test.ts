@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next";
+import type { DatabaseCellValueType } from "@shared/databases/types";
 import {
   DatabaseFieldType,
   DatabaseStatusGroup,
@@ -9,6 +10,7 @@ import {
   fieldKindLabel,
   fieldKindOf,
   fieldKindSetup,
+  isEditTimeFormula,
   isLossyConversion,
   uniqueFieldName,
 } from "./fieldTypes";
@@ -107,5 +109,39 @@ describe("uniqueFieldName", () => {
     const fields = [{ name: "Property" }, { name: "Property (1)" }];
     expect(uniqueFieldName(fields, "Other")).toBe("Other");
     expect(uniqueFieldName(fields, "property")).toBe("property (2)");
+  });
+});
+
+describe("isEditTimeFormula", () => {
+  const formula = (
+    expression: string,
+    cellValueType: DatabaseCellValueType = "dateTime"
+  ) =>
+    makeField({
+      type: DatabaseFieldType.Formula,
+      cellValueType,
+      options: { expression },
+    });
+
+  it("tells the imported created and edited times", () => {
+    expect(
+      isEditTimeFormula(
+        formula(
+          "IF(CREATED_TIME() > DATETIME_PARSE('2026-10-02T15:05:28.407Z'), CREATED_TIME(), {fldNLY7epZXFlGD6t8J})"
+        )
+      )
+    ).toBe(true);
+    expect(isEditTimeFormula(formula("LAST_MODIFIED_TIME()"))).toBe(true);
+  });
+
+  it("leaves other formulas to their Σ, as Notion does", () => {
+    expect(isEditTimeFormula(formula("DATEADD({fldStart}, 1, 'day')"))).toBe(
+      false
+    );
+    expect(
+      isEditTimeFormula(
+        formula("DATETIME_DIFF(CREATED_TIME(), NOW())", "number")
+      )
+    ).toBe(false);
   });
 });

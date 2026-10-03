@@ -1,4 +1,4 @@
-/** How a database block lays out its name and its tabs. */
+/** How a database block lays out its name, its tabs and its toolbar. */
 export interface BlockChrome {
   /** Whether the database name is drawn. */
   showHeading: boolean;
@@ -10,8 +10,8 @@ export interface BlockChrome {
  * Lays a database block out like Notion. A full-page database takes the name
  * of its page. Inside a page, the name shows unless the block hides it; with
  * several views it gets its own row above the tabs, with a single one no tab
- * is drawn and the name takes its place. A block whose name is hidden shows
- * its tabs, even a single one. The tabs and the toolbar are always in sight.
+ * is drawn and the name takes their place. Tabs and toolbar stay in sight, as
+ * Notion keeps them without the pointer over the block.
  *
  * @param options whether the block is full page, hides its name, and how many views it shows.
  * @returns the layout.

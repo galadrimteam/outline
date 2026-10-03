@@ -166,6 +166,7 @@ describe("DatabaseSettingsHelper", () => {
           hideEmpty: true,
           fieldOrder: ["fldB", "fldA"],
           pinnedFieldIds: ["fldA"],
+          omittedFieldIds: ["fldB", "fldA"],
         },
         subItemFieldId: "fldA",
       },
@@ -179,6 +180,7 @@ describe("DatabaseSettingsHelper", () => {
     expect(settings.pageLayout?.hideEmpty).toBe(true);
     expect(settings.pageLayout?.fieldOrder).toEqual(["fldB"]);
     expect(settings.pageLayout?.pinnedFieldIds).toEqual([]);
+    expect(settings.pageLayout?.omittedFieldIds).toEqual(["fldB"]);
   });
 
   it("merges the page layout key by key, its tabs kept", () => {

@@ -487,4 +487,47 @@ describe("database views", () => {
     expect(container.querySelector("[aria-label='Previous']")).not.toBeNull();
     expect(container.querySelector("[aria-label='Next']")).not.toBeNull();
   });
+
+  it("keeps the label of a bar that starts before the part in sight at the left edge, as Notion", async () => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
+    const scrollTo = vi.fn();
+    Element.prototype.scrollTo = scrollTo;
+    await render(
+      TimelineView,
+      makeView({
+        overrides: {
+          layout: DatabaseLayout.Timeline,
+          timeline: { startFieldId: "start", endFieldId: "end", zoom: "week" },
+        },
+      })
+    );
+    expect(
+      container.querySelector("[aria-label='Go to the start']")
+    ).toBeNull();
+
+    const bar = container.querySelector<HTMLElement>(
+      "[aria-label^='Maquettes,']"
+    );
+    const scroller = container.querySelector("[aria-busy]")?.lastElementChild;
+    await act(async () => {
+      if (scroller && bar) {
+        scroller.scrollLeft = parseFloat(bar.style.left) + 2 * 64;
+        scroller.dispatchEvent(new Event("scroll"));
+      }
+    });
+    const back = container.querySelector<HTMLElement>(
+      "[aria-label='Go to the start']"
+    );
+    expect(back).not.toBeNull();
+    expect(back?.parentElement?.textContent).toContain("Maquettes");
+    expect(
+      container.querySelectorAll("[aria-label='Go to the end']").length
+    ).toBeGreaterThan(0);
+
+    act(() => back?.click());
+    expect(scrollTo).toHaveBeenCalledWith({
+      left: parseFloat(bar?.style.left ?? "0") - 64,
+      behavior: "smooth",
+    });
+  });
 });

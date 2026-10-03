@@ -1,7 +1,7 @@
 import { blockChrome } from "./blockChrome";
 
 describe("blockChrome", () => {
-  it("draws a full-page database without a name", () => {
+  it("draws no name on a full-page database", () => {
     expect(
       blockChrome({ fullPage: true, hideTitle: false, viewCount: 1 })
     ).toEqual({ showHeading: false, headingAbove: false });
@@ -19,9 +19,9 @@ describe("blockChrome", () => {
     ).toEqual({ showHeading: true, headingAbove: true });
   });
 
-  it("draws the tabs of a block without a name in place of the name", () => {
+  it("draws the tabs alone of a block without a name", () => {
     expect(
-      blockChrome({ fullPage: false, hideTitle: true, viewCount: 1 })
+      blockChrome({ fullPage: false, hideTitle: true, viewCount: 2 })
     ).toEqual({ showHeading: false, headingAbove: false });
   });
 });

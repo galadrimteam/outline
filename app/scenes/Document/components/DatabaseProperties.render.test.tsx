@@ -151,6 +151,15 @@ describe("DatabaseProperties", () => {
     ).not.toBeNull();
   });
 
+  it("draws property lines 38 px high, as Notion", async () => {
+    await render({}, false);
+    const value = container.querySelector("[data-cell-host]");
+    expect(value && getComputedStyle(value).minHeight).toBe("38px");
+    expect(
+      value?.parentElement && getComputedStyle(value.parentElement).minHeight
+    ).toBe("38px");
+  });
+
   it("hides empty properties behind a toggle, read-only for readers", async () => {
     await render({ pageLayout: { hideWhenEmptyFieldIds: ["notes"] } }, true);
     const text = container.textContent ?? "";

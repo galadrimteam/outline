@@ -44,6 +44,8 @@ interface Props {
   /** Whether rows can be dragged to a new place (no sort on the view). */
   draggable: boolean;
   isSelected: boolean;
+  /** Whether the row's page is open in the side peek. */
+  isPeeked: boolean;
   /** Whether some rows are selected: every row then shows its checkbox. */
   selecting: boolean;
   /** The active column of this row, when the active cell is in it. */
@@ -97,6 +99,7 @@ export const TableRow = observer(function TableRow_({
   readOnly,
   draggable,
   isSelected,
+  isPeeked,
   selecting,
   activeFieldId,
   isEditing,
@@ -150,6 +153,7 @@ export const TableRow = observer(function TableRow_({
       data-index={index}
       $template={template}
       $selected={isSelected}
+      $peeked={isPeeked}
       $dropSide={dropSide}
       style={{
         transform: `translateY(${start}px)`,
@@ -218,6 +222,7 @@ export const TableRow = observer(function TableRow_({
           column={column}
           record={record}
           isActive={activeFieldId === column.field.id}
+          isPeeked={isPeeked}
           isEditing={isEditing && activeFieldId === column.field.id}
           initialInput={
             activeFieldId === column.field.id ? editInput : undefined

@@ -1,10 +1,13 @@
 import { EmailIcon, LinkIcon } from "outline-icons";
 import Icon from "@shared/components/Icon";
 import type { DatabaseField } from "@shared/databases/types";
-import { DatabaseStatusGroup } from "@shared/databases/types";
+import {
+  DatabaseFieldType,
+  DatabaseStatusGroup,
+} from "@shared/databases/types";
 import { FieldTypeIcon } from "../toolbar/icons";
 import type { FieldKindId } from "./fieldTypes";
-import { FIELD_KINDS, fieldKindOf } from "./fieldTypes";
+import { FIELD_KINDS, fieldKindOf, isEditTimeFormula } from "./fieldTypes";
 
 interface Props {
   /** The property kind, or an existing property. */
@@ -15,7 +18,8 @@ interface Props {
 
 /**
  * The icon of a property kind: the icon given to the property, else the type icon, with links,
- * e-mails and phones told apart from plain text.
+ * e-mails and phones told apart from plain text, and the clock of Notion's created and edited
+ * times on the formulas that stand for them.
  *
  * @param props the kind or the property, and the size.
  * @returns the icon.
@@ -46,6 +50,14 @@ export function FieldKindIcon({ kind, field, size = 18 }: Props) {
       break;
   }
 
+  if (field && isEditTimeFormula(field)) {
+    return (
+      <FieldTypeIcon
+        field={{ type: DatabaseFieldType.CreatedTime }}
+        size={size}
+      />
+    );
+  }
   if (field) {
     return <FieldTypeIcon field={field} size={size} />;
   }

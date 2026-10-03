@@ -99,6 +99,8 @@ export const Body = styled.div`
 /** A row line, positioned by the virtualizer. */
 export const RowLine = styled(Line)<{
   $selected?: boolean;
+  /** The row whose page is open in the side peek, framed as in Notion. */
+  $peeked?: boolean;
   $dropSide?: "before" | "after";
 }>`
   position: absolute;
@@ -113,6 +115,24 @@ export const RowLine = styled(Line)<{
     css`
       box-shadow: inset 0 ${props.$dropSide === "before" ? "2px" : "-2px"} 0
         ${props.theme.accent};
+    `}
+
+  ${(props) =>
+    props.$peeked &&
+    css`
+      &::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 -1px ${GUTTER_WIDTH}px;
+        border: 2px solid ${props.theme.accent};
+        border-radius: 3px;
+        z-index: 4;
+        pointer-events: none;
+      }
+
+      [data-open-button] {
+        opacity: 1;
+      }
     `}
 
   &:hover [data-gutter-control] {

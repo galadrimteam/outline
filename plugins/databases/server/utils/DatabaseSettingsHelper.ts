@@ -180,6 +180,7 @@ export class DatabaseSettingsHelper {
         hideWhenEmptyFieldIds: without(layout.hideWhenEmptyFieldIds),
         fieldOrder: without(layout.fieldOrder),
         pinnedFieldIds: without(layout.pinnedFieldIds),
+        omittedFieldIds: without(layout.omittedFieldIds),
         tabs: layout.tabs?.filter((tab) => tab.fieldId !== fieldId),
       };
     }

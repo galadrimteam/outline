@@ -75,7 +75,7 @@ export function clampColumnWidth(width: number): number {
 
 /**
  * The visible columns of a table view, in the view's order, with their width, frozen state and
- * wrapping. Columns up to `options.frozenFieldId` are frozen; without it, the first column is.
+ * wrapping. Columns up to `options.frozenFieldId` are frozen; without it none is, as in Notion.
  *
  * @param fields the database fields.
  * @param view the view.
@@ -90,10 +90,9 @@ export function tableColumns(
   const visible = orderedFields(fields, view).filter((field) =>
     isFieldVisible(view, field)
   );
-  const frozenIndex = Math.max(
-    visible.findIndex((field) => field.id === view.options.frozenFieldId),
-    0
-  );
+  const frozenIndex = view.options.frozenFieldId
+    ? visible.findIndex((field) => field.id === view.options.frozenFieldId)
+    : -1;
 
   let left = GUTTER_WIDTH;
   return visible.map((field, index) => {
@@ -138,6 +137,28 @@ export function frozenEdge(columns: TableColumn[]): number {
     (edge, column) =>
       column.frozen ? Math.max(edge, column.left + column.width) : edge,
     GUTTER_WIDTH
+  );
+}
+
+/**
+ * The columns as they can be frozen in the width the table has: when the frozen columns would
+ * take more than half of it, none stays in place, since the others could not be read sliding
+ * under them.
+ *
+ * @param columns the columns of the table.
+ * @param visibleWidth the width the table is seen in, gutter included; 0 when not measured.
+ * @returns the columns, unfrozen when they do not fit.
+ */
+export function fitFrozenColumns(
+  columns: TableColumn[],
+  visibleWidth: number
+): TableColumn[] {
+  const frozenWidth = frozenEdge(columns) - GUTTER_WIDTH;
+  if (!visibleWidth || frozenWidth <= (visibleWidth - GUTTER_WIDTH) / 2) {
+    return columns;
+  }
+  return columns.map((column) =>
+    column.frozen ? { ...column, frozen: false } : column
   );
 }
 
