@@ -138,6 +138,14 @@ export default class SelectionToolbarExtension extends Extension {
       return selection;
     }
 
+    // galadrim: a database held by a notice draws its own toolbar.
+    if (
+      selection instanceof NodeSelection &&
+      selection.node.type.name === "database"
+    ) {
+      return false;
+    }
+
     if (isInNotice(state) && selection.from > 0) {
       return selection;
     }

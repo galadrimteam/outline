@@ -127,6 +127,30 @@ describe("Database node", () => {
       expect(findNodes(doc, "database")).toHaveLength(0);
     });
 
+    it("sits in a notice, as a database sits in a Notion callout", () => {
+      const markdown = `:::default 📝\n## Liste des devis\n\n[Projets](/db/${databaseId})\n:::`;
+      const doc = parser.parse(markdown);
+      const notice = findNodes(doc?.toJSON(), "container_notice")[0];
+
+      expect(notice?.content?.map((node) => node.type)).toEqual([
+        "heading",
+        "database",
+      ]);
+      expect(() => doc?.check()).not.toThrow();
+      const again = doc && parser.parse(serializer.serialize(doc));
+      expect(
+        findNodes(again?.toJSON(), "container_notice")[0]?.content?.map(
+          (node) => node.attrs?.databaseId ?? node.type
+        )
+      ).toEqual(["heading", databaseId]);
+    });
+
+    it("is only claimed at the top level and in a notice", () => {
+      const doc = parseToJSON(`> [Roadmap](/db/${databaseId})`);
+
+      expect(findNodes(doc, "database")).toHaveLength(0);
+    });
+
     it("is not claimed with other text in the paragraph", () => {
       const doc = parseToJSON(`see [Roadmap](/db/${databaseId}) here`);
 
