@@ -534,7 +534,7 @@ describe("TableView", () => {
     await render(makeView({ id: "viwTable11" }));
     await wait(80);
 
-    const notes = container.querySelectorAll("[role='note']");
+    const notes = container.querySelectorAll("[aria-label^='5 comment']");
     expect(notes).toHaveLength(1);
     expect(notes[0].closest("[data-cell]")?.getAttribute("data-cell")).toBe(
       "rec1:name"
