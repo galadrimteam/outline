@@ -400,6 +400,75 @@ describe("database views", () => {
     expect(container.textContent).toContain("🧱");
   });
 
+  const checkboxesOf = (card: Element | undefined) =>
+    Array.from(card?.querySelectorAll("[aria-checked]") ?? []).map(
+      (box) =>
+        `${box.getAttribute("aria-checked")} ${box.parentElement?.textContent}`
+    );
+
+  it("draws a checkbox on gallery cards with its property name, checked or not, as Notion", async () => {
+    await render(
+      GalleryView,
+      makeView({
+        type: "gallery",
+        layout: DatabaseLayout.Gallery,
+        columnMeta: { done: { order: 1, visible: true } },
+      })
+    );
+    const card = (title: string) =>
+      Array.from(container.querySelectorAll("[role='button']")).find((node) =>
+        node.querySelector("div")?.textContent?.includes(title)
+      );
+    expect(checkboxesOf(card("Maquettes"))).toEqual(["true Inclus"]);
+    expect(checkboxesOf(card("Intégration"))).toEqual(["false Inclus"]);
+  });
+
+  it("draws a checkbox on board cards with its property name, checked or not, as Notion", async () => {
+    await render(
+      BoardView,
+      makeView({
+        type: "kanban",
+        layout: DatabaseLayout.Board,
+        options: { stackFieldId: "status" },
+        columnMeta: { done: { order: 1, visible: true } },
+      })
+    );
+    await settle();
+    expect(checkboxesOf(cardOf("Maquettes"))).toEqual(["true Inclus"]);
+    expect(checkboxesOf(cardOf("Intégration"))).toEqual(["false Inclus"]);
+  });
+
+  it("puts Notion's page glyph before the title of a written page without an icon, nothing before a row without a page", async () => {
+    const rows: DatabaseRecord[] = [
+      {
+        id: "recWritten",
+        fields: { name: "Écrite", status: "À faire" },
+        documentId: "50000000-0000-4000-8000-000000000009",
+      },
+      { id: "recBlank", fields: { name: "Vierge", status: "À faire" } },
+    ];
+    vi.mocked(client.post).mockResolvedValue({
+      data: rows,
+      pagination: { offset: 0, limit: 100, total: rows.length },
+    });
+    await render(
+      GalleryView,
+      makeView({
+        id: "viwGlyph",
+        type: "gallery",
+        layout: DatabaseLayout.Gallery,
+      })
+    );
+    const heading = (title: string) =>
+      Array.from(container.querySelectorAll("[role='button'] > div")).find(
+        (node) => node.textContent?.includes(title)
+      )?.firstElementChild;
+    expect(
+      heading("Écrite")?.querySelector("[aria-hidden] svg")
+    ).not.toBeNull();
+    expect(heading("Vierge")?.querySelector("svg")).toBeNull();
+  });
+
   it("draws a list", async () => {
     await render(
       ListView,

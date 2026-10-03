@@ -1,7 +1,7 @@
 import { CheckmarkIcon } from "outline-icons";
 import * as React from "react";
 import styled from "styled-components";
-import { s } from "@shared/styles";
+import { ellipsis, s } from "@shared/styles";
 import { isWritable } from "./editable";
 import { toArray } from "./format";
 import type {
@@ -20,18 +20,49 @@ export const checkboxCell: CellDefinition = {
 /**
  * Draws a checkbox, checked or not.
  *
- * @param props whether it is checked.
+ * @param props whether it is checked, and `small` for the 14px box of Notion's cards.
  * @returns the checkbox.
  */
-export function CheckboxBox({ checked }: { checked: boolean }) {
+export function CheckboxBox({
+  checked,
+  small = false,
+}: {
+  checked: boolean;
+  small?: boolean;
+}) {
   return (
-    <Box role="img" aria-checked={checked} $checked={checked}>
-      {checked && <CheckmarkIcon size={16} color="currentColor" />}
+    <Box role="img" aria-checked={checked} $checked={checked} $small={small}>
+      {checked && <CheckmarkIcon size={small ? 14 : 16} color="currentColor" />}
     </Box>
   );
 }
 
-function CheckboxRenderer({ value }: CellRendererProps) {
+/**
+ * The checkbox of a card, followed by the name of its property as Notion's
+ * cards draw it, checked or not: the box alone would not say what it is.
+ *
+ * @param props whether it is checked and the property's name.
+ * @returns the checkbox and its name.
+ */
+export function CardCheckbox({
+  checked,
+  name,
+}: {
+  checked: boolean;
+  name: string;
+}) {
+  return (
+    <Labelled>
+      <CheckboxBox checked={checked} small />
+      <Name>{name}</Name>
+    </Labelled>
+  );
+}
+
+function CheckboxRenderer({ value, field, variant }: CellRendererProps) {
+  if (variant === "card" && !Array.isArray(value)) {
+    return <CardCheckbox checked={value === true} name={field.name} />;
+  }
   const items = toArray(value);
   if (items.length > 1) {
     return (
@@ -45,7 +76,13 @@ function CheckboxRenderer({ value }: CellRendererProps) {
   return <CheckboxBox checked={value === true} />;
 }
 
-function CheckboxEditor({ value, onChange, onClose }: CellEditorProps) {
+function CheckboxEditor({
+  value,
+  field,
+  variant,
+  onChange,
+  onClose,
+}: CellEditorProps) {
   const toggled = React.useRef(false);
 
   React.useEffect(() => {
@@ -58,7 +95,11 @@ function CheckboxEditor({ value, onChange, onClose }: CellEditorProps) {
     onClose();
   }, [value, onChange, onClose]);
 
-  return <CheckboxBox checked={value !== true} />;
+  return variant === "card" ? (
+    <CardCheckbox checked={value !== true} name={field.name} />
+  ) : (
+    <CheckboxBox checked={value !== true} />
+  );
 }
 
 const Row = styled.span`
@@ -66,17 +107,37 @@ const Row = styled.span`
   gap: 4px;
 `;
 
-const Box = styled.span<{ $checked: boolean }>`
+// Notion's card: a 14px box with a 1px border, 6px before the property's name in the text colour.
+const Labelled = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  line-height: 14px;
+`;
+
+const Name = styled.span`
+  min-width: 0;
+  color: ${s("text")};
+  ${ellipsis()}
+`;
+
+const Box = styled.span<{ $checked: boolean; $small: boolean }>`
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
+  width: ${(props) => (props.$small ? 14 : 16)}px;
+  height: ${(props) => (props.$small ? 14 : 16)}px;
   border-radius: 3px;
   vertical-align: middle;
   color: ${s("white")};
   background: ${(props) => (props.$checked ? props.theme.accent : "transparent")};
-  border: 1.5px solid
-    ${(props) => (props.$checked ? props.theme.accent : props.theme.textTertiary)};
+  border: ${(props) => (props.$small ? 1 : 1.5)}px solid
+    ${(props) =>
+      props.$checked
+        ? props.theme.accent
+        : props.$small
+          ? props.theme.inputBorder
+          : props.theme.textTertiary};
 `;
