@@ -22,6 +22,9 @@ import Team from "./Team";
 import User from "./User";
 import ParanoidModel from "./base/ParanoidModel";
 
+/** SQL condition on a database: it keeps its row pages in the collection's tree. */
+const keepsRowsInTree = `"settings" @> '{"rowsInSidebar": true}'`;
+
 /**
  * A database: an engine table (Teable) shown natively in Outline. Its rights
  * follow its anchor, the home document when there is one, else the collection.
@@ -75,8 +78,12 @@ class Database extends ParanoidModel<
     const inTree = await this.findAll({
       attributes: ["id"],
       where: {
-        id: [...new Set(rowPages.map((document) => document.databaseId!))],
-        settings: { [Op.contains]: { rowsInSidebar: true } },
+        [Op.and]: [
+          {
+            id: [...new Set(rowPages.map((document) => document.databaseId!))],
+          },
+          literal(keepsRowsInTree),
+        ],
       },
       transaction: options.transaction,
     });
@@ -101,7 +108,7 @@ class Database extends ParanoidModel<
         {
           databaseId: {
             [Op.in]: literal(
-              `(SELECT "id" FROM "databases" WHERE "deletedAt" IS NULL AND "settings" @> '{"rowsInSidebar": true}')`
+              `(SELECT "id" FROM "databases" WHERE "deletedAt" IS NULL AND ${keepsRowsInTree})`
             ),
           },
         },
