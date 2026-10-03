@@ -298,6 +298,9 @@ const zFieldMeta = z.object({
     .optional(),
   endFieldId: zIdOrEmpty,
   icon: z.string().min(1).max(100).optional(),
+  standsFor: z
+    .enum([DatabaseFieldType.CreatedBy, DatabaseFieldType.LastModifiedBy])
+    .optional(),
 });
 
 const zPageTab = z

@@ -18,8 +18,8 @@ interface Props {
 
 /**
  * The icon of a property kind: the icon given to the property, else the type icon, with links,
- * e-mails and phones told apart from plain text, and the clock of Notion's created and edited
- * times on the formulas that stand for them.
+ * e-mails and phones told apart from plain text, and the icons of Notion's created and edited
+ * times and people on the formulas and person fields that stand for them.
  *
  * @param props the kind or the property, and the size.
  * @returns the icon.
@@ -50,6 +50,9 @@ export function FieldKindIcon({ kind, field, size = 18 }: Props) {
       break;
   }
 
+  if (field?.meta?.standsFor) {
+    return <FieldTypeIcon field={{ type: field.meta.standsFor }} size={size} />;
+  }
   if (field && isEditTimeFormula(field)) {
     return (
       <FieldTypeIcon

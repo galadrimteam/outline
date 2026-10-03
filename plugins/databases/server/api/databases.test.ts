@@ -485,7 +485,10 @@ describe("#databases.update", () => {
             fieldOrder: ["fldStatusAAAAAAAAAA", "fldIconAAAAAAAAAAAA"],
             pinnedFieldIds: ["fldStatusAAAAAAAAAA"],
           },
-          fieldMeta: { fldStatusAAAAAAAAAA: { icon: "💵" } },
+          fieldMeta: {
+            fldStatusAAAAAAAAAA: { icon: "💵" },
+            fldCreatorAAAAAAAAA: { standsFor: "createdBy" },
+          },
           subItemFieldId: "fldSubItems",
         },
       },
@@ -504,7 +507,10 @@ describe("#databases.update", () => {
         fieldOrder: ["fldStatusAAAAAAAAAA", "fldIconAAAAAAAAAAAA"],
         pinnedFieldIds: ["fldStatusAAAAAAAAAA"],
       },
-      fieldMeta: { fldStatusAAAAAAAAAA: { icon: "💵" } },
+      fieldMeta: {
+        fldStatusAAAAAAAAAA: { icon: "💵" },
+        fldCreatorAAAAAAAAA: { standsFor: "createdBy" },
+      },
       subItemFieldId: "fldSubItems",
     });
   });

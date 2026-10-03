@@ -109,6 +109,11 @@ export interface DatabaseFieldMeta {
   endFieldId?: string;
   /** The icon shown instead of the type icon: an emoji, an icon name or a custom emoji id. */
   icon?: string;
+  /**
+   * The computed type this field holds the imported values of: Notion's « Created by » and « Last
+   * edited by » come in as person fields, as the engine fills those types from its own rows.
+   */
+  standsFor?: DatabaseFieldType.CreatedBy | DatabaseFieldType.LastModifiedBy;
 }
 
 /** Where a lookup field or a rollup reads: through a link of its table, a field of the linked table. */
