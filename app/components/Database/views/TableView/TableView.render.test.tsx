@@ -183,6 +183,8 @@ describe("TableView", () => {
       settings?: DatabaseSettings;
       fields?: DatabaseField[];
       params?: RecordQueryParams;
+      /** Where the page is, eg with a row page open beside it. */
+      location?: string;
     } = {}
   ) {
     const database = stores.databases.add({
@@ -204,7 +206,7 @@ describe("TableView", () => {
     await act(async () => {
       root.render(
         <Provider rootStore={stores}>
-          <MemoryRouter>
+          <MemoryRouter initialEntries={[options.location ?? "/"]}>
             <ThemeProvider theme={light}>
               <ActionContextProvider>
                 <DatabaseBlockContext.Provider
@@ -254,6 +256,30 @@ describe("TableView", () => {
     expect(container.textContent).toContain("Maquettes");
     expect(container.textContent).toContain("Terminé");
     expect(container.textContent).toMatch(/2[.,]0/);
+  });
+
+  it("frames the row open in the side peek, its « Open » turned into « Close »", async () => {
+    stores.documents.add({
+      id: "50000000-0000-4000-8000-000000000002",
+      urlId: "Av5Nm6egXn",
+      title: "Intégration",
+      databaseId,
+      databaseRecordId: "rec2",
+    });
+    await render(makeView({ id: "viwTablePeek" }), {
+      location: `/doc/suivi-x7Yk2LmQpA?split=${encodeURIComponent(
+        "/doc/integration-Av5Nm6egXn"
+      )}`,
+    });
+    const rows = Array.from(
+      container.querySelectorAll<HTMLElement>("[role='row'][data-index]")
+    );
+    const buttons = rows.map(
+      (row) => row.querySelector("[data-open-button]")?.textContent
+    );
+    expect(buttons).toEqual(["Open", "Close", "Open"]);
+    expect(rows[1].className).not.toBe(rows[0].className);
+    expect(rows[2].className).toBe(rows[0].className);
   });
 
   it("edits a text cell in place and saves it", async () => {

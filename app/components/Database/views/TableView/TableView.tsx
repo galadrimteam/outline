@@ -35,6 +35,7 @@ import { cellValueToText } from "../../cells/format";
 import { getCell } from "../../cells/registry";
 import { orderPatch, orderedFields } from "../../toolbar/columns";
 import type { DatabaseViewProps } from "../../types";
+import { usePeekedRecordId } from "../../rowPeek";
 import { useElementWidth } from "../../useElementWidth";
 import { GroupAddRow, GroupHeaderRow, PositionedLine } from "./GroupRows";
 import {
@@ -136,6 +137,7 @@ export const TableView = observer(function TableView_({
   const [drop, setDrop] = React.useState<DropTarget | null>(null);
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
   const [scrolled, setScrolled] = React.useState(false);
+  const peekedId = usePeekedRecordId(database.id);
 
   React.useLayoutEffect(() => {
     editingRef.current = editing;
@@ -1012,6 +1014,7 @@ export const TableView = observer(function TableView_({
                     readOnly={readOnly}
                     draggable={draggable && row.level === 0}
                     isSelected={selectedIds.includes(row.record.id)}
+                    isPeeked={peekedId === row.record.id}
                     selecting={!readOnly && selectedIds.length > 0}
                     activeFieldId={
                       active?.recordId === row.record.id

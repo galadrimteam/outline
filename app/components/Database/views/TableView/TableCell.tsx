@@ -12,6 +12,7 @@ import { getCell } from "../../cells/registry";
 import { cellHostProps } from "../../cells/components/EditorPopover";
 import { CommentCount } from "../../comments/CommentCount";
 import { RowIcon } from "../../RowIcon";
+import { closeRowPeek } from "../../rowPeek";
 import type { TableColumn } from "./layout";
 import { Cell, OpenButton } from "./styles";
 
@@ -20,6 +21,8 @@ interface Props {
   column: TableColumn;
   record: DatabaseRecord;
   isActive: boolean;
+  /** Whether the row's page is open in the side peek: « Open » then closes it. */
+  isPeeked: boolean;
   isEditing: boolean;
   /** What the reader typed on the cell to start editing it. */
   initialInput?: string;
@@ -61,6 +64,7 @@ export const TableCell = observer(function TableCell_({
   column,
   record,
   isActive,
+  isPeeked,
   isEditing,
   initialInput,
   scrollMarginLeft,
@@ -99,9 +103,13 @@ export const TableCell = observer(function TableCell_({
   const handleOpen = React.useCallback(
     (event: React.MouseEvent) => {
       event.stopPropagation();
+      if (isPeeked) {
+        closeRowPeek();
+        return;
+      }
       onOpenRecord(record.id);
     },
-    [onOpenRecord, record.id]
+    [isPeeked, onOpenRecord, record.id]
   );
 
   const Editor = cell.Editor;
@@ -162,11 +170,11 @@ export const TableCell = observer(function TableCell_({
         <OpenButton
           type="button"
           data-open-button
-          aria-label={t("Open page")}
+          aria-label={isPeeked ? t("Close page") : t("Open page")}
           onClick={handleOpen}
         >
           <SidebarIcon size={16} />
-          {t("Open")}
+          {isPeeked ? t("Close") : t("Open")}
         </OpenButton>
       )}
     </Cell>

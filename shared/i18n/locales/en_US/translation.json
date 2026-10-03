@@ -737,6 +737,7 @@
   "{{ count }} months": "{{ count }} months",
   "{{ count }} months_plural": "{{ count }} months",
   "Open page": "Open page",
+  "Close page": "Close page",
   "Calculate": "Calculate",
   "Select all": "Select all",
   "Add a row below": "Add a row below",
