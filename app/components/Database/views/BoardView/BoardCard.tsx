@@ -19,7 +19,6 @@ import { createAction } from "~/actions";
 import { useMenuAction } from "~/hooks/useMenuAction";
 import useStores from "~/hooks/useStores";
 import type Database from "~/models/Database";
-import { isEmptyCell } from "~/stores/DatabaseRecordsStore";
 import { cellTitle } from "../../boardModel";
 import { compactPills } from "../../cells/components/ChoicePill";
 import { CommentCount } from "../../comments/CommentCount";
@@ -29,6 +28,8 @@ import {
   CardHeading,
   cardTitleFontSize,
   cardTitleLineHeight,
+  isShownOnCard,
+  namesItself,
   recordCardColor,
 } from "../GalleryView/cards";
 
@@ -243,10 +244,9 @@ const CardContent = observer(function CardContent({
 }: CardContentProps) {
   const cover = coverOf(record, view);
   const showNames = view.options.isFieldNameHidden === false;
-  const shown = fields.filter((field) => {
-    const value = record.fields[field.id];
-    return !isEmptyCell(value) && value !== false;
-  });
+  const shown = fields.filter((field) =>
+    isShownOnCard(field, record.fields[field.id])
+  );
 
   return (
     <>
@@ -268,7 +268,9 @@ const CardContent = observer(function CardContent({
                 readOnly={readOnly}
                 variant="card"
               >
-                {showNames && <PropertyName>{field.name}</PropertyName>}
+                {showNames && !namesItself(field) && (
+                  <PropertyName>{field.name}</PropertyName>
+                )}
               </Property>
             ))}
           </Properties>

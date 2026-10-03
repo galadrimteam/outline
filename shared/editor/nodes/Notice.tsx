@@ -98,9 +98,10 @@ export default class Notice extends Node {
       // content — a Notion callout whose whole body is its icon, which the
       // rule lifts out — is filled with an empty paragraph. Upstream's order
       // filled it with the first alternative instead, a to-do list, and the
-      // callout showed a checkbox nobody asked for. Same alternatives.
+      // callout showed a checkbox nobody asked for. Upstream's alternatives,
+      // and a database, which a Notion callout may hold.
       content:
-        "(paragraph | list | blockquote | hr | heading | code_block | code_fence | attachment)+",
+        "(paragraph | list | blockquote | hr | heading | code_block | code_fence | attachment | database)+",
       group: "block",
       defining: true,
       draggable: true,
