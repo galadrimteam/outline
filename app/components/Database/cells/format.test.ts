@@ -62,6 +62,24 @@ describe("formatNumber", () => {
     ).toBe("1 235");
   });
 
+  it("leaves thousands together when the field says so, as Notion's « Number »", () => {
+    expect(
+      formatNumber(2775, { type: "decimal", grouping: false }, "fr-FR")
+    ).toBe("2775");
+    expect(
+      spaces(
+        formatNumber(
+          12.345,
+          { type: "percent", precision: 0, grouping: false },
+          "fr-FR"
+        )
+      )
+    ).toBe("1235 %");
+    expect(spaces(formatNumber(2775, { type: "decimal" }, "fr-FR"))).toBe(
+      "2 775"
+    );
+  });
+
   it("keeps every decimal without precision", () => {
     expect(formatNumber(0.125, undefined, "en-US")).toBe("0.125");
   });

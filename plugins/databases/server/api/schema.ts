@@ -349,6 +349,7 @@ const zFieldOptions = z.object({
     .object({
       type: z.enum(["decimal", "percent", "currency"]).optional(),
       precision: z.number().int().min(0).max(10).optional(),
+      grouping: z.boolean().optional(),
       symbol: z.string().max(10).optional(),
       date: z.string().max(100).optional(),
       time: z.string().max(100).optional(),
