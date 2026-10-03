@@ -80,14 +80,17 @@ export function SelectionToolbar(props: Props) {
   const isMobileEditing = isMobile && !readOnly && isEditorFocused;
 
   // galadrim: whether the editor has had the focus since it was mounted. The
-  // selection of a freshly loaded document sits at its start, so a page that
-  // begins with a notice or a code block displayed the block toolbar (notice
-  // type, language) before anyone had clicked anywhere. The current focus state
-  // cannot be used for this: opening a menu of the toolbar blurs the editor.
+  // selection of a freshly loaded document sits on its first text, so a page
+  // that begins with a notice or a code block displayed the block toolbar
+  // (notice type, language), and one whose first text is a link (a database
+  // followed by a notice linking to Notion) its link editor, before anyone had
+  // clicked anywhere. The current focus state cannot be used for this: opening
+  // a menu of the toolbar blurs the editor.
   const hasBeenFocused = React.useRef(false);
   if (isEditorFocused) {
     hasBeenFocused.current = true;
   }
+  const isAwaitingFocus = !readOnly && !hasBeenFocused.current;
   const { state } = view;
   const [autoFocusLinkInput, setAutoFocusLinkInput] = React.useState(false);
   const isDragging = useIsDragging(state);
@@ -108,7 +111,9 @@ export function SelectionToolbar(props: Props) {
   const isNoticeSelection = isInNotice(state);
 
   React.useLayoutEffect(() => {
-    if (!isActive) {
+    // galadrim: no toolbar is chosen before the focus either, or closing the
+    // link editor nobody saw would hand the focus back to the editor.
+    if (!isActive || isAwaitingFocus) {
       setActiveToolbar(null);
       return;
     }
@@ -136,6 +141,7 @@ export function SelectionToolbar(props: Props) {
   }, [
     readOnly,
     isActive,
+    isAwaitingFocus,
     selection,
     linkMark,
     isEmbedSelection,
@@ -222,7 +228,10 @@ export function SelectionToolbar(props: Props) {
     { capture: true }
   );
 
-  if (isDragging) {
+  // galadrim: see hasBeenFocused. Read-only documents are left alone: they
+  // never take the focus, and the toolbar of their code blocks holds the copy
+  // button.
+  if (isDragging || isAwaitingFocus) {
     return null;
   }
 
@@ -302,12 +311,6 @@ export function SelectionToolbar(props: Props) {
     activeToolbar === Toolbar.Menu &&
     items.length
   ) {
-    // galadrim: see hasBeenFocused. Read-only documents are left alone: they
-    // never take the focus, and the toolbar of their code blocks holds the copy
-    // button.
-    if (!readOnly && !hasBeenFocused.current) {
-      return null;
-    }
     return <StickyBlockToolbar ref={menuRef} items={items} rtl={rtl} />;
   }
 
