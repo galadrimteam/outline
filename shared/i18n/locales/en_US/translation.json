@@ -761,6 +761,8 @@
   "{{ count }} sub-items": "{{ count }} sub-item",
   "{{ count }} sub-items_plural": "{{ count }} sub-items",
   "Drag to move, drag an edge to change a date": "Drag to move, drag an edge to change a date",
+  "Go to the start": "Go to the start",
+  "Go to the end": "Go to the end",
   "Couldn’t move the view": "Couldn’t move the view",
   "Couldn’t add the view": "Couldn’t add the view",
   "Couldn’t rename the view": "Couldn’t rename the view",
