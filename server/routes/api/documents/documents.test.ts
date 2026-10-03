@@ -979,6 +979,40 @@ describe("#documents.list", () => {
     ).toEqual(database.id);
   });
 
+  it("should list the row pages a database keeps in the tree among the children of a document", async () => {
+    const user = await buildUser();
+    const collection = await buildCollection({
+      userId: user.id,
+      teamId: user.teamId,
+    });
+    const parent = await buildDocument({
+      userId: user.id,
+      teamId: user.teamId,
+      collectionId: collection.id,
+    });
+    const database = await buildDatabase({
+      teamId: user.teamId,
+      documentId: parent.id,
+      settings: { rowsInSidebar: true },
+    });
+    const row = await buildDocument({
+      userId: user.id,
+      teamId: user.teamId,
+      collectionId: collection.id,
+      parentDocumentId: parent.id,
+      databaseId: database.id,
+      databaseRecordId: "rec1",
+    });
+
+    const res = await server.post("/api/documents.list", user, {
+      body: { parentDocumentId: parent.id },
+    });
+    expect(res.status).toEqual(200);
+    expect((await res.json()).data.map((d: { id: string }) => d.id)).toEqual([
+      row.id,
+    ]);
+  });
+
   it("should not return draft documents", async () => {
     const user = await buildUser();
     await buildDraftDocument({

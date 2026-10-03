@@ -1,6 +1,11 @@
 import type { Job } from "bull";
 import { DatabaseLayout, DatabaseStatusGroup } from "@shared/databases/types";
-import { Database, DatabaseAutomation, Document } from "@server/models";
+import {
+  Collection,
+  Database,
+  DatabaseAutomation,
+  Document,
+} from "@server/models";
 import { BaseTask } from "@server/queues/tasks/base/BaseTask";
 import {
   buildAdmin,
@@ -562,6 +567,53 @@ describe("#databases.update", () => {
     });
 
     expect(res.status).toEqual(400);
+  });
+
+  it("puts the row pages in the sidebar and takes them out again", async () => {
+    const user = await buildUser();
+    const collection = await buildCollection({
+      teamId: user.teamId,
+      userId: user.id,
+    });
+    const home = await buildDocument({
+      teamId: user.teamId,
+      userId: user.id,
+      collectionId: collection.id,
+    });
+    const database = await buildDatabase({
+      teamId: user.teamId,
+      documentId: home.id,
+    });
+    const row = await buildDocument({
+      teamId: user.teamId,
+      userId: user.id,
+      collectionId: collection.id,
+      parentDocumentId: home.id,
+      databaseId: database.id,
+      databaseRecordId: "recOne",
+    });
+    const tree = async () =>
+      (
+        await Collection.findByPk(collection.id, {
+          includeDocumentStructure: true,
+          rejectOnEmpty: true,
+        })
+      ).getDocumentTree(home.id)?.children ?? [];
+    expect(await tree()).toEqual([]);
+
+    const on = await server.post("/api/databases.update", user, {
+      body: { id: database.id, settings: { rowsInSidebar: true } },
+    });
+    expect(on.status).toEqual(200);
+    expect((await on.json()).data.settings.rowsInSidebar).toEqual(true);
+    expect((await tree()).map((node) => node.id)).toEqual([row.id]);
+
+    const off = await server.post("/api/databases.update", user, {
+      body: { id: database.id, settings: { rowsInSidebar: false } },
+    });
+    expect(off.status).toEqual(200);
+    expect((await off.json()).data.settings.rowsInSidebar).toBeUndefined();
+    expect(await tree()).toEqual([]);
   });
 
   it("forbids a viewer", async () => {
