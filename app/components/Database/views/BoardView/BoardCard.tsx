@@ -32,6 +32,7 @@ import {
   namesItself,
   recordCardColor,
 } from "../GalleryView/cards";
+import { borderBox } from "./styles";
 
 /** Drag data of a card, read by the board's collision detection. */
 export interface CardDragData {
@@ -529,6 +530,7 @@ const Properties = styled.div`
 `;
 
 const Property = styled(CardProperty)`
+  ${borderBox}
   display: flex;
   flex-direction: column;
   justify-content: center;
