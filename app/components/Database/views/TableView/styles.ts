@@ -11,7 +11,8 @@ export const HEADER_HEIGHT = 36;
 export const FOOTER_HEIGHT = 34;
 
 // The gutter lies in the page margin, like Notion's row handles: lines start
-// where the columns do.
+// where the columns do. A line runs under every column, over the background of
+// the frozen ones, which would otherwise hide it under the title column.
 const gridLine = css`
   position: relative;
 
@@ -21,9 +22,16 @@ const gridLine = css`
     left: ${GUTTER_WIDTH}px;
     right: 0;
     bottom: 0;
+    z-index: 2;
     border-bottom: 1px solid
       ${(props) => transparentize(0.2, props.theme.divider)};
     pointer-events: none;
+  }
+`;
+
+const noLine = css`
+  &::after {
+    display: none;
   }
 `;
 
@@ -73,20 +81,10 @@ export const Line = styled.div<{ $template: string }>`
   ${gridLine}
 `;
 
-/** The line of column headers. */
+/** The line of column headers: as in Notion, no rule above it nor between its cells. */
 export const HeaderLine = styled(Line)`
   height: ${HEADER_HEIGHT}px;
   color: ${s("textTertiary")};
-
-  &::before {
-    content: "";
-    position: absolute;
-    left: ${GUTTER_WIDTH}px;
-    right: 0;
-    top: 0;
-    border-top: 1px solid ${(props) => transparentize(0.2, props.theme.divider)};
-    pointer-events: none;
-  }
 `;
 
 /** The rows container: rows are absolutely positioned inside it. */
@@ -187,7 +185,6 @@ export const HeaderCell = styled.div<{ $frozen?: boolean; $left?: number }>`
   display: flex;
   align-items: center;
   min-width: 0;
-  ${cellLine}
   ${frozen}
 `;
 
@@ -326,6 +323,14 @@ export const SpanningLine = styled.div<{ $template: string }>`
   ${gridLine}
 `;
 
+/**
+ * A spanning line without a rule under it: Notion draws none under a group's
+ * title, nor under the « + New page » that ends a table without groups.
+ */
+export const OpenLine = styled(SpanningLine)`
+  ${noLine}
+`;
+
 /** The content of a spanning line, kept on screen when the table scrolls sideways. */
 export const SpanningContent = styled.div`
   position: sticky;
@@ -366,10 +371,7 @@ export const NewButton = styled.button`
 /** The line of calculations under the rows. */
 export const FooterLine = styled(Line)`
   min-height: ${FOOTER_HEIGHT}px;
-
-  &::after {
-    display: none;
-  }
+  ${noLine}
 `;
 
 /** A calculation cell. */
