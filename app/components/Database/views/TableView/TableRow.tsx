@@ -1,5 +1,6 @@
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { observer } from "mobx-react";
+import { PlusIcon } from "outline-icons";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import type {
@@ -43,6 +44,8 @@ interface Props {
   /** Whether rows can be dragged to a new place (no sort on the view). */
   draggable: boolean;
   isSelected: boolean;
+  /** Whether some rows are selected: every row then shows its checkbox. */
+  selecting: boolean;
   /** The active column of this row, when the active cell is in it. */
   activeFieldId?: string;
   isEditing: boolean;
@@ -53,6 +56,13 @@ interface Props {
   subItems?: RowSubItems;
   measureElement: (element: Element | null) => void;
   onToggleSelected: (recordId: string, event: React.MouseEvent) => void;
+  /** A click on the drag handle, which selects the row as in Notion. */
+  onSelectRow: (
+    recordId: string,
+    event: React.MouseEvent | React.KeyboardEvent
+  ) => void;
+  /** Adds a row under this one; absent when the reader cannot add rows. */
+  onInsertBelow?: (recordId: string) => void;
   onActivate: (recordId: string, fieldId: string, edit: boolean) => void;
   onChange: (
     recordId: string,
@@ -68,8 +78,8 @@ interface Props {
 }
 
 /**
- * A row of the table: gutter (drag handle, checkbox) and one cell per column. Rows are drop
- * targets for the rows being dragged.
+ * A row of the table: gutter (« + », drag handle, checkbox of a selection) and one cell per
+ * column. Rows are drop targets for the rows being dragged.
  *
  * @param props the row, its columns and its state.
  * @returns the row.
@@ -87,6 +97,7 @@ export const TableRow = observer(function TableRow_({
   readOnly,
   draggable,
   isSelected,
+  selecting,
   activeFieldId,
   isEditing,
   editInput,
@@ -94,6 +105,8 @@ export const TableRow = observer(function TableRow_({
   subItems,
   measureElement,
   onToggleSelected,
+  onSelectRow,
+  onInsertBelow,
   onActivate,
   onChange,
   onChangeFields,
@@ -146,25 +159,55 @@ export const TableRow = observer(function TableRow_({
       }}
     >
       <Gutter role="presentation">
-        {draggable && !readOnly && (
-          <GutterControl
-            ref={drag.setNodeRef}
-            data-gutter-control
-            aria-label={t("Drag to move")}
-            style={{ cursor: "grab", touchAction: "none" }}
-            {...drag.attributes}
-            {...drag.listeners}
-          >
-            <DragHandleIcon />
-          </GutterControl>
-        )}
-        {!readOnly && (
-          <GutterControl data-gutter-control $visible={isSelected}>
+        {selecting && (
+          <GutterControl data-gutter-control $visible>
             <SelectionCheckbox
               checked={isSelected}
               label={t("Select")}
               onClick={(event) => onToggleSelected(record.id, event)}
             />
+          </GutterControl>
+        )}
+        {!readOnly && !selecting && onInsertBelow && (
+          <GutterControl
+            role="button"
+            tabIndex={-1}
+            data-gutter-control
+            aria-label={t("Add a row below")}
+            $width={24}
+            style={{ cursor: "var(--pointer)" }}
+            onClick={(event) => {
+              event.stopPropagation();
+              onInsertBelow(record.id);
+            }}
+          >
+            <PlusIcon size={20} />
+          </GutterControl>
+        )}
+        {!readOnly && (
+          <GutterControl
+            ref={drag.setNodeRef}
+            data-gutter-control
+            {...drag.attributes}
+            role="button"
+            aria-label={
+              draggable ? t("Drag to move, click to select") : t("Select")
+            }
+            $width={18}
+            style={{
+              cursor: draggable ? "grab" : "var(--pointer)",
+              touchAction: "none",
+            }}
+            {...drag.listeners}
+            onClick={(event) => onSelectRow(record.id, event)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onSelectRow(record.id, event);
+              }
+            }}
+          >
+            <DragHandleIcon size={20} />
           </GutterControl>
         )}
       </Gutter>

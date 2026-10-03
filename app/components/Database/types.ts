@@ -1,4 +1,8 @@
-import type { DatabaseCellInput, DatabaseView } from "@shared/databases/types";
+import type {
+  DatabaseCellInput,
+  DatabaseRecordOrder,
+  DatabaseView,
+} from "@shared/databases/types";
 import type Database from "~/models/Database";
 import type { RecordQuery } from "~/stores/DatabaseRecordsStore";
 
@@ -14,8 +18,12 @@ export interface DatabaseViewProps {
   readOnly: boolean;
   /** Opens the row's page. */
   onOpenRecord: (recordId: string) => void;
-  /** Creates a row, optionally prefilled; absent when the reader cannot write. */
+  /**
+   * Creates a row, optionally prefilled and placed next to another one in a view; absent when
+   * the reader cannot write.
+   */
   onCreateRecord?: (
-    fields?: Record<string, DatabaseCellInput>
+    fields?: Record<string, DatabaseCellInput>,
+    order?: DatabaseRecordOrder
   ) => Promise<void>;
 }

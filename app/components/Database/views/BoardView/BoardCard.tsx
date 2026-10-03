@@ -22,8 +22,8 @@ import type Database from "~/models/Database";
 import { isEmptyCell } from "~/stores/DatabaseRecordsStore";
 import { cellTitle } from "../../boardModel";
 import { compactPills } from "../../cells/components/ChoicePill";
-import { getCell } from "../../cells/registry";
 import { CommentCount } from "../../comments/CommentCount";
+import { CardProperty } from "../CardProperty";
 import {
   CardHeading,
   cardTitleFontSize,
@@ -44,6 +44,8 @@ interface CardContentProps {
   record: DatabaseRecord;
   /** The properties shown under the title. */
   fields: DatabaseField[];
+  /** Whether a click on a property may not edit it. */
+  readOnly: boolean;
 }
 
 interface SortableCardProps {
@@ -131,6 +133,7 @@ export const SortableCard = observer(function SortableCard({
         view={view}
         record={record}
         fields={fields}
+        readOnly={readOnly}
       />
       {!readOnly && (
         <CardMenu database={database} record={record} onOpen={onOpen} />
@@ -148,8 +151,11 @@ export const StaticCard = observer(function StaticCard({
   view,
   recordId,
   fields,
+  readOnly = true,
   onOpen,
-}: Omit<SortableCardProps, "container" | "readOnly">) {
+}: Omit<SortableCardProps, "container" | "readOnly"> & {
+  readOnly?: boolean;
+}) {
   const { t } = useTranslation();
   const { databaseRecords } = useStores();
   const record = databaseRecords.recordById(database.id, recordId);
@@ -191,6 +197,7 @@ export const StaticCard = observer(function StaticCard({
         view={view}
         record={record}
         fields={fields}
+        readOnly={readOnly}
       />
     </Card>
   );
@@ -218,6 +225,7 @@ export const CardOverlay = observer(function CardOverlay({
         view={view}
         record={record}
         fields={fields}
+        readOnly
       />
     </Card>
   );
@@ -228,9 +236,14 @@ const CardContent = observer(function CardContent({
   view,
   record,
   fields,
+  readOnly,
 }: CardContentProps) {
   const cover = coverOf(record, view);
   const showNames = view.options.isFieldNameHidden === false;
+  const shown = fields.filter((field) => {
+    const value = record.fields[field.id];
+    return !isEmptyCell(value) && value !== false;
+  });
 
   return (
     <>
@@ -241,26 +254,23 @@ const CardContent = observer(function CardContent({
       )}
       <Body>
         <Title database={database} record={record} />
-        {fields.map((field) => {
-          const value = record.fields[field.id];
-          if (isEmptyCell(value) || value === false) {
-            return null;
-          }
-          const { Renderer } = getCell(field.type);
-          return (
-            <Property key={field.id}>
-              {showNames && <PropertyName>{field.name}</PropertyName>}
-              <Renderer
-                field={field}
-                value={value}
+        {shown.length > 0 && (
+          <Properties>
+            {shown.map((field) => (
+              <Property
+                key={field.id}
                 database={database}
-                variant="card"
+                field={field}
                 record={record}
-              />
-            </Property>
-          );
-        })}
-        <CommentCount
+                readOnly={readOnly}
+                variant="card"
+              >
+                {showNames && <PropertyName>{field.name}</PropertyName>}
+              </Property>
+            ))}
+          </Properties>
+        )}
+        <Comments
           databaseId={database.id}
           recordId={record.id}
           documentId={record.documentId}
@@ -363,7 +373,7 @@ function coverOf(
 }
 
 /** Space above a card's title, in px. */
-const titleTop = 10;
+const titleTop = 8;
 
 const coverHeights: Record<DatabaseCardSize, number> = {
   small: 96,
@@ -397,7 +407,7 @@ const MenuButton = styled.button`
 const MenuAnchor = styled.div`
   position: absolute;
   top: ${titleTop}px;
-  right: 6px;
+  right: 8px;
   display: flex;
   align-items: center;
   height: ${cardTitleFontSize * cardTitleLineHeight}px;
@@ -419,7 +429,7 @@ const Card = styled.div<{
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 10px;
   background: ${(props) => (props.theme.isDark ? "#252525" : props.theme.background)};
   box-shadow: ${(props) =>
     props.theme.isDark
@@ -480,26 +490,43 @@ const Cover = styled.div<{ $size?: DatabaseCardSize; $fit: boolean }>`
   }
 `;
 
+// Notion's card: the title 6px above the properties, each 28px tall with its
+// value 5px in, the comments 6px under them, 8px round the whole.
 const Body = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: ${titleTop}px 12px 12px;
+  padding: ${titleTop}px 10px 8px;
   min-width: 0;
 `;
 
 const Title = styled(CardHeading)`
+  min-height: 24px;
   padding-right: 20px;
 `;
 
-const Property = styled.div`
+const Properties = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  margin: 6px -4px 0;
   min-width: 0;
+`;
+
+const Property = styled(CardProperty)`
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-height: 28px;
+  padding: 5px;
+  border-radius: 5px;
   font-size: 12px;
   line-height: 1.5;
   ${compactPills}
+`;
+
+const Comments = styled(CommentCount)`
+  align-self: flex-start;
+  margin-top: 6px;
 `;
 
 const PropertyName = styled.span`
